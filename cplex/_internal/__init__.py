@@ -1,9 +1,9 @@
 # --------------------------------------------------------------------------
-# File: __init__.py 
+# File: __init__.py
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2016. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -30,15 +30,20 @@ from . import _pycplex
 from . import _parameters_auto
 from . import _anno
 from . import _pwl
+from . import _constantsenum
+from . import _callbackinfoenum
+from . import _solutionstrategyenum
 from ..exceptions import CplexError
 
 __all__ = ["Environment", "_aux_functions", "_list_array_utils",
            "_ostream", "_procedural", "_constants", "_matrices",
            "_parameter_classes", "_subinterfaces", "_pycplex",
-           "_parameters_auto", "_anno", "_pwl"]
+           "_parameters_auto", "_anno", "_pwl", "ProblemType",
+           "_constantsenum",
+           "_callbackinfoenum", "_solutionstrategyenum"]
 
 
-class ProblemType:
+class ProblemType(object):
     """Types of problems the Cplex object can encapsulate.
 
        For explanations of the problem types, see those topics in the
@@ -47,17 +52,18 @@ class ProblemType:
        for MILP, FIXEDMILP, NODELP, NODEQP, MIQCP, NODEQCP.
 
     """
-    LP         = _constants.CPXPROB_LP
-    MILP       = _constants.CPXPROB_MILP
+    LP = _constants.CPXPROB_LP
+    MILP = _constants.CPXPROB_MILP
     fixed_MILP = _constants.CPXPROB_FIXEDMILP
-    node_LP    = _constants.CPXPROB_NODELP
-    QP         = _constants.CPXPROB_QP
-    MIQP       = _constants.CPXPROB_MIQP
+    node_LP = _constants.CPXPROB_NODELP
+    QP = _constants.CPXPROB_QP
+    MIQP = _constants.CPXPROB_MIQP
     fixed_MIQP = _constants.CPXPROB_FIXEDMIQP
-    node_QP    = _constants.CPXPROB_NODEQP
-    QCP        = _constants.CPXPROB_QCP
-    MIQCP      = _constants.CPXPROB_MIQCP
-    node_QCP   = _constants.CPXPROB_NODEQCP
+    node_QP = _constants.CPXPROB_NODEQP
+    QCP = _constants.CPXPROB_QCP
+    MIQCP = _constants.CPXPROB_MIQCP
+    node_QCP = _constants.CPXPROB_NODEQCP
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -93,6 +99,7 @@ class ProblemType:
         if item == _constants.CPXPROB_NODEQCP:
             return 'node_QCP'
 
+
 class Environment(object):
     """non-public"""
     RESULTS_CHNL_IDX = 0
@@ -105,10 +112,10 @@ class Environment(object):
         # Declare and initialize attributes
         self._e = None
         self._lock = None
-        self._streams = {self.RESULTS_CHNL_IDX:None,
-                         self.WARNING_CHNL_IDX:None,
-                         self.ERROR_CHNL_IDX:None,
-                         self.LOG_CHNL_IDX:None}
+        self._streams = {self.RESULTS_CHNL_IDX: None,
+                         self.WARNING_CHNL_IDX: None,
+                         self.ERROR_CHNL_IDX: None,
+                         self.LOG_CHNL_IDX: None}
         self._callback_exception = None
         self._callbacks = []
         self._disposed = False
@@ -177,7 +184,8 @@ class Environment(object):
             for c in self._callbacks:
                 if self._needs_delete_callback(c):
                     num_delete = num_delete + 1
-            old_cb = getattr(self, "_" + cb._cb_type_string + "_callback", None)
+            old_cb = getattr(
+                self, "_" + cb._cb_type_string + "_callback", None)
             if old_cb is not None:
                 self._callbacks.remove(old_cb)
             setattr(self, "_" + cb._cb_type_string + "_callback", cb)
@@ -205,7 +213,8 @@ class Environment(object):
 
         """
         cb = callback_class(self)
-        current_cb = getattr(self, "_" + cb._cb_type_string + "_callback", None)
+        current_cb = getattr(
+            self, "_" + cb._cb_type_string + "_callback", None)
         if current_cb is not None:
             # Count the number of installed callbacks that require
             # need a delete callback
@@ -218,10 +227,12 @@ class Environment(object):
                 # a delete callback.
                 _procedural.delpydel(self._e)
             self._callbacks.remove(current_cb)
+
             class do_nothing(callback_class):
                 def __init__(self, env):
-                    callback_class.__init__(self, env)
+                    super(do_nothing, self).__init__(env)
                     self._unregister = True
+
                 def __call__(self):
                     return
             self.register_callback(do_nothing)
@@ -269,7 +280,7 @@ class Environment(object):
                                 outputfile=results_file,
                                 func=fn,
                                 initerrstr=False)
-    
+
     def set_warning_stream(self, warning_file, fn=None):
         """Specifies where warnings will be printed.
 

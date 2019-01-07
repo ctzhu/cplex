@@ -3,7 +3,7 @@
 # -----------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2016. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -12,9 +12,8 @@
 """
 """
 
-from contextlib import contextmanager
+from ._aux_functions import init_list_args, validate_arg_lengths
 from ..exceptions import CplexError
-from . import _procedural
 from .. import six
 
 
@@ -40,10 +39,7 @@ class SparsePair(object):
 
         >>> spair = SparsePair(ind=[0], val=[1.0])
         """
-        if ind is None:
-            ind = []
-        if val is None:
-            val = []
+        ind, val = init_list_args(ind, val)
         self.ind = ind
         self.val = val
         if not self.isvalid():
@@ -82,17 +78,6 @@ class SparsePair(object):
         >>> ind, val = spair.unpack()
         """
         return self.ind, self.val
-
-
-@contextmanager
-def chbmatrix(lolmat, env_lp, r_c, enc):
-    """See matrix_conversion.c:Pylolmat_to_CHBmat()."""
-    mat = _procedural.Pylolmat_to_CHBmat(lolmat, env_lp, r_c, enc)
-    try:
-        # yields ([matbeg, matind, matval], nnz)
-        yield mat[:-1], mat[-1]
-    finally:
-        _procedural.free_CHBmat(mat)
 
 
 class _HBMatrix(object):
@@ -174,12 +159,7 @@ class SparseTriple(object):
 
         >>> striple = SparseTriple(ind1=[0], ind2=[0], val=[1.0])
         """
-        if ind1 is None:
-            ind1 = []
-        if ind2 is None:
-            ind2 = []
-        if val is None:
-            val = []
+        ind1, ind2, val = init_list_args(ind1, ind2, val)
         self.ind1 = ind1
         self.ind2 = ind2
         self.val = val
@@ -224,3 +204,47 @@ class SparseTriple(object):
         >>> ind1, ind2, val = striple.unpack()
         """
         return self.ind1, self.ind2, self.val
+
+
+def unpack_pair(item):
+    """Extracts the indices and values from an object.
+
+    The argument item can either be an instance of SparsePair or a
+    sequence of length two.
+
+    Example usage:
+
+    >>> sp = SparsePair()
+    >>> ind, val = unpack_pair(sp)
+    >>> lin_expr = [[], []]
+    >>> ind, val = unpack_pair(lin_expr)
+    """
+    try:
+        assert item.isvalid()
+        ind, val = item.unpack()
+    except AttributeError:
+        ind, val = item[0:2]
+    validate_arg_lengths([ind, val])
+    return ind, val
+
+
+def unpack_triple(item):
+    """Extracts the indices and values from an object.
+
+    The argument item can either be an instance of SparseTriple or a
+    sequence of length three.
+
+    Example usage:
+
+    >>> st = SparseTriple()
+    >>> ind1, ind2, val = unpack_triple(st)
+    >>> quad_expr = [[], [], []]
+    >>> ind1, ind2, val = unpack_triple(quad_expr)
+    """
+    try:
+        assert item.isvalid()
+        ind1, ind2, val = item.unpack()
+    except AttributeError:
+        ind1, ind2, val = item[0:3]
+    validate_arg_lengths([ind1, ind2, val])
+    return ind1, ind2, val

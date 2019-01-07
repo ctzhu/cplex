@@ -3,19 +3,19 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2016. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 # ------------------------------------------------------------------------
 """Piecewise Linear API"""
-from ._subinterfaces import IndexedInterface
+from ._subinterfaces import BaseInterface
 from . import _procedural as _proc
 from . import _aux_functions as _aux
 
 
-class PWLConstraintInterface(IndexedInterface):
+class PWLConstraintInterface(BaseInterface):
     """Methods for adding, querying, and modifying PWL constraints.
 
     A PWL constraint describes a piecewise linear relationship between
@@ -31,9 +31,15 @@ class PWLConstraintInterface(IndexedInterface):
     may not have the same x coordinate.
     """
 
-    def _setup(self, cpx):
-        IndexedInterface._setup(self, cpx)
-        self._get_index_function = _proc.getpwlindex
+    def __init__(self, cpx):
+        """Creates a new PWLConstraintInterface.
+
+        The PWL constraint interface is exposed by the top-level `Cplex`
+        class as `Cplex.pwl_constraints`.  This constructor is not meant
+        to be used externally.
+        """
+        super(PWLConstraintInterface, self).__init__(
+            cplex=cpx, getindexfunc=_proc.getpwlindex)
 
     def get_num(self):
         """Returns the number of PWL constraints in the problem.
@@ -97,8 +103,10 @@ class PWLConstraintInterface(IndexedInterface):
         # FIXME: Should we provide defaults for any of the other arguments?
         yidx = self._cplex.variables._conv(vary)
         xidx = self._cplex.variables._conv(varx)
-        nbreaks = _aux.validate_arg_lengths([breakx, breaky],
-                                            allow_empty=False)
+        arg_list = [breakx, breaky]
+        nbreaks = _aux.max_arg_length(arg_list)
+        _aux.validate_arg_lengths(arg_list, allow_empty=False)
+
         def _add(vary, varx, preslope, postslope, breakx, breaky, name):
             _proc.addpwl(self._env._e, self._cplex._lp,
                          vary, varx,
@@ -150,9 +158,9 @@ class PWLConstraintInterface(IndexedInterface):
         >>> c.pwl_constraints.get_num()
         0
         """
-        def _delete(idx):
-            _proc.delpwl(self._env._e, self._cplex._lp, idx, idx)
-        _aux.delete_set(_delete, self._conv, self.get_num(), *args)
+        def _delete(begin, end=None):
+            _proc.delpwl(self._env._e, self._cplex._lp, begin, end)
+        _aux.delete_set_by_range(_delete, self._conv, self.get_num(), *args)
 
     def get_names(self, *args):
         """Returns the names of a set of PWL constraints.
@@ -197,7 +205,7 @@ class PWLConstraintInterface(IndexedInterface):
                 self._env._e, self._cplex._lp, idx,
                 self._env._apienc)
         return _aux.apply_freeform_one_arg(
-            _get_names, self.get_indices, self.get_num(), args)
+            _get_names, self._conv, self.get_num(), args)
 
     def get_definitions(self, *args):
         """Returns the definitions of a set of PWL constraints.
@@ -244,5 +252,5 @@ class PWLConstraintInterface(IndexedInterface):
         """
         def _getpwl(idx):
             return _proc.getpwl(self._env._e, self._cplex._lp, idx)
-        return _aux.apply_freeform_one_arg(_getpwl, self.get_indices,
+        return _aux.apply_freeform_one_arg(_getpwl, self._conv,
                                            self.get_num(), args)

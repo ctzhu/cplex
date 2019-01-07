@@ -1,9 +1,9 @@
 # --------------------------------------------------------------------------
-# File: _aux_functions.py 
+# File: _aux_functions.py
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2016. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -13,22 +13,95 @@
 
 
 """
-
+import collections
+import functools
+import inspect
+import warnings
 
 from ..exceptions import CplexError, WrongNumberOfArgumentsError
 from .. import six
 from ..six.moves import (map, zip, range)
 
 
-def validate_arg_lengths(arg_list, allow_empty=True):
-    """non-public"""
-    arg_lengths = [len(x) for x in arg_list]
-    max_length = max(arg_lengths)
-    for arg_length in arg_lengths:
-        if ((not allow_empty or arg_length != 0) and
-            arg_length != max_length):
-            raise CplexError("Inconsistent arguments")
-    return max_length
+class deprecated(object):
+    """A decorator that marks methods/functions as deprecated."""
+
+    def __init__(self, version):
+        self.version = version
+
+    def __call__(self, cls_or_func):
+        if (inspect.isfunction(cls_or_func) or
+                inspect.ismethod(cls_or_func)):
+            fmt = "{0} function or method"
+        # NOTE: Doesn't work for classes .. haven't figured that out yet.
+        #       Specifically, when a decorated class is used as a base
+        #       class.
+        # elif inspect.isclass(cls_or_func):
+        #     fmt = "{0} class"
+        else:
+            raise TypeError(type(cls_or_func))
+        msg = _getdeprecatedmsg(fmt.format(cls_or_func.__name__),
+                                self.version)
+
+        @functools.wraps(cls_or_func)
+        def wrapped(*args, **kwargs):
+            warnings.warn(msg, DeprecationWarning, stacklevel=2)
+            return cls_or_func(*args, **kwargs)
+        return wrapped
+
+
+def deprecated_class(name, version, stacklevel=3):
+    """Emits a warning for a deprecated class.
+
+    This should be called in __init__.
+
+    name - the name of the class (e.g., PresolveCallback).
+
+    version - the version at which the class was deprecated (e.g.,
+              "V12.7.1").
+
+    stacklevel - indicates how many levels up the stack is the caller.
+    """
+    msg = _getdeprecatedmsg("{0} class".format(name), version)
+    warnings.warn(msg, DeprecationWarning, stacklevel=stacklevel)
+
+
+def _getdeprecatedmsg(item, version):
+    return "the {0} is deprecated since {1}".format(item, version)
+
+
+def max_arg_length(arg_list):
+    """Returns the max length of the arguments in arg_list."""
+    return max([len(x) for x in arg_list])
+
+
+if __debug__:
+
+    # With non-optimzied bytecode, validate_arg_lengths actually does
+    # something.
+    def validate_arg_lengths(arg_list, allow_empty=True):
+        """Checks for equivalent argument lengths.
+
+        If allow_empty is True (the default), then empty arguments are not
+        checked against the max length of non-empty arguments. Some functions
+        allow NULL arguments in the Callable Library, for example.
+        """
+        arg_lengths = [len(x) for x in arg_list]
+        if allow_empty:
+            arg_lengths = [x for x in arg_lengths if x > 0]
+        if len(arg_lengths) == 0:
+            return
+        max_length = max(arg_lengths)
+        for arg_length in arg_lengths:
+            if (arg_length != max_length):
+                raise CplexError("inconsistent arguments")
+
+else:
+
+    # A no-op if using python -O or the PYTHONOPTIMIZE environment
+    # variable is defined as a non-empty string.
+    def validate_arg_lengths(arg_list, allow_empty=True):
+        pass
 
 
 def make_ranges(indices):
@@ -44,27 +117,25 @@ def make_ranges(indices):
         j = i
     return ranges
 
+
 def apply_freeform_two_args(fn, convert, args):
     """non-public"""
-    def con(a):
-        if isinstance(a, six.string_types):
-            return convert(a)
-        else:
-            return a
+    if convert is None:
+        def convert(x): return x
     if len(args) == 2:
-        conarg0, conarg1 = (con(args[0]), con(args[1]))
+        conarg0, conarg1 = (convert(args[0]), convert(args[1]))
         if (isinstance(conarg0, six.integer_types) and
-            isinstance(conarg1, six.integer_types)):
+                isinstance(conarg1, six.integer_types)):
             return fn(conarg0, conarg1)
         else:
             raise TypeError("expecting names or indices")
     elif len(args) == 1:
         if isinstance(args[0], (list, tuple)):
             retval = []
-            for member in map(fn, *zip(*make_ranges(list(map(con, args[0]))))):
+            for member in map(fn, *zip(*make_ranges(convert(args[0])))):
                 retval.extend(member)
             return retval
-        conarg0 = con(args[0])
+        conarg0 = convert(args[0])
         if isinstance(conarg0, six.integer_types):
             return fn(conarg0, conarg0)[0]
         else:
@@ -74,24 +145,22 @@ def apply_freeform_two_args(fn, convert, args):
     else:
         raise WrongNumberOfArgumentsError()
 
+
 def apply_freeform_one_arg(fn, convert, maxval, args):
     """non-public"""
-    def con(a):
-        if isinstance(a, six.string_types):
-            return convert(a)
-        else:
-            return a
+    if convert is None:
+        def convert(x): return x
     if len(args) == 2:
-        conarg0, conarg1 = (con(args[0]), con(args[1]))
+        conarg0, conarg1 = (convert(args[0]), convert(args[1]))
         if (isinstance(conarg0, six.integer_types) and
-            isinstance(conarg1, six.integer_types)):
+                isinstance(conarg1, six.integer_types)):
             return [fn(x) for x in range(conarg0, conarg1 + 1)]
         else:
             raise TypeError("expecting names or indices")
     elif len(args) == 1:
         if isinstance(args[0], (list, tuple)):
-            return [fn(x) for x in map(con, args[0])]
-        conarg0 = con(args[0])
+            return [fn(x) for x in convert(args[0])]
+        conarg0 = convert(args[0])
         if isinstance(conarg0, six.integer_types):
             return fn(conarg0)
         else:
@@ -102,56 +171,35 @@ def apply_freeform_one_arg(fn, convert, maxval, args):
     else:
         raise WrongNumberOfArgumentsError()
 
+
 def apply_pairs(fn, convert, *args):
     """non-public"""
-    def con(a):
-        if isinstance(a, six.string_types):
-            return convert(a)
-        else:
-            return a
     if len(args) == 2:
-        fn([con(args[0])], [args[1]])
+        fn([convert(args[0])], [args[1]])
     else:
         a1, a2 = zip(*args[0])
-        fn(list(map(con, a1)), list(a2))
+        fn(convert(a1), list(a2))
 
-def delete_set(fn, convert, max_num, *args):
+
+def delete_set_by_range(fn, convert, max_num, *args):
     """non-public"""
     if len(args) == 0:
         # Delete All:
-        # FIXME: We're deleting one-by-one here.  This is not a surprise,
-        # but we should, at the least, delete from greatest index to
-        # lowest to reduce index shuffling.  Even better, we could call
-        # a delete range or delete all, instead.
-        for i in range(max_num):
-            fn(0)
+        if max_num > 0:
+            fn(0, max_num - 1)
     elif len(args) == 1:
         # Delete all items from a possibly unordered list of mixed types:
-        if isinstance(convert(args[0]), six.integer_types):
-            # FIXME: convert does nothing here, right?
-            fn(convert(args[0]))
-        else:
-            args = list(map(convert, args[0]))
-            args.sort()
-            for i, a in enumerate(args):
-                # FIXME: Because the list is sorted, and each time we
-                # delete the indices above are decremented, this should
-                # work.  Seems like it would be much more efficient to
-                # just delete in reverse order.
-                # FIXME: convert does nothing here, right?
-                fn(convert(a) - i)
+        args = listify(convert(args[0]))
+        for i in sorted(args, reverse=True):
+            fn(i, i)
     elif len(args) == 2:
         # Delete range from arg[0] to arg[1]:
-        # FIXME: This silently takes an invalid range where begin > end
-        # and turns it into an empty list, which eventually deletes
-        # nothing.  At the least, we should raise a ValueError.  At best,
-        # we should pass begin and end (as they are) into the callable
-        # library and let it do the heavy lifting of triggering an error.
-        delete_set(fn, convert, max_num,
-                   list(range(convert(args[0]), convert(args[1]) + 1)))
+        fn(convert(args[0]), convert(args[1]))
+    else:
+        raise WrongNumberOfArgumentsError()
 
 
-class _group:
+class _group(object):
     """Object to contain constraint groups"""
 
     def __init__(self, gp):
@@ -167,7 +215,7 @@ class _group:
         """
         self._gp = gp
 
-        
+
 def make_group(conv, max_num, c_type, *args):
     """Returns a _group object
 
@@ -200,10 +248,76 @@ def make_group(conv, max_num, c_type, *args):
         weight = args[0]
     if len(args) == 2:
         weight = args[0]
-        if isinstance(conv(args[1]), six.integer_types):
-            cons = [conv(args[1])]
-        else:
-            cons = map(conv, args[1])
+        cons = listify(conv(args[1]))
     elif len(args) == 3:
         cons = list(range(conv(args[1]), conv(args[2]) + 1))
     return _group([(weight, ((c_type, i),)) for i in cons])
+
+
+def init_list_args(*args):
+    """Initialize default arguments with empty lists if necessary."""
+    return tuple([] if a is None else a for a in args)
+
+
+def listify(x):
+    """Returns [x] if x isn't already a list.
+
+    This is used to wrap arguments for functions that require lists.
+    """
+    # Assumes name to index conversions already done.
+    assert not isinstance(x, six.string_types)
+    try:
+        iter(x)
+        return x
+    except TypeError:
+        return [x]
+
+
+def _cachelookup(item, getindexfunc, cache):
+    try:
+        idx = cache[item]
+    except KeyError:
+        idx = getindexfunc(item)
+        cache[item] = idx
+    return idx
+
+
+def _convert_sequence(seq, getindexfunc, cache):
+    results = []
+    for item in seq:
+        if isinstance(item, six.string_types):
+            idx = _cachelookup(item, getindexfunc, cache)
+            results.append(idx)
+        else:
+            results.append(item)
+    return results
+
+
+def convert(name, getindexfunc, cache=None):
+    """Converts from names to indices as necessary.
+
+    If name is a string, an index is returned.
+
+    If name is a sequence, a sequence of indices is returned.
+
+    If name is neither (i.e., it's an integer), then that is returned
+    as is.
+
+    getindexfunc is a function that takes a name and returns an index.
+
+    The optional cache argument allows for further localized
+    caching (e.g., within a loop).
+    """
+    # In some cases, it can be benficial to cache lookups.
+    if cache is None:
+        cache = {}
+    if isinstance(name, six.string_types):
+        return _cachelookup(name, getindexfunc, cache)
+    elif isinstance(name, collections.Sequence):
+        # It's tempting to use a recursive solution here, but that kills
+        # performance for the case where all indices are passed in (i.e.,
+        # no names). This is due to the fact that we end up doing the
+        # extra check for sequence types over and over (above).
+        return _convert_sequence(name, getindexfunc, cache)
+    else:
+        return name

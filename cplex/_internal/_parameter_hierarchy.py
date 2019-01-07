@@ -1,9 +1,9 @@
 # --------------------------------------------------------------------------
-# Version 12.7.0
+# Version 12.8.0
 # --------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2000, 2016. All Rights Reserved.
+# Copyright IBM Corporation 2000, 2017. All Rights Reserved.
 # 
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -155,6 +155,15 @@ def mip_pool_members(env, parent):
                 replace = NumParameter(env, MIPPoolReplace, parent, 'replace', replace_constants),
                 )
 
+def mip_submip_members(env, parent):
+    return dict(_name = "submip",
+                help = lambda : "Parameters used when solving sub-MIPs.",
+                startalg = NumParameter(env, MIPSubMIPStartAlg, parent, 'startalg', subalg_constants),
+                subalg = NumParameter(env, MIPSubMIPSubAlg, parent, 'subalg', subalg_constants),
+                nodelimit = NumParameter(env, MIPSubMIPNodeLimit, parent, 'nodelimit'),
+                scale = NumParameter(env, MIPSubMIPScale, parent, 'scale', scale_constants),
+                )
+
 def mip_strategy_members(env, parent):
     return dict(_name = "strategy",
                 help = lambda : "Strategy for mixed integer optimization.",
@@ -201,8 +210,26 @@ def mip_members(env, parent):
                 ordertype = NumParameter(env, MIPOrderType, parent, 'ordertype', ordertype_constants),
                 polishafter = ParameterGroup(env, mip_polishafter_members, parent),
                 pool = ParameterGroup(env, mip_pool_members, parent),
+                submip = ParameterGroup(env, mip_submip_members, parent),
                 strategy = ParameterGroup(env, mip_strategy_members, parent),
                 tolerances = ParameterGroup(env, mip_tolerances_members, parent),
+                )
+
+def network_tolerances_members(env, parent):
+    return dict(_name = "tolerances",
+                help = lambda : "Numerical tolerances for network simplex optimization.",
+                feasibility = NumParameter(env, NetworkTolerancesFeasibility, parent, 'feasibility'),
+                optimality = NumParameter(env, NetworkTolerancesOptimality, parent, 'optimality'),
+                )
+
+def network_members(env, parent):
+    return dict(_name = "network",
+                help = lambda : "Parameters for network optimizations.",
+                display = NumParameter(env, NetworkDisplay, parent, 'display', network_display_constants),
+                iterations = NumParameter(env, NetworkIterations, parent, 'iterations'),
+                netfind = NumParameter(env, NetworkNetFind, parent, 'netfind', network_netfind_constants),
+                pricing = NumParameter(env, NetworkPricing, parent, 'pricing', network_pricing_constants),
+                tolerances = ParameterGroup(env, network_tolerances_members, parent),
                 )
 
 def output_members(env, parent):
@@ -252,6 +279,7 @@ def sifting_members(env, parent):
     return dict(_name = "sifting",
                 help = lambda : "Parameters for sifting optimization.",
                 algorithm = NumParameter(env, SiftingAlgorithm, parent, 'algorithm', sift_alg_constants),
+                simplex = NumParameter(env, SiftingSimplex, parent, 'simplex', off_on_constants),
                 display = NumParameter(env, SiftingDisplay, parent, 'display', display_constants),
                 iterations = NumParameter(env, SiftingIterations, parent, 'iterations'),
                 )
@@ -287,6 +315,7 @@ def simplex_members(env, parent):
                 crash = NumParameter(env, SimplexCrash, parent, 'crash'),
                 dgradient = NumParameter(env, SimplexDGradient, parent, 'dgradient', dual_pricing_constants),
                 display = NumParameter(env, SimplexDisplay, parent, 'display', display_constants),
+                dynamicrows = NumParameter(env, SimplexDynamicRows, parent, 'dynamicrows'),
                 limits = ParameterGroup(env, simplex_limits_members, parent),
                 perturbation = ParameterGroup(env, simplex_perturbation_members, parent),
                 pgradient = NumParameter(env, SimplexPGradient, parent, 'pgradient', primal_pricing_constants),
@@ -320,13 +349,16 @@ def root_members(env, parent):
                 feasopt = ParameterGroup(env, feasopt_members, parent),
                 lpmethod = NumParameter(env, setLPMethod, parent, 'lpmethod', alg_constants),
                 mip = ParameterGroup(env, mip_members, parent),
+                network = ParameterGroup(env, network_members, parent),
                 optimalitytarget = NumParameter(env, setOptimalityTarget, parent, 'optimalitytarget', optimalitytarget_constants),
                 output = ParameterGroup(env, output_members, parent),
                 parallel = NumParameter(env, setParallel, parent, 'parallel', par_constants),
+                paramdisplay = NumParameter(env, setParamDisplay, parent, 'paramdisplay', off_on_constants),
                 preprocessing = ParameterGroup(env, preprocessing_members, parent),
                 qpmethod = NumParameter(env, setQPMethod, parent, 'qpmethod', qp_alg_constants),
                 randomseed = NumParameter(env, setRandomSeed, parent, 'randomseed'),
                 read = ParameterGroup(env, read_members, parent),
+                record = NumParameter(env, setRecord, parent, 'record', off_on_constants),
                 sifting = ParameterGroup(env, sifting_members, parent),
                 simplex = ParameterGroup(env, simplex_members, parent),
                 solutiontype = NumParameter(env, setSolutionType, parent, 'solutiontype', solutiontype_constants),

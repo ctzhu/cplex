@@ -1,28 +1,33 @@
 # --------------------------------------------------------------------------
-# File: _subinterfaces.py 
+# File: _subinterfaces.py
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2016. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 # ------------------------------------------------------------------------
-
+"""Sub-interfaces of the CPLEX API."""
+from contextlib import closing, contextmanager
 import weakref
 
 from . import _constants
 from . import _procedural as CPX_PROC
-from ._matrices import SparsePair, SparseTriple, _HBMatrix, chbmatrix
+from ._matrices import (SparsePair, SparseTriple, _HBMatrix,
+                        unpack_pair, unpack_triple)
 from ._aux_functions import (apply_freeform_one_arg,
                              apply_freeform_two_args,
+                             max_arg_length,
                              validate_arg_lengths, apply_pairs,
-                             delete_set, make_group, _group)
+                             delete_set_by_range,
+                             make_group, _group,
+                             deprecated, init_list_args, listify,
+                             convert)
 from ..exceptions import CplexError, WrongNumberOfArgumentsError
 from .. import six
-from ..six.moves import map
-from ..six.moves import zip
+from ..six.moves import map, zip, cStringIO
 
 
 class Histogram(object):
@@ -60,11 +65,11 @@ class Histogram(object):
             hdr0 = "Row counts (excluding fixed variables):"
             hdr1 = " Nonzero Count:"
             hdr2 = "Number of Rows:"
-        rng     = len(self.__hist)
+        rng = len(self.__hist)
         maxhist = max(self.__hist)
-        length  = max(2,
-                      len(str(rng)),
-                      len(str(maxhist))) + 2
+        length = max(2,
+                     len(str(rng)),
+                     len(str(maxhist))) + 2
         perline = max((75 - len(hdr1)) / length, 1)
         ret = ""
         i = 0
@@ -81,7 +86,7 @@ class Histogram(object):
                 ret = ret + hdr0 + "\n\n"
                 needs_hdr0 = False
             ret = ret + hdr1
-            k  = 0
+            k = 0
             for j in range(i, rng):
                 if k >= perline:
                     break
@@ -89,10 +94,10 @@ class Histogram(object):
                     continue
                 ret = ret + str("%*d" % (length, j))
                 k += 1
-            
+
             ret = ret + "\n"
             ret = ret + hdr2
-            k  = 0
+            k = 0
             jj = i
             for j in range(i, rng):
                 if k >= perline:
@@ -105,51 +110,29 @@ class Histogram(object):
             ret = ret + "\n\n"
             i = jj
         return ret
-    
+
 
 class BaseInterface(object):
-    """non-public
+    """Common methods for sub-interfaces."""
 
-    """
+    def __init__(self, cplex, advanced=False, getindexfunc=None):
+        """Creates a new BaseInterface.
 
-    def _setup(self, cplex):
-        """non-public"""
-        self._cplex = weakref.proxy(cplex)
-        self._env = weakref.proxy(cplex._env)
-
-    def _conv(self, name):
-        """non-public"""
-        if isinstance(name, six.string_types):
-            return self.get_indices(name)
+        This class is not meant to be instantiated directly nor used
+        externally.
+        """
+        if type(self) == BaseInterface:
+            raise TypeError("BaseInterface must be sub-classed")
+        if advanced:
+            self._cplex = cplex
         else:
-            return name
+            self._cplex = weakref.proxy(cplex)
+        self._env = weakref.proxy(cplex._env)
+        self._get_index_function = getindexfunc
 
-    @staticmethod
-    def _unpack_pair(item):
-        """non-public"""
-        try:
-            ind, val = item.unpack()
-        except AttributeError:
-            ind, val = item[0:2]
-        validate_arg_lengths([ind, val])
-        return ind, val
-
-    @staticmethod
-    def _unpack_triple(item):
-        """non-public"""
-        try:
-            ind1, ind2, val = item.unpack()
-            assert item.isvalid()
-        except AttributeError:
-            ind1, ind2, val = item[0:3]
-        validate_arg_lengths([ind1, ind2, val])
-        return ind1, ind2, val
-
-class IndexedInterface(BaseInterface):
-    """non-public
-
-    :undocumented
-    """
+    def _conv(self, name, cache=None):
+        """Converts from names to indices as necessary."""
+        return convert(name, self._get_index, cache)
 
     @staticmethod
     def _add_iter(getnumfun, addfun, *args, **kwargs):
@@ -164,6 +147,11 @@ class IndexedInterface(BaseInterface):
         addfun(*args, **kwargs)
         return getnumfun() - 1  # minus one for zero-based indices
 
+    def _get_index(self, name):
+        return self._get_index_function(
+            self._env._e, self._cplex._lp, name,
+            self._env._apienc)
+
     def get_indices(self, name):
         """Converts from names to indices.
 
@@ -174,32 +162,40 @@ class IndexedInterface(BaseInterface):
         If name is a sequence of strings, get_indices returns a list
         of the indices corresponding to the strings in name.
         Equivalent to map(self.get_indices, name).
+
+        If the subclass does not provide an index function (i.e., the
+        interface is not indexed), then a NotImplementedError is raised.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> indices = c.variables.add(names=["a", "b"])
+        >>> c.variables.get_indices("a")
+        0
+        >>> c.variables.get_indices(["a", "b"])
+        [0, 1]
         """
+        if self._get_index_function is None:
+            raise NotImplementedError("This is not an indexed interface")
         if isinstance(name, six.string_types):
-            return self._get_index_function(
-                self._env._e, self._cplex._lp, name,
-                self._env._apienc)
+            return self._get_index(name)
         else:
-            return [self._get_index_function(
-                    self._env._e, self._cplex._lp, a,
-                    self._env._apienc)
-                    for a in name]
+            return [self._get_index(x) for x in name]
 
 
-class AdvancedInterface(object):
-    """non-public
-
-    """
-
-    def _setup(self, parent):
-        """non-public"""
-        self._parent = parent
-        self._cplex = parent._cplex
-        self._env = weakref.proxy(parent._cplex._env)
-
-
-class AdvancedVariablesInterface(AdvancedInterface):
+class AdvancedVariablesInterface(BaseInterface):
     """Methods for advanced operations on variables."""
+
+    def __init__(self, parent):
+        """Creates a new AdvancedVariablesInterface.
+
+        The advanced variables interface is exposed by the top-level
+        `Cplex` class as Cplex.variables.advanced.  This constructor is
+        not meant to be used externally.
+        """
+        super(AdvancedVariablesInterface, self).__init__(
+            cplex=parent._cplex, advanced=True)
 
     def protect(self, *args):
         """Prevents variables from being aggregated during presolve.
@@ -215,17 +211,14 @@ class AdvancedVariablesInterface(AdvancedInterface):
         Note
           If presolve can fix a variable to a value, it will be removed
           from the problem even if it has been protected.
-        
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> indices = c.variables.add(names = ["a", "b", "c", "d"])
         >>> c.variables.advanced.protect("a")
         >>> c.variables.advanced.protect(["b", "d"])
         """
-        if isinstance(self._parent._conv(args[0]), six.integer_types):
-            a = [self._parent._conv(args[0])]
-        else:
-            a = [self._parent._conv(x) for x in args[0]]
+        a = listify(self._cplex.variables._conv(args[0]))
         CPX_PROC.copyprotected(self._env._e, self._cplex._lp, a)
 
     def get_protected(self):
@@ -250,7 +243,7 @@ class AdvancedVariablesInterface(AdvancedInterface):
 
         There are two forms by which
         variables.advanced.tighten_lower_bounds may be called.
-        
+
         variables.advanced.tighten_lower_bounds(i, lb)
           i must be a variable name or index and lb must be a real
           number.  Sets the lower bound of the variable whose index
@@ -274,15 +267,16 @@ class AdvancedVariablesInterface(AdvancedInterface):
         [1.0, -1.0, 3.0]
         """
         def tlb(a, b):
-            CPX_PROC.tightenbds(self._env._e, self._cplex._lp, a, "L" * len(a), b)
-        apply_pairs(tlb, self._parent.get_indices, *args)
+            CPX_PROC.tightenbds(self._env._e, self._cplex._lp, a,
+                                'L' * len(a), b)
+        apply_pairs(tlb, self._cplex.variables._conv, *args)
 
     def tighten_upper_bounds(self, *args):
         """Tightens the upper bounds on the specified variables.
 
         There are two forms by which
         variables.advanced.tighten_upper_bounds may be called.
-        
+
         variables.advanced.tighten_upper_bounds(i, lb)
           i must be a variable name or index and lb must be a real
           number.  Sets the upper bound of the variable whose index
@@ -304,21 +298,23 @@ class AdvancedVariablesInterface(AdvancedInterface):
         [1.0, 10.0, 3.0]
         """
         def tub(a, b):
-            CPX_PROC.tightenbds(self._env._e, self._cplex._lp, a, "U" * len(a), b)
-        apply_pairs(tub, self._parent.get_indices, *args)
+            CPX_PROC.tightenbds(self._env._e, self._cplex._lp, a,
+                                'U' * len(a), b)
+        apply_pairs(tub, self._cplex.variables._conv, *args)
 
 
-class VarTypes:
+class VarTypes(object):
     """Constants defining variable types
 
     For a definition of each type, see those topics in the CPLEX User's
     Manual.
     """
-    continuous      = _constants.CPX_CONTINUOUS
-    binary          = _constants.CPX_BINARY
-    integer         = _constants.CPX_INTEGER
-    semi_integer    = _constants.CPX_SEMIINT
+    continuous = _constants.CPX_CONTINUOUS
+    binary = _constants.CPX_BINARY
+    integer = _constants.CPX_INTEGER
+    semi_integer = _constants.CPX_SEMIINT
     semi_continuous = _constants.CPX_SEMICONT
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -342,7 +338,8 @@ class VarTypes:
         if item == _constants.CPX_SEMICONT:
             return 'semi_continuous'
 
-class VariablesInterface(IndexedInterface):
+
+class VariablesInterface(BaseInterface):
     """Methods for adding, querying, and modifying variables.
 
     Example usage:
@@ -368,22 +365,23 @@ class VariablesInterface(IndexedInterface):
     >>> c.variables.set_types(0, c.variables.type.binary)
     >>> c.variables.get_num_binary()
     1
-    
     """
-
-    advanced = AdvancedVariablesInterface()
-    """See `AdvancedVariablesInterface()` """
 
     type = VarTypes()
     """See `VarTypes()` """
 
-    def _setup(self, cplex):
-        """non-public"""
-        IndexedInterface._setup(self, cplex)
-        self.advanced = AdvancedVariablesInterface()
-        self.advanced._setup(self)
-        self._get_index_function = CPX_PROC.getcolindex
-        
+    def __init__(self, cplex):
+        """Creates a new VariablesInterface.
+
+        The variables interface is exposed by the top-level `Cplex` class
+        as `Cplex.variables`.  This constructor is not meant to be used
+        externally.
+        """
+        super(VariablesInterface, self).__init__(
+            cplex=cplex, getindexfunc=CPX_PROC.getcolindex)
+        self.advanced = AdvancedVariablesInterface(self)
+        """See `AdvancedVariablesInterface()` """
+
     def get_num(self):
         """Returns the number of variables in the problem.
 
@@ -453,20 +451,21 @@ class VariablesInterface(IndexedInterface):
         2
         """
         return CPX_PROC.getnumsemiint(self._env._e, self._cplex._lp)
-    
+
     def _add(self, obj, lb, ub, types, names, columns):
         """non-public"""
         if not isinstance(types, six.string_types):
             types = "".join(types)
-        num_new_cols = validate_arg_lengths(
-            [obj, lb, ub, types, names, columns])
+        arg_list = [obj, lb, ub, types, names, columns]
+        num_new_cols = max_arg_length(arg_list)
+        validate_arg_lengths(arg_list)
         num_old_cols = self.get_num()
         if columns == []:
             CPX_PROC.newcols(self._env._e, self._cplex._lp, obj, lb, ub,
                              types, names, self._env._apienc)
         else:
-            with chbmatrix(columns, self._cplex._env_lp_ptr, 1,
-                           self._env._apienc) as (cmat, nnz):
+            with CPX_PROC.chbmatrix(columns, self._cplex._env_lp_ptr, 1,
+                                    self._env._apienc) as (cmat, nnz):
                 CPX_PROC.addcols(self._env._e, self._cplex._lp,
                                  num_new_cols, nnz, obj,
                                  cmat, lb, ub, names,
@@ -477,7 +476,8 @@ class VariablesInterface(IndexedInterface):
                     list(range(num_old_cols, num_old_cols + num_new_cols)),
                     types)
 
-    def add(self, obj = [], lb = [], ub = [], types = "", names = [], columns = []):
+    def add(self, obj=None, lb=None, ub=None, types="", names=None,
+            columns=None):
         """Adds variables and related data to the problem.
 
         variables.add accepts the keyword arguments obj, lb, ub,
@@ -528,12 +528,14 @@ class VariablesInterface(IndexedInterface):
                                       columns = [cplex.SparsePair(ind = ['c0', 2], val = [1.0, -1.0]),\
                                       [['c2'],[2.0]],\
                                       cplex.SparsePair(ind = [0, 1], val = [3.0, 4.0])])
-        
+
         >>> c.variables.get_lower_bounds()
         [0.0, 0.0, 0.0, -1.0, 1.0, 0.0]
         >>> c.variables.get_cols("1")
         SparsePair(ind = [2], val = [2.0])
         """
+        obj, lb, ub, names, columns = init_list_args(obj, lb, ub, names,
+                                                     columns)
         return self._add_iter(self.get_num, self._add,
                               obj, lb, ub, types, names, columns)
 
@@ -579,16 +581,16 @@ class VariablesInterface(IndexedInterface):
         >>> c.variables.get_names()
         []
         """
-        def delonecol(a):
-            CPX_PROC.delcols(self._env._e, self._cplex._lp, a, a)
-        delete_set(delonecol, self._conv, self.get_num(), *args)
+        def _delete(begin, end=None):
+            CPX_PROC.delcols(self._env._e, self._cplex._lp, begin, end)
+        delete_set_by_range(_delete, self._conv, self.get_num(), *args)
 
     def set_lower_bounds(self, *args):
         """Sets the lower bound for a variable or set of variables.
 
         There are two forms by which variables.set_lower_bounds may be
         called.
-        
+
         variables.set_lower_bounds(i, lb)
           i must be a variable name or index and lb must be a real
           number.  Sets the lower bound of the variable whose index
@@ -613,14 +615,14 @@ class VariablesInterface(IndexedInterface):
         """
         def setlb(a, b):
             CPX_PROC.chgbds(self._env._e, self._cplex._lp, a, "L" * len(a), b)
-        apply_pairs(setlb, self.get_indices, *args)
+        apply_pairs(setlb, self._conv, *args)
 
     def set_upper_bounds(self, *args):
         """Sets the upper bound for a variable or set of variables.
 
         There are two forms by which variables.set_upper_bounds may be
         called.
-        
+
         variables.set_upper_bounds(i, ub)
           i must be a variable name or index and ub must be a real
           number.  Sets the upper bound of the variable whose index
@@ -643,14 +645,14 @@ class VariablesInterface(IndexedInterface):
         """
         def setub(a, b):
             CPX_PROC.chgbds(self._env._e, self._cplex._lp, a, "U" * len(a), b)
-        apply_pairs(setub, self.get_indices, *args)
+        apply_pairs(setub, self._conv, *args)
 
     def set_names(self, *args):
         """Sets the name of a variable or set of variables.
 
         There are two forms by which variables.set_names may be
         called.
-        
+
         variables.set_names(i, name)
           i must be a variable name or index and name must be a
           string.
@@ -674,14 +676,14 @@ class VariablesInterface(IndexedInterface):
         def setnames(a, b):
             CPX_PROC.chgcolname(self._env._e, self._cplex._lp, a, b,
                                 self._env._apienc)
-        apply_pairs(setnames, self.get_indices, *args)
-        
+        apply_pairs(setnames, self._conv, *args)
+
     def set_types(self, *args):
         """Sets the type of a variable or set of variables.
 
         There are two forms by which variables.set_types may be
         called.
-        
+
         variables.set_types(i, type)
           i must be a variable name or index and name must be a
           single-character string.
@@ -711,13 +713,15 @@ class VariablesInterface(IndexedInterface):
         'continuous'
         """
         if len(args) == 2:
-            CPX_PROC.chgctype(self._env._e, self._cplex._lp,
-                              [self._conv(args[0])], args[1])
+            indices = [self._conv(args[0])]
+            xctypes = args[1]
+        elif len(args) == 1:
+            indices, xctypes = list(zip(*args[0]))
+            indices = self._conv(indices)
+            xctypes = "".join(xctypes)
         else:
-            a1, a2 = list(zip(*args[0]))
-            CPX_PROC.chgctype(self._env._e, self._cplex._lp,
-                              [self._conv(x) for x in a1],
-                              "".join(a2))
+            raise WrongNumberOfArgumentsError()
+        CPX_PROC.chgctype(self._env._e, self._cplex._lp, indices, xctypes)
 
     def get_lower_bounds(self, *args):
         """Returns the lower bounds on variables from the problem.
@@ -759,9 +763,9 @@ class VariablesInterface(IndexedInterface):
         >>> c.variables.get_lower_bounds()
         [0.0, 1.5, 3.0, 4.5, 6.0, 7.5, 9.0, 10.5, 12.0, 13.5]
         """
-        def getlb(a, b = self.get_num() - 1):
+        def getlb(a, b=self.get_num() - 1):
             return CPX_PROC.getlb(self._env._e, self._cplex._lp, a, b)
-        return apply_freeform_two_args(getlb, self.get_indices, args)
+        return apply_freeform_two_args(getlb, self._conv, args)
 
     def get_upper_bounds(self, *args):
         """Returns the upper bounds on variables from the problem.
@@ -803,9 +807,9 @@ class VariablesInterface(IndexedInterface):
         >>> c.variables.get_upper_bounds()
         [1.0, 2.5, 4.0, 5.5, 7.0, 8.5, 10.0, 11.5, 13.0, 14.5]
         """
-        def getub(a, b = self.get_num() - 1):
+        def getub(a, b=self.get_num() - 1):
             return CPX_PROC.getub(self._env._e, self._cplex._lp, a, b)
-        return apply_freeform_two_args(getub, self.get_indices, args)
+        return apply_freeform_two_args(getub, self._conv, args)
 
     def get_names(self, *args):
         """Returns the names of variables from the problem.
@@ -843,11 +847,11 @@ class VariablesInterface(IndexedInterface):
         >>> c.variables.get_names()
         ['x0', 'x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7', 'x8', 'x9']
         """
-        def getname(a, b = self.get_num() - 1):
+        def getname(a, b=self.get_num() - 1):
             return CPX_PROC.getcolname(
                 self._env._e, self._cplex._lp, a, b,
                 self._env._apienc)
-        return apply_freeform_two_args(getname, self.get_indices, args)
+        return apply_freeform_two_args(getname, self._conv, args)
 
     def get_types(self, *args):
         """Returns the types of variables from the problem.
@@ -865,7 +869,7 @@ class VariablesInterface(IndexedInterface):
           s must be a sequence of variable names or indices.  Returns
           the types of the variables with indices the members of s.
           Equivalent to [variables.types(i) for i in s]
-          
+
         variables.types(begin, end)
           begin and end must be variable indices with begin <= end or
           variable names whose indices respect this order.  Returns
@@ -890,10 +894,10 @@ class VariablesInterface(IndexedInterface):
         >>> c.variables.get_types()
         ['C', 'I', 'B', 'S', 'N']
         """
-        def gettype(a, b = self.get_num() - 1):
+        def gettype(a, b=self.get_num() - 1):
             return CPX_PROC.getctype(self._env._e, self._cplex._lp, a, b)
         t = [i for i in "".join(apply_freeform_two_args(
-                    gettype, self.get_indices, args))]
+            gettype, self._conv, args))]
         return t[0] if len(t) == 1 else t
 
     def get_cols(self, *args):
@@ -943,14 +947,14 @@ class VariablesInterface(IndexedInterface):
         >>> c.variables.get_cols()
         [SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [1], val = [2.0]), SparsePair(ind = [0, 1], val = [3.0, 4.0])]
         """
-        def getcols(a, b = self.get_num() - 1):
+        def getcols(a, b=self.get_num() - 1):
             mat = _HBMatrix()
             t = CPX_PROC.getcols(self._env._e, self._cplex._lp, a, b)
             mat.matbeg = t[0]
             mat.matind = t[1]
             mat.matval = t[2]
             return [m for m in mat]
-        return apply_freeform_two_args(getcols, self.get_indices, args)
+        return apply_freeform_two_args(getcols, self._conv, args)
 
     def get_histogram(self):
         """Returns a histogram of the columns of the linear constraint matrix.
@@ -985,7 +989,7 @@ class VariablesInterface(IndexedInterface):
         return Histogram(self._cplex, "column")
 
 
-class AdvancedLinearConstraintInterface(AdvancedInterface):
+class AdvancedLinearConstraintInterface(BaseInterface):
     """Methods for handling lazy cuts and user cuts.
 
     Lazy cuts are constraints not specified in the constraint
@@ -1004,6 +1008,16 @@ class AdvancedLinearConstraintInterface(AdvancedInterface):
     (zero) to make sure that CPLEX makes only linear reductions.
     """
 
+    def __init__(self, parent):
+        """Creates a new AdvancedLinearConstraintInterface.
+
+        The advanced linear constraints interface is exposed by the
+        top-level `Cplex` class as Cplex.linear_constraints.advanced.
+        This constructor is not meant to be used externally.
+        """
+        super(AdvancedLinearConstraintInterface, self).__init__(
+            cplex=parent._cplex, advanced=True)
+
     def get_num_lazy_constraints(self):
         """Returns the number of lazy cuts in the problem.
 
@@ -1013,7 +1027,7 @@ class AdvancedLinearConstraintInterface(AdvancedInterface):
         >>> c = cplex.Cplex()
         >>> indices = c.variables.add(names=[str(i) for i in range(10)])
         >>> cut = cplex.SparsePair(ind=[0, 1, 4], val=[1.0, 1.0, 1.0])
-        >>> indices = c.linear_constraints.advanced.add_lazy_cuts(
+        >>> indices = c.linear_constraints.advanced.add_lazy_constraints(
         ...     lin_expr=[cut],
         ...     senses="E",
         ...     rhs=[0.0],
@@ -1042,25 +1056,21 @@ class AdvancedLinearConstraintInterface(AdvancedInterface):
         """
         return CPX_PROC._getnumusercuts(self._env._e, self._cplex._lp)
 
-    def _add_lazy_cuts(self, lin_expr, senses, rhs, names):
+    def _add_lazy_constraints(self, lin_expr, senses, rhs, names):
         """non-public"""
         if not isinstance(senses, six.string_types):
             senses = "".join(senses)
-        num_lazy_cuts = validate_arg_lengths(
-            [rhs, senses, names, lin_expr])
-        if isinstance(lin_expr, type([])):
-            rmat = _HBMatrix(lin_expr)
+        validate_arg_lengths([rhs, senses, names, lin_expr])
         CPX_PROC.addlazyconstraints(
             self._env._e, self._cplex._lp, rhs, senses,
-            rmat.matbeg,
-            [self._cplex.variables._conv(x) for x in rmat.matind],
-            rmat.matval, names, self._env._apienc)
+            lin_expr, names, self._env._apienc)
 
-    def add_lazy_cuts(self, lin_expr = [], senses = "", rhs = [], names = []):
-        """Adds lazy cuts to the problem.
+    def add_lazy_constraints(self, lin_expr=None, senses="", rhs=None,
+                             names=None):
+        """Adds lazy constraints to the problem.
 
-        linear_constraints.advanced.add_lazy_cuts accepts the keyword
-        arguments lin_expr, senses, rhs, and names.
+        linear_constraints.advanced.add_lazy_constraints accepts the
+        keyword arguments lin_expr, senses, rhs, and names.
 
         If more than one argument is specified, all arguments must
         have the same length.
@@ -1075,27 +1085,28 @@ class AdvancedLinearConstraintInterface(AdvancedInterface):
           name, an exception will be raised.
 
         senses must be either a list of single-character strings or a
-        string containing the senses of the linear constraints.  
+        string containing the senses of the linear constraints.
 
         rhs is a list of floats, specifying the righthand side of
         each linear constraint.
 
         names is a list of strings.
 
-        Returns an iterator containing the indices of the added lazy cuts.
+        Returns an iterator containing the indices of the added lazy
+        constraints.
 
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> indices = c.variables.add(names=[str(i) for i in range(10)])
         >>> cut = cplex.SparsePair(ind=[0, 1, 4], val=[1.0, 1.0, 1.0])
-        >>> indices = c.linear_constraints.advanced.add_lazy_cuts(
+        >>> indices = c.linear_constraints.advanced.add_lazy_constraints(
         ...     lin_expr=[cut],
         ...     senses="E",
         ...     rhs=[0.0],
         ...     names=["lz1"])
         >>> cut2 = cplex.SparsePair(ind=[0, 2, 4], val=[1.0, 1.0, 1.0])
         >>> cut3 = cplex.SparsePair(ind=[0, 2, 5], val=[1.0, 1.0, 1.0])
-        >>> indices = c.linear_constraints.advanced.add_lazy_cuts(
+        >>> indices = c.linear_constraints.advanced.add_lazy_constraints(
         ...     lin_expr=[cut2, cut3],
         ...     senses="EE",
         ...     rhs=[0.0, 0.0],
@@ -1103,24 +1114,21 @@ class AdvancedLinearConstraintInterface(AdvancedInterface):
         >>> c.linear_constraints.advanced.get_num_lazy_constraints()
         3
         """
-        add_iter = IndexedInterface._add_iter
-        return add_iter(self.get_num_lazy_constraints, self._add_lazy_cuts,
-                        lin_expr, senses, rhs, names)
+        lin_expr, rhs, names = init_list_args(lin_expr, rhs, names)
+        return self._add_iter(self.get_num_lazy_constraints,
+                              self._add_lazy_constraints,
+                              lin_expr, senses, rhs, names)
 
     def _add_user_cuts(self, lin_expr, senses, rhs, names):
         """non-public"""
         if not isinstance(senses, six.string_types):
             senses = "".join(senses)
-        num_user_cuts = validate_arg_lengths(
-            [rhs, senses, names, lin_expr])
-        if isinstance(lin_expr, type([])):
-            rmat = _HBMatrix(lin_expr)
+        validate_arg_lengths([rhs, senses, names, lin_expr])
         CPX_PROC.addusercuts(
-            self._env._e, self._cplex._lp, rhs, senses, rmat.matbeg,
-            [self._cplex.variables._conv(x) for x in rmat.matind],
-            rmat.matval, names, self._env._apienc)
+            self._env._e, self._cplex._lp, rhs, senses,
+            lin_expr, names, self._env._apienc)
 
-    def add_user_cuts(self, lin_expr = [], senses = "", rhs = [], names = []):
+    def add_user_cuts(self, lin_expr=None, senses="", rhs=None, names=None):
         """Adds user cuts to the problem.
 
         linear_constraints.advanced.add_user_cuts accepts the keyword
@@ -1165,12 +1173,13 @@ class AdvancedLinearConstraintInterface(AdvancedInterface):
         >>> c.linear_constraints.advanced.get_num_user_cuts()
         3
         """
-        add_iter = IndexedInterface._add_iter
-        return add_iter(self.get_num_user_cuts, self._add_user_cuts,
-                        lin_expr, senses, rhs, names)
+        lin_expr, senses, rhs, names = init_list_args(
+            lin_expr, senses, rhs, names)
+        return self._add_iter(self.get_num_user_cuts, self._add_user_cuts,
+                              lin_expr, senses, rhs, names)
 
-    def free_lazy_cuts(self):
-        """Removes all lazy cuts from the problem.
+    def free_lazy_constraints(self):
+        """Removes all lazy constraints from the problem.
 
         Example usage:
 
@@ -1178,14 +1187,14 @@ class AdvancedLinearConstraintInterface(AdvancedInterface):
         >>> c = cplex.Cplex()
         >>> indices = c.variables.add(names=[str(i) for i in range(10)])
         >>> cut = cplex.SparsePair(ind=[0, 1, 4], val=[1.0, 1.0, 1.0])
-        >>> indices = c.linear_constraints.advanced.add_lazy_cuts(
+        >>> indices = c.linear_constraints.advanced.add_lazy_constraints(
         ...     lin_expr = [cut],
         ...     senses = "E",
         ...     rhs = [0.0],
         ...     names = ["lz1"])
         >>> c.linear_constraints.advanced.get_num_lazy_constraints()
         1
-        >>> c.linear_constraints.advanced.free_lazy_cuts()
+        >>> c.linear_constraints.advanced.free_lazy_constraints()
         >>> c.linear_constraints.advanced.get_num_lazy_constraints()
         0
         """
@@ -1214,24 +1223,21 @@ class AdvancedLinearConstraintInterface(AdvancedInterface):
         CPX_PROC.freeusercuts(self._env._e, self._cplex._lp)
 
 
-class LinearConstraintInterface(IndexedInterface):
-    """Methods for adding, modifying, and querying linear constraints.
+class LinearConstraintInterface(BaseInterface):
+    """Methods for adding, modifying, and querying linear constraints."""
 
-    """
+    def __init__(self, cplex):
+        """Creates a new LinearConstraintInterface.
 
-    # FIXME: We construct self.advanced twice.  Here and in _setup.
-    #        We should only do it once.  This is done all over the place
-    #        in this module.
-    advanced = AdvancedLinearConstraintInterface()
-    """See `AdvancedLinearConstraintInterface()` """
+        The linear constraints interface is exposed by the top-level
+        `Cplex` class as `Cplex.linear_constraints`.  This constructor is
+        not meant to be used externally.
+        """
+        super(LinearConstraintInterface, self).__init__(
+            cplex=cplex, getindexfunc=CPX_PROC.getrowindex)
+        self.advanced = AdvancedLinearConstraintInterface(self)
+        """See `AdvancedLinearConstraintInterface()` """
 
-    def _setup(self, cplex):
-        """non-public"""
-        IndexedInterface._setup(self, cplex)
-        self.advanced = AdvancedLinearConstraintInterface()
-        self.advanced._setup(self)
-        self._get_index_function = CPX_PROC.getrowindex
-        
     def get_num(self):
         """Returns the number of linear constraints.
 
@@ -1249,8 +1255,9 @@ class LinearConstraintInterface(IndexedInterface):
         """non-public"""
         if not isinstance(senses, six.string_types):
             senses = "".join(senses)
-        num_new_rows = validate_arg_lengths(
-            [rhs, senses, range_values, names, lin_expr])
+        arg_list = [rhs, senses, range_values, names, lin_expr]
+        num_new_rows = max_arg_length(arg_list)
+        validate_arg_lengths(arg_list)
         num_old_rows = self.get_num()
         if lin_expr == []:
             if senses.find('R') != -1 and len(range_values) == 0:
@@ -1259,8 +1266,8 @@ class LinearConstraintInterface(IndexedInterface):
                              range_values, names,
                              self._env._apienc)
         else:
-            with chbmatrix(lin_expr, self._cplex._env_lp_ptr, 0,
-                           self._env._apienc) as (rmat, nnz):
+            with CPX_PROC.chbmatrix(lin_expr, self._cplex._env_lp_ptr, 0,
+                                    self._env._apienc) as (rmat, nnz):
                 CPX_PROC.addrows(self._env._e, self._cplex._lp, 0,
                                  num_new_rows, nnz, rhs, senses,
                                  rmat, [], names, self._env._apienc)
@@ -1270,7 +1277,8 @@ class LinearConstraintInterface(IndexedInterface):
                     list(range(num_old_rows, num_old_rows + num_new_rows)),
                     range_values)
 
-    def add(self, lin_expr = [], senses = "", rhs = [], range_values = [], names = []):
+    def add(self, lin_expr=None, senses="", rhs=None, range_values=None,
+            names=None):
         """Adds linear constraints to the problem.
 
         linear_constraints.add accepts the keyword arguments lin_expr,
@@ -1324,6 +1332,8 @@ class LinearConstraintInterface(IndexedInterface):
         >>> c.linear_constraints.get_rhs()
         [0.0, 1.0, -1.0, 2.0]
         """
+        lin_expr, senses, rhs, range_values, names = init_list_args(
+            lin_expr, senses, rhs, range_values, names)
         return self._add_iter(self.get_num, self._add,
                               lin_expr, senses, rhs, range_values, names)
 
@@ -1369,16 +1379,16 @@ class LinearConstraintInterface(IndexedInterface):
         >>> c.linear_constraints.get_names()
         []
         """
-        def delonerow(a):
-            CPX_PROC.delrows(self._env._e, self._cplex._lp, a, a)
-        delete_set(delonerow, self._conv, self.get_num(), *args)
+        def _delete(begin, end=None):
+            CPX_PROC.delrows(self._env._e, self._cplex._lp, begin, end)
+        delete_set_by_range(_delete, self._conv, self.get_num(), *args)
 
     def set_rhs(self, *args):
         """Sets the righthand side of a set of linear constraints.
 
         There are two forms by which linear_constraints.set_rhs may be
         called.
-        
+
         linear_constraints.set_rhs(i, rhs)
           i must be a row name or index and rhs must be a real number.
           Sets the righthand side of the row whose index or name is
@@ -1405,14 +1415,14 @@ class LinearConstraintInterface(IndexedInterface):
         """
         def chgrhs(a, b):
             CPX_PROC.chgrhs(self._env._e, self._cplex._lp, a, b)
-        apply_pairs(chgrhs, self.get_indices, *args)
+        apply_pairs(chgrhs, self._conv, *args)
 
     def set_names(self, *args):
         """Sets the name of a linear constraint or set of linear constraints.
 
         There are two forms by which linear_constraints.set_names may be
         called.
-        
+
         linear_constraints.set_names(i, name)
           i must be a linear constraint name or index and name must be a
           string.
@@ -1437,14 +1447,14 @@ class LinearConstraintInterface(IndexedInterface):
         def setnames(a, b):
             CPX_PROC.chgrowname(self._env._e, self._cplex._lp, a, b,
                                 self._env._apienc)
-        apply_pairs(setnames, self.get_indices, *args)
-        
+        apply_pairs(setnames, self._conv, *args)
+
     def set_senses(self, *args):
         """Sets the sense of a linear constraint or set of linear constraints.
 
         There are two forms by which linear_constraints.set_senses may be
         called.
-        
+
         linear_constraints.set_senses(i, type)
           i must be a row name or index and name must be a
           single-character string.
@@ -1473,18 +1483,22 @@ class LinearConstraintInterface(IndexedInterface):
         ['E', 'G', 'R', 'L']
         """
         if len(args) == 2:
-            CPX_PROC.chgsense(self._env._e, self._cplex._lp,
-                              [self._conv(args[0])], args[1])
+            indices = [self._conv(args[0])]
+            senses = args[1]
+        elif len(args) == 1:
+            indices, senses = list(zip(*args[0]))
+            indices = self._conv(indices)
+            senses = "".join(senses)
         else:
-            a1, a2 = list(zip(*args[0]))
-            CPX_PROC.chgsense(self._env._e, self._cplex._lp,
-                              [self._conv(x) for x in a1], "".join(a2))
+            raise WrongNumberOfArgumentsError()
+        CPX_PROC.chgsense(self._env._e, self._cplex._lp,
+                          indices, senses)
 
     def set_linear_components(self, *args):
         """Sets a linear constraint or set of linear constraints.
 
         There are two forms by which this method may be called:
-        
+
         linear_constraints.set_linear_components(i, lin)
           i must be a row name or index and lin must be either a
           SparsePair or a pair of sequences, the first of which
@@ -1511,15 +1525,16 @@ class LinearConstraintInterface(IndexedInterface):
         [SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [], val = []), SparsePair(ind = [0, 1], val = [-2.0, 3.0]), SparsePair(ind = [1], val = [-1.0])]
         """
         def setlin(aa, bb):
+            lincache, varcache = {}, {}
             for i, a in enumerate(aa):
                 b = bb[i]
-                ind, val = self._unpack_pair(b)
+                ind, val = unpack_pair(b)
                 CPX_PROC.chgcoeflist(
                     self._env._e, self._cplex._lp,
-                    [self._conv(a)] * len(ind),
-                    [self._cplex.variables._conv(x) for x in ind],
+                    [self._conv(a, lincache)] * len(ind),
+                    self._cplex.variables._conv(ind, varcache),
                     val)
-        apply_pairs(setlin, self.get_indices, *args)
+        apply_pairs(setlin, self._conv, *args)
 
     def set_range_values(self, *args):
         """Sets the range values for a set of linear constraints.
@@ -1534,17 +1549,17 @@ class LinearConstraintInterface(IndexedInterface):
         then constraint i is defined as 
         rhs[i] + range_value[i] <= a*x <= rhs[i].
 
-	Note that changing the range values will not change the sense of a 
-	constraint; you must call the method set_senses() of the class 
-	LinearConstraintInterface to change the sense of a ranged row if 
-	the previous range value was 0 (zero) and the constraint sense was not 
-	'R'. Similarly, changing the range coefficient from a nonzero value to 
-	0 (zero) will not change the constraint sense from 'R" to "E"; an 
-	additional call of setsenses() is required to accomplish that.
+        Note that changing the range values will not change the sense of a 
+        constraint; you must call the method set_senses() of the class 
+        LinearConstraintInterface to change the sense of a ranged row if 
+        the previous range value was 0 (zero) and the constraint sense was not 
+        'R'. Similarly, changing the range coefficient from a nonzero value to 
+        0 (zero) will not change the constraint sense from 'R" to "E"; an 
+        additional call of setsenses() is required to accomplish that.
 
         There are two forms by which linear_constraints.set_range_values may be
         called.
-        
+
         linear_constraints.set_range_values(i, range)
           i must be a row name or index and range must be a real
           number.  Sets the range value of the row whose index or
@@ -1569,7 +1584,7 @@ class LinearConstraintInterface(IndexedInterface):
         """
         def chgrngval(a, b):
             CPX_PROC.chgrngval(self._env._e, self._cplex._lp, a, b)
-        apply_pairs(chgrngval, self.get_indices, *args)
+        apply_pairs(chgrngval, self._conv, *args)
 
     def set_coefficients(self, *args):
         """Sets individual coefficients of the linear constraint matrix.
@@ -1598,21 +1613,23 @@ class LinearConstraintInterface(IndexedInterface):
         >>> c.linear_constraints.get_rows("c2")
         SparsePair(ind = [0, 1], val = [2.0, -1.0])
         """
-        if isinstance(self._conv(args[0]), six.integer_types):
+        if len(args) == 3:
             arg_list = [[arg] for arg in args]
-        else:
+        elif len(args) == 1:
             arg_list = list(zip(*args[0]))
+        else:
+            raise WrongNumberOfArgumentsError()
         CPX_PROC.chgcoeflist(
             self._env._e, self._cplex._lp,
-            [self._conv(x) for x in arg_list[0]],
-            [self._cplex.variables._conv(x) for x in arg_list[1]],
+            self._conv(arg_list[0]),
+            self._cplex.variables._conv(arg_list[1]),
             arg_list[2])
 
     def get_rhs(self, *args):
         """Returns the righthand side of constraints from the problem.
 
         Can be called by four forms.
-        
+
         linear_constraints.get_rhs()
           return the righthand side of all linear constraints from
           the problem.
@@ -1651,15 +1668,15 @@ class LinearConstraintInterface(IndexedInterface):
         >>> c.linear_constraints.get_rhs()
         [0.0, 1.5, 3.0, 4.5, 6.0, 7.5, 9.0, 10.5, 12.0, 13.5]
         """
-        def getrhs(a, b = self.get_num() - 1):
+        def getrhs(a, b=self.get_num() - 1):
             return CPX_PROC.getrhs(self._env._e, self._cplex._lp, a, b)
-        return apply_freeform_two_args(getrhs, self.get_indices, args)
+        return apply_freeform_two_args(getrhs, self._conv, args)
 
     def get_senses(self, *args):
         """Returns the senses of constraints from the problem.
 
         Can be called by four forms.
-        
+
         linear_constraints.get_senses()
           return the senses of all linear constraints from the
           problem.
@@ -1698,10 +1715,10 @@ class LinearConstraintInterface(IndexedInterface):
         >>> c.linear_constraints.get_senses()
         ['E', 'G', 'L', 'R']
         """
-        def getsense(a, b = self.get_num() - 1):
+        def getsense(a, b=self.get_num() - 1):
             return CPX_PROC.getsense(self._env._e, self._cplex._lp, a, b)
         s = [i for i in "".join(apply_freeform_two_args(
-                    getsense, self.get_indices, args))]
+            getsense, self._conv, args))]
         return s[0] if len(s) == 1 else s
 
     def get_range_values(self, *args):
@@ -1720,7 +1737,7 @@ class LinearConstraintInterface(IndexedInterface):
         rhs[i] + range_value[i] <= a*x <= rhs[i].
 
         Can be called by four forms.
-        
+
         linear_constraints.get_range_values()
           return the range values of all linear constraints from the
           problem.
@@ -1734,7 +1751,7 @@ class LinearConstraintInterface(IndexedInterface):
           Returns the range values of the linear constraints with
           indices the members of s.  Equivalent to
           [linear_constraints.get_range_values(i) for i in s]
-          
+
         linear_constraints.get_range_values(begin, end)
           begin and end must be linear constraint indices with begin
           <= end or linear constraint names whose indices respect
@@ -1760,9 +1777,9 @@ class LinearConstraintInterface(IndexedInterface):
         >>> c.linear_constraints.get_range_values()
         [0.0, 1.5, 3.0, 4.5, 6.0, 7.5, 9.0, 10.5, 12.0, 13.5]
         """
-        def getrngval(a, b = self.get_num() - 1):
+        def getrngval(a, b=self.get_num() - 1):
             return CPX_PROC.getrngval(self._env._e, self._cplex._lp, a, b)
-        return apply_freeform_two_args(getrngval, self.get_indices, args)
+        return apply_freeform_two_args(getrngval, self._conv, args)
 
     def get_coefficients(self, *args):
         """Returns coefficients by row, column coordinates.
@@ -1775,7 +1792,7 @@ class LinearConstraintInterface(IndexedInterface):
 
         linear_constraints.get_coefficients(sequence_of_pairs)
           returns a list of coefficients.
-        
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> indices = c.variables.add(names = ["x0", "x1"])
@@ -1787,26 +1804,13 @@ class LinearConstraintInterface(IndexedInterface):
         >>> c.linear_constraints.get_coefficients([("c1", "x0"), ("c1", "x1")])
         [2.0, -1.0]
         """
-        def getcoef(a):
-            return CPX_PROC.getcoef(self._env._e, self._cplex._lp, a[0], a[1])
-        def convert(a):
-            retval = [-1, -1]
-            if isinstance(a[0], six.string_types):
-                retval[0] = self._cplex.linear_constraints.get_indices(a[0])
-            else:
-                retval[0] = a[0]
-            if isinstance(a[1], six.string_types):
-                retval[1] = self._cplex.variables.get_indices(a[1])
-            else:
-                retval[1] = a[1]
-            return retval
+        def getcoef(row, col):
+            return CPX_PROC.getcoef(self._env._e, self._cplex._lp, row, col)
         if len(args) == 2:
-            return getcoef(convert(args))
+            return getcoef(self._conv(args[0]),
+                           self._cplex.variables._conv(args[1]))
         elif len(args) == 1:
-            retval = []
-            for arg in args[0]:
-                retval.append(self.get_coefficients(*arg))
-            return retval
+            return [self.get_coefficients(*arg) for arg in args[0]]
         else:
             raise WrongNumberOfArgumentsError()
 
@@ -1856,14 +1860,14 @@ class LinearConstraintInterface(IndexedInterface):
         >>> c.linear_constraints.get_rows()
         [SparsePair(ind = [0, 2], val = [1.0, -1.0]), SparsePair(ind = [0, 1], val = [1.0, 1.0]), SparsePair(ind = [0, 1, 2], val = [-1.0, -1.0, -1.0]), SparsePair(ind = [1, 2], val = [10.0, -2.0])]
         """
-        def getrows(begin, end = self.get_num() - 1):
+        def getrows(begin, end=self.get_num() - 1):
             mat = _HBMatrix()
             t = CPX_PROC.getrows(self._env._e, self._cplex._lp, begin, end)
             mat.matbeg = t[0]
             mat.matind = t[1]
             mat.matval = t[2]
             return [m for m in mat]
-        return apply_freeform_two_args(getrows, self.get_indices, args)
+        return apply_freeform_two_args(getrows, self._conv, args)
 
     def get_num_nonzeros(self):
         """Returns the number of nonzeros in the linear constraint matrix.
@@ -1919,10 +1923,10 @@ class LinearConstraintInterface(IndexedInterface):
         >>> c.linear_constraints.get_names()
         ['c0', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7', 'c8', 'c9']
         """
-        def getname(a, b = self.get_num() - 1):
+        def getname(a, b=self.get_num() - 1):
             return CPX_PROC.getrowname(self._env._e, self._cplex._lp,
                                        a, b, self._env._apienc)
-        return apply_freeform_two_args(getname, self.get_indices, args)
+        return apply_freeform_two_args(getname, self._conv, args)
 
     def get_histogram(self):
         """Returns a histogram of the rows of the linear constraint matrix.
@@ -1956,16 +1960,51 @@ class LinearConstraintInterface(IndexedInterface):
         """
         return Histogram(self._cplex, "row")
 
-    
-class IndicatorConstraintInterface(IndexedInterface):
-    """Methods for adding, modifying, and querying indicator constraints.
 
-    """
+class IndicatorType(object):
+    """Identifiers for types of indicator constraints."""
+    if_ = _constants.CPX_INDICATOR_IF
+    """CPX_INDICATOR_IF ('->')."""
+    onlyif = _constants.CPX_INDICATOR_ONLYIF
+    """CPX_INDICATOR_ONLYIF ('<-')"""
+    iff = _constants.CPX_INDICATOR_IFANDONLYIF
+    """CPX_INDICATOR_IFANDONLYIF ('<->')"""
 
-    def _setup(self, cplex):
-        """non-public"""
-        IndexedInterface._setup(self, cplex)
-        self._get_index_function = CPX_PROC.getindconstrindex
+    def __getitem__(self, item):
+        """Converts a constant to a string.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> c.indicator_constraints.type_.if_
+        1
+        >>> c.indicator_constraints.type_[1]
+        'if_'
+        """
+        if item == _constants.CPX_INDICATOR_IF:
+            return 'if_'
+        if item == _constants.CPX_INDICATOR_ONLYIF:
+            return 'onlyif'
+        if item == _constants.CPX_INDICATOR_IFANDONLYIF:
+            return 'iff'
+
+
+class IndicatorConstraintInterface(BaseInterface):
+    """Methods for adding, modifying, and querying indicator constraints."""
+
+    type_ = IndicatorType()
+    """See `IndicatorType()`"""
+
+    def __init__(self, cplex):
+        """Creates a new IndicatorConstraintInterface.
+
+        The indicator constraints interface is exposed by the top-level
+        `Cplex` class as `Cplex.indicator_constraints`.  This constructor
+        is not meant to be used externally.
+        """
+        super(IndicatorConstraintInterface, self).__init__(
+            cplex=cplex, getindexfunc=CPX_PROC.getindconstrindex)
 
     def get_num(self):
         """Returns the number of indicator constraints.
@@ -1981,20 +2020,101 @@ class IndicatorConstraintInterface(IndexedInterface):
         """
         return CPX_PROC.getnumindconstrs(self._env._e, self._cplex._lp)
 
-    def _add(self, lin_expr, sense, rhs, indvar, complemented, name):
-        """non-public"""
-        ind, val = self._unpack_pair(lin_expr)
-        CPX_PROC.addindconstr(self._env._e, self._cplex._lp,
-                              self._cplex.variables._conv(indvar),
-                              complemented, rhs, sense,
-                              [self._cplex.variables._conv(x) for x in ind],
-                              val, name,
-                              self._env._apienc)
+    def _add_batch(self, lin_expr, sense, rhs, indvar, complemented, name,
+                   indtype):
+        if not isinstance(sense, six.string_types):
+            sense = "".join(sense)
+        arg_list = [lin_expr, sense, rhs, indvar, complemented, name,
+                    indtype]
+        num_new_rows = max_arg_length(arg_list)
+        validate_arg_lengths(arg_list)
+        with CPX_PROC.chbmatrix(lin_expr, self._cplex._env_lp_ptr, 0,
+                                self._env._apienc) as (linmat, nnz):
+            CPX_PROC.addindconstr(self._env._e, self._cplex._lp,
+                                  num_new_rows,
+                                  self._cplex.variables._conv(indvar),
+                                  complemented, rhs, sense,
+                                  linmat, indtype, name, nnz,
+                                  self._env._apienc)
 
-    def add(self, lin_expr = SparsePair(), sense = "E", rhs = 0.0, indvar = 0, complemented = 0, name = ""):
+    def add_batch(self, lin_expr=None, sense=None, rhs=None, indvar=None,
+                  complemented=None, name=None, indtype=None):
+        """Adds indicator constraints to the problem.
+
+        Takes up to eight keyword arguments.
+
+        If more than one argument is specified, all arguments must
+        have the same length.
+
+        lin_expr : either a list of SparsePair instances or a matrix in
+        list-of-lists format.
+
+        Note
+          lin_expr must not contain duplicate indices.  If lin_expr
+          references a variable more than once, either by index, name,
+          or a combination of index and name, an exception will be
+          raised.
+
+        sense : must be either a list of single-character strings or a
+        string containing the senses of the indicator constraints.
+        Each entry must be one of 'G', 'L', 'E', indicating greater-than,
+        less-than, and equality, respectively. Left unspecified, the
+        default is 'E'.
+
+        rhs : a list of floats, specifying the righthand side of each
+        indicator constraint.
+
+        indvar : a list of names or indices (or a mixture of the two), of
+        the variables that control whether the constraint is active or
+        not.
+
+        complemented : a list of values (0 or 1) that determines whether
+        the constraint is active when the variable indvar is equal to 0
+        or 1: default is 0.
+
+        name : a list of strings that determine the names of the
+        individual constraints.
+
+        indtype : a list of the types of indicator constraints. Defaults
+        to CPX_INDICATOR_IF ('->').  See `IndicatorType()`.
+
+        Returns an iterator containing the indices of the added indicator
+        constraints.
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> indices = c.variables.add(names=["x1", "x2", "x3"])
+        >>> indices = c.indicator_constraints.add_batch(
+        ...     lin_expr=[cplex.SparsePair(ind=["x2"], val=[2.0]),
+        ...               cplex.SparsePair(ind=["x3"], val=[2.0])],
+        ...     sense="LL",
+        ...     rhs=[1.0, 1.0],
+        ...     indvar=["x1", "x2"],
+        ...     complemented=[0, 0],
+        ...     name=["ind1", "ind2"],
+        ...     indtype=[c.indicator_constraints.type_.if_,
+        ...              c.indicator_constraints.type_.if_])
+        >>> len(list(indices))
+        2
+        """
+        (lin_expr, sense, rhs, indvar,
+         complemented, name, indtype) = init_list_args(
+             lin_expr, sense, rhs, indvar, complemented, name, indtype)
+        return self._add_iter(self.get_num, self._add_batch,
+                              lin_expr, sense, rhs, indvar, complemented,
+                              name, indtype)
+
+    def _add(self, lin_expr, sense, rhs, indvar, complemented, name,
+             indtype):
+        """non-public"""
+        self._add_batch([lin_expr], sense, [rhs], [indvar], [complemented],
+                        [name], [indtype])
+
+    def add(self, lin_expr=None, sense="E", rhs=0.0, indvar=0,
+            complemented=0, name="", indtype=IndicatorType.if_):
         """Adds an indicator constraint to the problem.
 
-        Takes up to six keyword arguments.
+        Takes up to eight keyword arguments.
 
         lin_expr : either a SparsePair or a list of two lists, the first of
         which contains variable indices or names, the second of which
@@ -2019,6 +2139,9 @@ class IndicatorConstraintInterface(IndexedInterface):
 
         name : the name of the constraint.
 
+        indtype : the type of indicator constraint. Defaults to
+        CPX_INDICATOR_IF ('->').  See `IndicatorType()`.
+
         Returns the index of the added indicator constraint.
 
         >>> import cplex
@@ -2030,13 +2153,16 @@ class IndicatorConstraintInterface(IndexedInterface):
         ...     rhs=1.0,
         ...     sense="G",
         ...     lin_expr=cplex.SparsePair(ind=["x2"], val=[2.0]),
-        ...     name="ind1")
+        ...     name="ind1",
+        ...     indtype=c.indicator_constraints.type_.if_)
         0
         """
+        if lin_expr is None:
+            lin_expr = SparsePair()
         # We only ever create one indicator constraint at a time.
-        return self._add_single(self.get_num, self._add,
-                                lin_expr, sense, rhs, indvar,
-                                complemented, name)
+        return self._add_single(self.get_num, self._add, lin_expr,
+                                sense, rhs, indvar, complemented,
+                                name, indtype)
 
     def delete(self, *args):
         """Deletes a set of indicator constraints from the problem.
@@ -2082,10 +2208,10 @@ class IndicatorConstraintInterface(IndexedInterface):
         >>> c.indicator_constraints.get_names()
         []
         """
-        def deloneindcon(a):
-            CPX_PROC.delindconstrs(self._env._e, self._cplex._lp, a, a)
-        delete_set(deloneindcon, self._conv, self.get_num(), *args)
-        
+        def _delete(begin, end=None):
+            CPX_PROC.delindconstrs(self._env._e, self._cplex._lp, begin, end)
+        delete_set_by_range(_delete, self._conv, self.get_num(), *args)
+
     def get_indicator_variables(self, *args):
         """Returns the indicator variables of a set of indicator constraints. 
 
@@ -2099,13 +2225,13 @@ class IndicatorConstraintInterface(IndexedInterface):
           i must be an indicator constraint name or index.  Returns the
           indicator variables of the indicator constraint whose index
           or name is i.
-          
+
         indicator_constraints.get_indicator_variables(s)
           s must be a sequence of indicator constraint names or
           indices.  Returns the indicator variables of the indicator
           constraints with indices the members of s.  Equivalent to
           [indicator_constraints.get_indicator_variables(i) for i in s]
-          
+
         indicator_constraints.get_indicator_variables(begin, end)
           begin and end must be indicator constraint indices with
           begin <= end or indicator constraint names whose indices
@@ -2133,11 +2259,10 @@ class IndicatorConstraintInterface(IndexedInterface):
         >>> c.indicator_constraints.get_indicator_variables()
         [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
         """
-        def getindvar(a):
+        def getindvar(begin, end=self.get_num() - 1):
             return CPX_PROC.getindconstr_constant(
-                self._env._e, self._cplex._lp, a)[0]
-        return apply_freeform_one_arg(
-            getindvar, self.get_indices, self.get_num(), args)
+                self._env._e, self._cplex._lp, begin, end)[1]
+        return apply_freeform_two_args(getindvar, self._conv, args)
 
     def get_complemented(self, *args):
         """Returns whether a set of indicator constraints is complemented.
@@ -2186,11 +2311,10 @@ class IndicatorConstraintInterface(IndexedInterface):
         >>> c.indicator_constraints.get_complemented()
         [0, 1, 0, 1, 0, 1, 0, 1, 0, 1]
         """
-        def getcomp(a):
+        def getcomp(begin, end=self.get_num() - 1):
             return CPX_PROC.getindconstr_constant(
-                self._env._e, self._cplex._lp, a)[1]
-        return apply_freeform_one_arg(
-            getcomp, self.get_indices, self.get_num(), args)
+                self._env._e, self._cplex._lp, begin, end)[2]
+        return apply_freeform_two_args(getcomp, self._conv, args)
 
     def get_num_nonzeros(self, *args):
         """Returns the number of nonzeros in a set of indicator constraints.
@@ -2242,9 +2366,9 @@ class IndicatorConstraintInterface(IndexedInterface):
         def getnnz(a):
             # NB: We return surplus here for nzcnt (this is on purpose).
             return CPX_PROC.getindconstr_constant(
-                self._env._e, self._cplex._lp, a)[4]
+                self._env._e, self._cplex._lp, a, a)[5]
         return apply_freeform_one_arg(
-            getnnz, self.get_indices, self.get_num(), args)
+            getnnz, self._conv, self.get_num(), args)
 
     def get_rhs(self, *args):
         """Returns the righthand side of a set of indicator constraints.
@@ -2289,11 +2413,10 @@ class IndicatorConstraintInterface(IndexedInterface):
         >>> c.indicator_constraints.get_rhs()
         [0.0, 1.5, 3.0, 4.5, 6.0, 7.5, 9.0, 10.5, 12.0, 13.5]
         """
-        def getrhs(a):
+        def getrhs(begin, end=self.get_num() - 1):
             return CPX_PROC.getindconstr_constant(
-                self._env._e, self._cplex._lp, a)[2]
-        return apply_freeform_one_arg(
-            getrhs, self.get_indices, self.get_num(), args)
+                self._env._e, self._cplex._lp, begin, end)[3]
+        return apply_freeform_two_args(getrhs, self._conv, args)
 
     def get_senses(self, *args):
         """Returns the sense of a set of indicator constraints.
@@ -2339,11 +2462,54 @@ class IndicatorConstraintInterface(IndexedInterface):
         >>> c.indicator_constraints.get_senses()
         ['E', 'G', 'L', 'E']
         """
-        def getsense(a):
+        def getsense(begin, end=self.get_num() - 1):
             return CPX_PROC.getindconstr_constant(
-                self._env._e, self._cplex._lp, a)[3]
-        return apply_freeform_one_arg(
-            getsense, self.get_indices, self.get_num(), args)
+                self._env._e, self._cplex._lp, begin, end)[4]
+        result = apply_freeform_two_args(getsense, self._conv, args)
+        s = [i for i in "".join(result)]
+        return s[0] if len(s) == 1 else s
+
+    def get_types(self, *args):
+        """Returns the type of a set of indicator constraints.
+
+        See `IndicatorType()`.
+
+        May be called by four forms.
+
+        indicator_constraints.get_types()
+          return the types of all indicator constraints from the
+          problem.
+
+        indicator_constraints.get_types(i)
+          i must be an indicator constraint name or index.  Returns the
+          type of the indicator constraint whose index or name is i.
+
+        indicator_constraints.get_types(s)
+          s must be a sequence of indicator constraint names or
+          indices.  Returns the types of the indicator constraints
+          with indices the members of s.  Equivalent to
+          [indicator_constraints.get_types(i) for i in s]
+
+        indicator_constraints.get_types(begin, end)
+          begin and end must be indicator constraint indices with
+          begin <= end or indicator constraint names whose indices
+          respect this order.  Returns the types of the indicator
+          constraints with indices between begin and end, inclusive
+          of end.  Equivalent to
+          indicator_constraints.get_types(range(begin, end + 1)).
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> idx = c.indicator_constraints.add(name='i1')
+        >>> c.indicator_constraints.get_types(idx)
+        1
+        >>> c.indicator_constraints.type_[1]
+        'if_'
+        """
+        def gettype(begin, end=self.get_num() - 1):
+            return CPX_PROC.getindconstr_constant(
+                self._env._e, self._cplex._lp, begin, end)[0]
+        return apply_freeform_two_args(gettype, self._conv, args)
 
     def get_linear_components(self, *args):
         """Returns the linear constraint of a set of indicator constraints.
@@ -2367,7 +2533,7 @@ class IndicatorConstraintInterface(IndexedInterface):
           indices.  Returns the linear components of the indicator
           constraints with indices the members of s.  Equivalent to
           [indicator_constraints.get_linear_components(i) for i in s]
-          
+
         indicator_constraints.get_linear_components(begin, end)
           begin and end must be indicator constraint indices with
           begin <= end or indicator constraint names whose indices
@@ -2375,7 +2541,7 @@ class IndicatorConstraintInterface(IndexedInterface):
           indicator constraints with indices between begin and end,
           inclusive of end.  Equivalent to
           indicator_constraints.get_linear_components(range(begin, end + 1)).
-          
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> indices = c.variables.add(names = [str(i) for i in range(11)], types = "B" * 11)
@@ -2396,11 +2562,12 @@ class IndicatorConstraintInterface(IndexedInterface):
         >>> c.indicator_constraints.get_linear_components()
         [SparsePair(ind = [], val = []), SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [0, 1], val = [1.0, 2.0]), SparsePair(ind = [0, 1, 2], val = [1.0, 2.0, 3.0])]
         """
-        def getlin(a):
-            ret = CPX_PROC.getindconstr(self._env._e, self._cplex._lp, a)
-            return SparsePair(ret[0], ret[1])
-        return apply_freeform_one_arg(
-            getlin, self.get_indices, self.get_num(), args)
+        def getlin(begin, end=self.get_num() - 1):
+            mat = _HBMatrix()
+            mat.matbeg, mat.matind, mat.matval = CPX_PROC.getindconstr(
+                self._env._e, self._cplex._lp, begin, end)
+            return [m for m in mat]
+        return apply_freeform_two_args(getlin, self._conv, args)
 
     def get_names(self, *args):
         """Returns the names of a set of indicator constraints.
@@ -2449,18 +2616,21 @@ class IndicatorConstraintInterface(IndexedInterface):
                 self._env._e, self._cplex._lp, a,
                 self._env._apienc)
         return apply_freeform_one_arg(
-            getname, self.get_indices, self.get_num(), args)
+            getname, self._conv, self.get_num(), args)
 
-        
-class QuadraticConstraintInterface(IndexedInterface):
-    """Methods for adding, modifying, and querying quadratic constraints.
 
-    """
+class QuadraticConstraintInterface(BaseInterface):
+    """Methods for adding, modifying, and querying quadratic constraints."""
 
-    def _setup(self, cplex):
-        """non-public"""
-        IndexedInterface._setup(self, cplex)
-        self._get_index_function = CPX_PROC.getqconstrindex
+    def __init__(self, cplex):
+        """Creates a new QuadraticConstraintInterface.
+
+        The quadratic constraints interface is exposed by the top-level
+        `Cplex` class as `Cplex.quadratic_constraints`.  This constructor
+        is not meant to be used externally.
+        """
+        super(QuadraticConstraintInterface, self).__init__(
+            cplex=cplex, getindexfunc=CPX_PROC.getqconstrindex)
 
     def get_num(self):
         """Returns the number of quadratic constraints.
@@ -2482,20 +2652,21 @@ class QuadraticConstraintInterface(IndexedInterface):
 
     def _add(self, lin_expr, quad_expr, sense, rhs, name):
         """non-public"""
-        ind, val = self._unpack_pair(lin_expr)
+        ind, val = unpack_pair(lin_expr)
         if len(val) == 1 and val[0] == 0.0:
             ind = []
             val = []
-        ind1, ind2, qval = self._unpack_triple(quad_expr)
+        ind1, ind2, qval = unpack_triple(quad_expr)
+        varcache = {}
         CPX_PROC.addqconstr(self._env._e, self._cplex._lp, rhs, sense,
-                            [self._cplex.variables._conv(x) for x in ind],
+                            self._cplex.variables._conv(ind, varcache),
                             val,
-                            [self._cplex.variables._conv(x) for x in ind1],
-                            [self._cplex.variables._conv(x) for x in ind2],
+                            self._cplex.variables._conv(ind1, varcache),
+                            self._cplex.variables._conv(ind2, varcache),
                             qval, name,
                             self._env._apienc)
 
-    def add(self, lin_expr = SparsePair([0], [0.0]), quad_expr = SparseTriple([0], [0], [0.0]), sense = "L", rhs = 0.0, name = ""):
+    def add(self, lin_expr=None, quad_expr=None, sense="L", rhs=0.0, name=""):
         """Adds a quadratic constraint to the problem.
 
         Takes up to five keyword arguments:
@@ -2538,6 +2709,10 @@ class QuadraticConstraintInterface(IndexedInterface):
         ...                             sense = "G")
         0
         """
+        if lin_expr is None:
+            lin_expr = SparsePair([0], [0.0])
+        if quad_expr is None:
+            quad_expr = SparseTriple([0], [0], [0.0])
         # We only ever create one quadratic constraint at a time.
         return self._add_single(self.get_num, self._add,
                                 lin_expr, quad_expr, sense, rhs, name)
@@ -2546,7 +2721,7 @@ class QuadraticConstraintInterface(IndexedInterface):
         """Deletes a set of quadratic constraints.
 
         Can be called by four forms.
-        
+
         quadratic_constraints.delete()
           deletes all quadratic constraints from the problem.
 
@@ -2591,15 +2766,15 @@ class QuadraticConstraintInterface(IndexedInterface):
         >>> c.quadratic_constraints.get_names()
         []
         """
-        def deloneqcon(a):
-            CPX_PROC.delqconstrs(self._env._e, self._cplex._lp, a, a)
-        delete_set(deloneqcon, self._conv, self.get_num(), *args)
-        
+        def _delete(begin, end=None):
+            CPX_PROC.delqconstrs(self._env._e, self._cplex._lp, begin, end)
+        delete_set_by_range(_delete, self._conv, self.get_num(), *args)
+
     def get_rhs(self, *args):
         """Returns the righthand side of a set of quadratic constraints.
-        
+
         Can be called by four forms.
-        
+
         quadratic_constraints.get_rhs()
           return the righthand side of all quadratic constraints
           from the problem.
@@ -2644,13 +2819,13 @@ class QuadraticConstraintInterface(IndexedInterface):
             return CPX_PROC.getqconstr_info(
                 self._env._e, self._cplex._lp, a)[0]
         return apply_freeform_one_arg(
-            getrhs, self.get_indices, self.get_num(), args)
+            getrhs, self._conv, self.get_num(), args)
 
     def get_senses(self, *args):
         """Returns the senses of a set of quadratic constraints.
 
         Can be called by four forms.
-        
+
         quadratic_constraints.get_senses()
           return the senses of all quadratic constraints from the
           problem.
@@ -2695,13 +2870,13 @@ class QuadraticConstraintInterface(IndexedInterface):
             return CPX_PROC.getqconstr_info(
                 self._env._e, self._cplex._lp, a)[1]
         return apply_freeform_one_arg(
-            getsense, self.get_indices, self.get_num(), args)
+            getsense, self._conv, self.get_num(), args)
 
     def get_linear_num_nonzeros(self, *args):
         """Returns the number of nonzeros in the linear part of a set of quadratic constraints.
 
         Can be called by four forms.
-        
+
         quadratic_constraints.get_linear_num_nonzeros()
           return the number of nonzeros in all quadratic constraints
           from the problem.
@@ -2748,7 +2923,7 @@ class QuadraticConstraintInterface(IndexedInterface):
             return CPX_PROC.getqconstr_info(
                 self._env._e, self._cplex._lp, a)[2]
         return apply_freeform_one_arg(
-            getlinnz, self.get_indices, self.get_num(), args)
+            getlinnz, self._conv, self.get_num(), args)
 
     def get_linear_components(self, *args):
         """Returns the linear part of a set of quadratic constraints.
@@ -2756,7 +2931,7 @@ class QuadraticConstraintInterface(IndexedInterface):
         Returns a list of SparsePair instances or one SparsePair instance.
 
         Can be called by four forms.
-        
+
         quadratic_constraints.get_linear_components()
           return the linear components of all quadratic constraints
           from the problem.
@@ -2802,15 +2977,15 @@ class QuadraticConstraintInterface(IndexedInterface):
         """
         def getlin(a):
             return SparsePair(*CPX_PROC.getqconstr_lin(
-                    self._env._e, self._cplex._lp, a))
+                self._env._e, self._cplex._lp, a))
         return apply_freeform_one_arg(
-            getlin, self.get_indices, self.get_num(), args)
+            getlin, self._conv, self.get_num(), args)
 
     def get_quad_num_nonzeros(self, *args):
         """Returns the number of nonzeros in the quadratic part of a set of quadratic constraints.
-        
+
         Can be called by four forms.
-        
+
         quadratic_constraints.get_quad_num_nonzeros()
           Returns the number of nonzeros in all quadratic constraints
           from the problem.
@@ -2825,7 +3000,7 @@ class QuadraticConstraintInterface(IndexedInterface):
           indices.  Returns the number of nonzeros in the quadratic
           constraints with indices the members of s.  Equivalent to
           [quadratic_constraints.get_quad_num_nonzeros(i) for i in s]
-          
+
         quadratic_constraints.get_quad_num_nonzeros(begin, end)
           begin and end must be quadratic constraint indices with
           begin <= end or quadratic constraint names whose indices
@@ -2857,13 +3032,13 @@ class QuadraticConstraintInterface(IndexedInterface):
             return CPX_PROC.getqconstr_info(
                 self._env._e, self._cplex._lp, a)[3]
         return apply_freeform_one_arg(
-            getquadnz, self.get_indices, self.get_num(), args)
+            getquadnz, self._conv, self.get_num(), args)
 
     def get_quadratic_components(self, *args):
         """Returns the quadratic part of a set of quadratic constraints.
-        
+
         Can be called by four forms.
-        
+
         quadratic_constraints.get_quadratic_components()
           return the quadratic components of all quadratic constraints
           from the problem.
@@ -2878,7 +3053,7 @@ class QuadraticConstraintInterface(IndexedInterface):
           indices.  Returns the quadratic components of the quadratic
           constraints with indices the members of s.  Equivalent to
           [quadratic_constraints.get_quadratic_components(i) for i in s]
-          
+
         quadratic_constraints.get_quadratic_components(begin, end)
           begin and end must be quadratic constraint indices with
           begin <= end or quadratic constraint names whose indices
@@ -2909,15 +3084,15 @@ class QuadraticConstraintInterface(IndexedInterface):
         """
         def getquad(a):
             return SparseTriple(*CPX_PROC.getqconstr_quad(
-                    self._env._e, self._cplex._lp, a))
+                self._env._e, self._cplex._lp, a))
         return apply_freeform_one_arg(
-            getquad, self.get_indices, self.get_num(), args)
-    
+            getquad, self._conv, self.get_num(), args)
+
     def get_names(self, *args):
         """Returns the names of a set of quadratic constraints.
 
         Can be called by four forms.
-        
+
         quadratic_constraints.get_names()
           return the names of all quadratic constraints from the
           problem.
@@ -2963,17 +3138,18 @@ class QuadraticConstraintInterface(IndexedInterface):
                 self._env._e, self._cplex._lp, a,
                 self._env._apienc)
         return apply_freeform_one_arg(
-            getname, self.get_indices, self.get_num(), args)
+            getname, self._conv, self.get_num(), args)
 
 
-class SOSType:
+class SOSType(object):
     """Constants defining the type of special ordered sets.
-     
+
     For a definition of SOS type 1 and 2, see those topics in the CPLEX
     User's Manual.
     """
     SOS1 = _constants.CPX_TYPE_SOS1
     SOS2 = _constants.CPX_TYPE_SOS2
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -2990,19 +3166,23 @@ class SOSType:
             return 'SOS1'
         if item == _constants.CPX_TYPE_SOS2:
             return 'SOS2'
-        
-class SOSInterface(IndexedInterface):
-    """Class containing methods for Special Ordered Sets (SOS).
 
-    """
+
+class SOSInterface(BaseInterface):
+    """Class containing methods for Special Ordered Sets (SOS)."""
 
     type = SOSType()
     """See `SOSType()` """
 
-    def _setup(self, cplex):
-        """non-public"""
-        IndexedInterface._setup(self, cplex)
-        self._get_index_function = CPX_PROC.getsosindex
+    def __init__(self, cplex):
+        """Creates a new SOSInterface.
+
+        The SOS interface is exposed by the top-level `Cplex` class as
+        `Cplex.SOS`.  This constructor is not meant to be used
+        externally.
+        """
+        super(SOSInterface, self).__init__(
+            cplex=cplex, getindexfunc=CPX_PROC.getsosindex)
 
     def get_num(self):
         """Returns the number of special ordered sets."""
@@ -3012,13 +3192,13 @@ class SOSInterface(IndexedInterface):
     #        word and SOS should be lowercased.
     def _add(self, type, SOS, name):
         """non-public"""
-        indices, weights = self._unpack_pair(SOS)
+        indices, weights = unpack_pair(SOS)
         CPX_PROC.addsos(self._env._e, self._cplex._lp, type, [0],
-                        [self._cplex.variables._conv(x) for x in indices],
+                        self._cplex.variables._conv(indices),
                         weights, [name],
                         self._env._apienc)
 
-    def add(self, type = "1", SOS = SparsePair([0], [0.0]), name = ""):
+    def add(self, type="1", SOS=None, name=""):
         """Adds a special ordered set constraint to the problem.
 
         Takes three keyword arguments.
@@ -3045,6 +3225,8 @@ class SOSInterface(IndexedInterface):
         ...                                  val = [1.0, 3.0, 25.0, 18.0]))
         1
         """
+        if SOS is None:
+            SOS = SparsePair([0], [0.0])
         # We only ever create one sos constraint at a time.
         return self._add_single(self.get_num, self._add,
                                 type, SOS, name)
@@ -3060,7 +3242,7 @@ class SOSInterface(IndexedInterface):
         SOS.delete(i)
           i must be a SOS constraint name or index.  Deletes the SOS
           constraint indexed as i or named i.
-           
+
         SOS.delete(s)
           s must be a sequence of SOS constraint names or indices.
           Deletes the SOS constraints with indices the members of s.
@@ -3094,10 +3276,9 @@ class SOSInterface(IndexedInterface):
         >>> c.SOS.get_names()
         []
         """
-        def delonesos(idx):
-            CPX_PROC.delsos(self._env._e, self._cplex._lp,
-                            begin=idx, end=idx)
-        delete_set(delonesos, self._conv, self.get_num(), *args)
+        def _delete(begin, end=None):
+            CPX_PROC.delsos(self._env._e, self._cplex._lp, begin, end)
+        delete_set_by_range(_delete, self._conv, self.get_num(), *args)
 
     def get_sets(self, *args):
         """Returns the sets of variables and their corresponding weights.
@@ -3114,7 +3295,7 @@ class SOSInterface(IndexedInterface):
           i must be a SOS constraint name or index.  Returns the set
           of variables and weights of the SOS constraint whose index
           or name is i.
-          
+
         SOS.get_sets(s)
           s must be a sequence of SOS constraint names or indices.
           Returns the variables and weights of the SOS constraints
@@ -3147,14 +3328,14 @@ class SOSInterface(IndexedInterface):
         >>> c.SOS.get_sets()
         [SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [0, 1], val = [1.0, 2.0]), SparsePair(ind = [0, 1, 2], val = [1.0, 2.0, 3.0])]
         """
-        def getsos(a, b = self.get_num() - 1):
+        def getsos(a, b=self.get_num() - 1):
             ret = CPX_PROC.getsos(self._env._e, self._cplex._lp, a, b)
             mat = _HBMatrix()
             mat.matbeg = ret[0]
             mat.matind = ret[1]
             mat.matval = ret[2]
             return [m for m in mat]
-        return apply_freeform_two_args(getsos, self.get_indices, args)
+        return apply_freeform_two_args(getsos, self._conv, args)
 
     def get_types(self, *args):
         """Returns the type of a set of special ordered sets.
@@ -3199,10 +3380,10 @@ class SOSInterface(IndexedInterface):
         >>> c.SOS.get_types()
         ['1', '2', '1', '2', '1', '2', '1', '2', '1', '2']
         """
-        def gettype(a, b = self.get_num() - 1):
+        def gettype(a, b=self.get_num() - 1):
             return CPX_PROC.getsos_info(self._env._e, self._cplex._lp, a, b)[0]
         t = [i for i in "".join(apply_freeform_two_args(
-                    gettype, self.get_indices, args))]
+            gettype, self._conv, args))]
         return t[0] if len(t) == 1 else t
 
     def get_num_members(self, *args):
@@ -3253,7 +3434,7 @@ class SOSInterface(IndexedInterface):
         def getsize(a):
             return CPX_PROC.getsos_info(self._env._e, self._cplex._lp, a, a)[1]
         return apply_freeform_one_arg(
-            getsize, self.get_indices, self.get_num(), args)
+            getsize, self._conv, self.get_num(), args)
 
     def get_names(self, *args):
         """Returns the names of a set of special ordered sets.
@@ -3294,20 +3475,21 @@ class SOSInterface(IndexedInterface):
         >>> c.SOS.get_names()
         ['sos1', 'sos2', 'sos3', 'sos4', 'sos5', 'sos6', 'sos7', 'sos8', 'sos9', 'sos10']
         """
-        def getname(a, b = self.get_num() - 1):
+        def getname(a, b=self.get_num() - 1):
             return CPX_PROC.getsosname(self._env._e, self._cplex._lp, a, b,
                                        self._env._apienc)
-        return apply_freeform_two_args(getname, self.get_indices, args)
+        return apply_freeform_two_args(getname, self._conv, args)
 
-        
-class EffortLevel:
+
+class EffortLevel(object):
     """Effort levels associated with a MIP start"""
-    auto              = _constants.CPX_MIPSTART_AUTO
+    auto = _constants.CPX_MIPSTART_AUTO
     check_feasibility = _constants.CPX_MIPSTART_CHECKFEAS
-    solve_fixed       = _constants.CPX_MIPSTART_SOLVEFIXED
-    solve_MIP         = _constants.CPX_MIPSTART_SOLVEMIP
-    repair            = _constants.CPX_MIPSTART_REPAIR
-    no_check          = _constants.CPX_MIPSTART_NOCHECK
+    solve_fixed = _constants.CPX_MIPSTART_SOLVEFIXED
+    solve_MIP = _constants.CPX_MIPSTART_SOLVEMIP
+    repair = _constants.CPX_MIPSTART_REPAIR
+    no_check = _constants.CPX_MIPSTART_NOCHECK
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -3333,18 +3515,22 @@ class EffortLevel:
         if item == _constants.CPX_MIPSTART_NOCHECK:
             return 'no_check'
 
-class MIPStartsInterface(IndexedInterface):
-    """Contains methods pertaining to MIP starts.
 
-    """
+class MIPStartsInterface(BaseInterface):
+    """Contains methods pertaining to MIP starts."""
 
     effort_level = EffortLevel()
     """See `EffortLevel()` """
 
-    def _setup(self, cplex):
-        """non-public"""
-        IndexedInterface._setup(self, cplex)
-        self._get_index_function = CPX_PROC.getmipstartindex
+    def __init__(self, cplex):
+        """Creates a new MIPStartsInterface.
+
+        The MIP starts interface is exposed by the top-level `Cplex`
+        class as `Cplex.MIP_starts`.  This constructor is not meant to be
+        used externally.
+        """
+        super(MIPStartsInterface, self).__init__(
+            cplex=cplex, getindexfunc=CPX_PROC.getmipstartindex)
 
     def get_num(self):
         """Returns the number of MIP starts currently stored.
@@ -3392,7 +3578,7 @@ class MIPStartsInterface(IndexedInterface):
         CPX_PROC.readcopymipstarts(self._env._e, self._cplex._lp, filename,
                                    enc=self._env._apienc)
 
-    def write(self, filename, begin = -1, end = -1):
+    def write(self, filename, begin=-1, end=-1):
         """Writes a set of MIP starts to a file.
 
         If called with only a filename, writes all MIP starts to that
@@ -3436,10 +3622,10 @@ class MIPStartsInterface(IndexedInterface):
                 name = args[2]
             else:
                 raise WrongNumberOfArgumentsError()
-            ind, val = self._unpack_pair(args[0])
+            ind, val = unpack_pair(args[0])
             CPX_PROC.addmipstarts(
                 self._env._e, self._cplex._lp, [0],
-                [self._cplex.variables._conv(x) for x in ind],
+                self._cplex.variables._conv(ind),
                 val, [args[1]], [name],
                 self._env._apienc)
 
@@ -3448,7 +3634,7 @@ class MIPStartsInterface(IndexedInterface):
 
         To add a single MIP start, call this method as
 
-        cpx.MIP_starts.add(start, effort_level, name = "")
+        cpx.MIP_starts.add(start, effort_level, name)
 
         The first argument, start, must be either a SparsePair
         instance or a list of two lists, the first of which contains
@@ -3543,10 +3729,10 @@ class MIPStartsInterface(IndexedInterface):
         [(SparsePair(ind = [0, 1, 2], val = [-1.0, -1.0, 2.0]), 1), (SparsePair(ind = [0, 2], val = [3.0, 2.0]), 4)]
         """
         if len(args) == 3:
-            ind, val = self._unpack_pair(args[1])
+            ind, val = unpack_pair(args[1])
             CPX_PROC.chgmipstarts(
                 self._env._e, self._cplex._lp, [self._conv(args[0])], [0],
-                [self._cplex.variables._conv(x) for x in ind],
+                self._cplex.variables._conv(ind),
                 val, [args[2]])
         elif len(args) == 1:
             for arg in args[0]:
@@ -3602,9 +3788,9 @@ class MIPStartsInterface(IndexedInterface):
         []
         """
 
-        def delonemst(a):
-            CPX_PROC.delmipstarts(self._env._e, self._cplex._lp, a, a)
-        delete_set(delonemst, self._conv, self.get_num(), *args)
+        def _delete(begin, end=None):
+            CPX_PROC.delmipstarts(self._env._e, self._cplex._lp, begin, end)
+        delete_set_by_range(_delete, self._conv, self.get_num(), *args)
 
     def get_starts(self, *args):
         """Returns a set of MIP starts.
@@ -3657,14 +3843,14 @@ class MIPStartsInterface(IndexedInterface):
         >>> c.MIP_starts.effort_level[0]
         'auto'
         """
-        def getmst(a, b = self.get_num() - 1):
+        def getmst(a, b=self.get_num() - 1):
             ret = CPX_PROC.getmipstarts(self._env._e, self._cplex._lp, a, b)
             mat = _HBMatrix()
             mat.matbeg = ret[0]
             mat.matind = ret[1]
             mat.matval = ret[2]
             return [(m, ret[3][i]) for (i, m) in enumerate(mat)]
-        return apply_freeform_two_args(getmst, self.get_indices, args)
+        return apply_freeform_two_args(getmst, self._conv, args)
 
     def get_effort_levels(self, *args):
         """Returns the effort levels for a set of MIP starts.
@@ -3717,9 +3903,9 @@ class MIPStartsInterface(IndexedInterface):
         >>> c.MIP_starts.get_effort_levels()
         [0, 1, 2, 3, 4, 5, 0, 0, 0, 0]
         """
-        def geteffort(a, b = self.get_num() - 1):
+        def geteffort(a, b=self.get_num() - 1):
             return CPX_PROC.getmipstarts_effort(self._env._e, self._cplex._lp, a, b)
-        return apply_freeform_two_args(geteffort, self.get_indices, args)
+        return apply_freeform_two_args(geteffort, self._conv, args)
 
     def get_num_entries(self, *args):
         """Returns the number of variables specified by a set of MIP starts.
@@ -3772,8 +3958,8 @@ class MIPStartsInterface(IndexedInterface):
         def getmstsize(a):
             return CPX_PROC.getmipstarts_size(self._env._e, self._cplex._lp, a, a)
         return apply_freeform_one_arg(
-            getmstsize, self.get_indices, self.get_num(), args)
-    
+            getmstsize, self._conv, self.get_num(), args)
+
     def get_names(self, *args):
         """Returns the names of a set of MIP starts.
 
@@ -3816,16 +4002,17 @@ class MIPStartsInterface(IndexedInterface):
         >>> c.MIP_starts.get_names()
         ['mst0', 'mst1', 'mst2', 'mst3', 'mst4', 'mst5', 'mst6', 'mst7', 'mst8', 'mst9']
         """
-        def getname(a, b = self.get_num() - 1):
+        def getname(a, b=self.get_num() - 1):
             return CPX_PROC.getmipstartname(self._env._e, self._cplex._lp,
                                             a, b, self._env._apienc)
-        return apply_freeform_two_args(getname, self.get_indices, args)
+        return apply_freeform_two_args(getname, self._conv, args)
 
 
-class ObjSense:
+class ObjSense(object):
     """Constants defining the sense of the objective function."""
     maximize = _constants.CPX_MAX
     minimize = _constants.CPX_MIN
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -3843,12 +4030,13 @@ class ObjSense:
         if item == _constants.CPX_MIN:
             return 'minimize'
 
+
 class ObjectiveInterface(BaseInterface):
     """Contains methods for querying and modifying the objective function."""
 
     sense = ObjSense()
     """See `ObjSense()` """
-    
+
     def set_linear(self, *args):
         """Changes the linear part of the objective function.
 
@@ -3863,7 +4051,7 @@ class ObjectiveInterface(BaseInterface):
           sequence is a sequence of pairs (var, value) as described
           above.  Changes the coefficients for the specified
           variables to the given values.
-        
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> indices = c.variables.add(names = [str(i) for i in range(4)])
@@ -3879,10 +4067,10 @@ class ObjectiveInterface(BaseInterface):
         >>> c.objective.get_linear()
         [1.0, 0.5, 2.0, -1.0]
         """
-        
+
         def chgobj(a, b):
             CPX_PROC.chgobj(self._env._e, self._cplex._lp, a, b)
-        apply_pairs(chgobj, self._cplex.variables.get_indices, *args)
+        apply_pairs(chgobj, self._cplex.variables._conv, *args)
 
     def set_quadratic(self, *args):
         """Sets the quadratic part of the objective function.
@@ -3904,7 +4092,7 @@ class ObjectiveInterface(BaseInterface):
           quadratic objective function.  To modify only part of the
           quadratic objective function, use the method
           set_quadratic_coefficients.
-          
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> indices = c.variables.add(names = [str(i) for i in range(3)])
@@ -3917,12 +4105,14 @@ class ObjectiveInterface(BaseInterface):
         >>> c.objective.get_quadratic()
         [SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [1], val = [2.0]), SparsePair(ind = [2], val = [3.0])]
         """
+        if len(args) != 1:
+            raise WrongNumberOfArgumentsError()
         if isinstance(args[0], _HBMatrix):
             CPX_PROC.copyquad(
                 self._env._e, self._cplex._lp, args[0].matbeg,
-                [self._cplex.variables._conv(x) for x in args[0].matind],
+                self._cplex.variables._conv(args[0].matind),
                 args[0].matval)
-        elif isinstance(args[0][0], type(0.0)):
+        elif isinstance(args[0][0], float):
             CPX_PROC.copyqpsep(self._env._e, self._cplex._lp, args[0])
         else:
             self.set_quadratic(_HBMatrix(args[0]))
@@ -3964,15 +4154,19 @@ class ObjectiveInterface(BaseInterface):
         >>> c.objective.get_quadratic()
         [SparsePair(ind = [1, 2], val = [5.0, 3.0]), SparsePair(ind = [0, 1], val = [5.0, 2.0]), SparsePair(ind = [0], val = [3.0])]
         """
-        if isinstance(self._cplex.variables._conv(args[0]), six.integer_types):
-            arg_list = ((args[0],), (args[1],), (args[2],))
+        if len(args) not in (3, 1):
+            raise WrongNumberOfArgumentsError()
+        if (isinstance(args[0], six.string_types) or
+                isinstance(args[0], six.integer_types)):
+            arg_list = [args]
         else:
-            arg_list = list(zip(*args[0]))
-        for i in range(len(arg_list[0])):
+            arg_list = args[0]
+        varcache = {}
+        for i, j, val in arg_list:
             CPX_PROC.chgqpcoef(self._env._e, self._cplex._lp,
-                               self._cplex.variables._conv(arg_list[0][i]),
-                               self._cplex.variables._conv(arg_list[1][i]),
-                               arg_list[2][i])
+                               self._cplex.variables._conv(i, varcache),
+                               self._cplex.variables._conv(j, varcache),
+                               val)
 
     def set_sense(self, sense):
         """Sets the sense of the objective function.
@@ -4020,7 +4214,7 @@ class ObjectiveInterface(BaseInterface):
           i must be a variable name or index.  Returns the linear
           objective coefficient of the variable whose index or name
           is i.
-          
+
         objective.get_linear(s)
           s must be a sequence of variable names or indices.  Returns
           the linear objective coefficient of the variables with
@@ -4049,10 +4243,10 @@ class ObjectiveInterface(BaseInterface):
         >>> c.objective.get_linear()
         [0.0, 1.5, 3.0, 4.5, 6.0, 7.5, 9.0, 10.5, 12.0, 13.5]
         """
-        def getobj(a, b = self._cplex.variables.get_num() - 1):
+        def getobj(a, b=self._cplex.variables.get_num() - 1):
             return CPX_PROC.getobj(self._env._e, self._cplex._lp, a, b)
         return apply_freeform_two_args(
-            getobj, self._cplex.variables.get_indices, args)
+            getobj, self._cplex.variables._conv, args)
 
     def get_quadratic(self, *args):
         """Returns a set of columns of the quadratic component of the objective function.
@@ -4098,15 +4292,15 @@ class ObjectiveInterface(BaseInterface):
         >>> c.objective.get_quadratic()
         [SparsePair(ind = [], val = []), SparsePair(ind = [1], val = [1.5]), SparsePair(ind = [2], val = [3.0]), SparsePair(ind = [3], val = [4.5]), SparsePair(ind = [4], val = [6.0]), SparsePair(ind = [5], val = [7.5]), SparsePair(ind = [6], val = [9.0]), SparsePair(ind = [7], val = [10.5]), SparsePair(ind = [8], val = [12.0]), SparsePair(ind = [9], val = [13.5])]
         """
-        def getquad(begin, end = self._cplex.variables.get_num() - 1):
+        num = self._cplex.variables.get_num()
+
+        def getquad(begin, end=num - 1):
             mat = _HBMatrix()
             t = CPX_PROC.getquad(self._env._e, self._cplex._lp, begin, end)
-            mat.matbeg = t[0]
-            mat.matind = t[1]
-            mat.matval = t[2]
+            mat.matbeg, mat.matind, mat.matval = t
             return [m for m in mat]
         return apply_freeform_two_args(
-            getquad, self._cplex.variables.get_indices, args)
+            getquad, self._cplex.variables._conv, args)
 
     def get_quadratic_coefficients(self, *args):
         """Returns individual coefficients from the quadratic objective function.
@@ -4134,26 +4328,13 @@ class ObjectiveInterface(BaseInterface):
         >>> c.objective.get_quadratic_coefficients([(1, 0), (1, "1"), (2, "0")])
         [5.0, 2.0, 3.0]
         """
-        def getqpcoef(a):
-            return CPX_PROC.getqpcoef(self._env._e, self._cplex._lp, a[0], a[1])
-        def convert(a):
-            retval = [-1, -1]
-            if isinstance(a[0], six.string_types):
-                retval[0] = self._cplex.variables.get_indices(a[0])
-            else:
-                retval[0] = a[0]
-            if isinstance(a[1], six.string_types):
-                retval[1] = self._cplex.variables.get_indices(a[1])
-            else:
-                retval[1] = a[1]
-            return retval
+        def getqpcoef(v1, v2):
+            return CPX_PROC.getqpcoef(self._env._e, self._cplex._lp, v1, v2)
         if len(args) == 2:
-            return getqpcoef(convert(args))
+            indices = self._cplex.variables._conv(args)
+            return getqpcoef(indices[0], indices[1])
         elif len(args) == 1:
-            retval = []
-            for arg in args[0]:
-                retval.append(self.get_quadratic_coefficients(*arg))
-            return retval
+            return [self.get_quadratic_coefficients(*arg) for arg in args[0]]
         else:
             raise WrongNumberOfArgumentsError()
 
@@ -4257,8 +4438,18 @@ class ObjectiveInterface(BaseInterface):
         return CPX_PROC.chgobjoffset(self._env._e, self._cplex._lp, offset)
 
 
-class ProgressInterface(AdvancedInterface):
+class ProgressInterface(BaseInterface):
     """Methods to query the progress of optimization."""
+
+    def __init__(self, parent):
+        """Creates a new ProgressInterface.
+
+        The progress interface is exposed by the top-level `Cplex`
+        class as Cplex.solution.progress.  This constructor is not
+        meant to be used externally.
+        """
+        super(ProgressInterface, self).__init__(cplex=parent._cplex,
+                                                advanced=True)
 
     def get_num_iterations(self):
         """Returns the number of iterations executed so far.
@@ -4299,7 +4490,7 @@ class ProgressInterface(AdvancedInterface):
         8
         """
         return CPX_PROC.getbaritcnt(self._env._e, self._cplex._lp)
-        
+
     def get_num_sifting_iterations(self):
         """Returns the number of sifting iterations.
 
@@ -4316,7 +4507,7 @@ class ProgressInterface(AdvancedInterface):
         3
         """
         return CPX_PROC.getsiftitcnt(self._env._e, self._cplex._lp)
-        
+
     def get_num_phase_one_iterations(self):
         """Returns the number of iterations to find a feasible solution.
 
@@ -4332,7 +4523,7 @@ class ProgressInterface(AdvancedInterface):
         4
         """
         return CPX_PROC.getphase1cnt(self._env._e, self._cplex._lp)
-        
+
     def get_num_sifting_phase_one_iterations(self):
         """Returns the number of sifting iterations to find a feasible solution.
 
@@ -4349,7 +4540,7 @@ class ProgressInterface(AdvancedInterface):
         0
         """
         return CPX_PROC.getsiftphase1cnt(self._env._e, self._cplex._lp)
-        
+
     def get_num_nodes_processed(self):
         """Returns the number of nodes processed.
 
@@ -4362,11 +4553,10 @@ class ProgressInterface(AdvancedInterface):
         >>> out = c.set_log_stream(None)
         >>> c.read("ind.lp")
         >>> c.solve()
-        >>> int(c.solution.progress.get_num_nodes_processed())
-        0
+        >>> num_nodes = c.solution.progress.get_num_nodes_processed()
         """
         return CPX_PROC.getnodecnt(self._env._e, self._cplex._lp)
-        
+
     def get_num_nodes_remaining(self):
         """Returns the number of nodes left to process.
 
@@ -4382,7 +4572,7 @@ class ProgressInterface(AdvancedInterface):
         0
         """
         return CPX_PROC.getnodeleftcnt(self._env._e, self._cplex._lp)
-        
+
     def get_num_primal_push(self):
         """Returns the number of primal push operations.
 
@@ -4399,7 +4589,7 @@ class ProgressInterface(AdvancedInterface):
         0
         """
         return CPX_PROC.getcrossppushcnt(self._env._e, self._cplex._lp)
-        
+
     def get_num_primal_exchange(self):
         """Returns the number of primal exchange operations.
 
@@ -4416,7 +4606,7 @@ class ProgressInterface(AdvancedInterface):
         1
         """
         return CPX_PROC.getcrosspexchcnt(self._env._e, self._cplex._lp)
-        
+
     def get_num_dual_push(self):
         """Returns the number of dual push operations.
 
@@ -4433,7 +4623,7 @@ class ProgressInterface(AdvancedInterface):
         0
         """
         return CPX_PROC.getcrossdpushcnt(self._env._e, self._cplex._lp)
-        
+
     def get_num_dual_exchange(self):
         """Returns the number of dual exchange operations.
 
@@ -4450,9 +4640,9 @@ class ProgressInterface(AdvancedInterface):
         0
         """
         return CPX_PROC.getcrossdexchcnt(self._env._e, self._cplex._lp)
-        
 
-class InfeasibilityInterface(AdvancedInterface):
+
+class InfeasibilityInterface(BaseInterface):
     """Methods for computing degree of infeasibility in a solution vector.
 
     Each of these methods takes one required argument, x, which must
@@ -4476,6 +4666,16 @@ class InfeasibilityInterface(AdvancedInterface):
     in a list.
     """
 
+    def __init__(self, parent):
+        """Creates a new InfeasibilityInterface.
+
+        The infeasibility interface is exposed by the top-level `Cplex`
+        class as Cplex.solution.infeasibility.  This constructor is not
+        meant to be used externally.
+        """
+        super(InfeasibilityInterface, self).__init__(cplex=parent._cplex,
+                                                     advanced=True)
+
     def bound_constraints(self, x, *args):
         """Returns the amount by which variable bounds are violated by x.
 
@@ -4497,11 +4697,11 @@ class InfeasibilityInterface(AdvancedInterface):
         >>> bd[15]
         0.0
         """
-        def getinfeas(a, b = self._cplex.variables.get_num() - 1):
+        def getinfeas(a, b=self._cplex.variables.get_num() - 1):
             return CPX_PROC.getcolinfeas(self._env._e, self._cplex._lp, x, a, b)
         return apply_freeform_two_args(
-            getinfeas, self._cplex.variables.get_indices, args)
-    
+            getinfeas, self._cplex.variables._conv, args)
+
     def linear_constraints(self, x, *args):
         """Returns the amount by which a set of linear constraints are violated by x.
 
@@ -4526,11 +4726,11 @@ class InfeasibilityInterface(AdvancedInterface):
         0.0
 
         """
-        def getinfeas(a, b = self._cplex.linear_constraints.get_num() - 1):
+        def getinfeas(a, b=self._cplex.linear_constraints.get_num() - 1):
             return CPX_PROC.getrowinfeas(self._env._e, self._cplex._lp, x, a, b)
         return apply_freeform_two_args(
-            getinfeas, self._cplex.linear_constraints.get_indices, args)
-        
+            getinfeas, self._cplex.linear_constraints._conv, args)
+
     def quadratic_constraints(self, x, *args):
         """Returns the amount by which a set of quadratic constraints are violated by x.
 
@@ -4553,11 +4753,11 @@ class InfeasibilityInterface(AdvancedInterface):
         [True, True, True, True]
 
         """
-        def getinfeas(a, b = self._cplex.quadratic_constraints.get_num() - 1):
+        def getinfeas(a, b=self._cplex.quadratic_constraints.get_num() - 1):
             return CPX_PROC.getqconstrinfeas(self._env._e, self._cplex._lp, x, a, b)
         return apply_freeform_two_args(
-            getinfeas, self._cplex.quadratic_constraints.get_indices, args)
-        
+            getinfeas, self._cplex.quadratic_constraints._conv, args)
+
     def indicator_constraints(self, x, *args):
         """Returns the amount by which indicator constraints are violated by x.
 
@@ -4579,11 +4779,11 @@ class InfeasibilityInterface(AdvancedInterface):
         >>> iconstraint[5]
         0.0
         """
-        def getinfeas(a, b = self._cplex.indicator_constraints.get_num() - 1):
+        def getinfeas(a, b=self._cplex.indicator_constraints.get_num() - 1):
             return CPX_PROC.getindconstrinfeas(self._env._e, self._cplex._lp, x, a, b)
         return apply_freeform_two_args(
-            getinfeas, self._cplex.indicator_constraints.get_indices, args)
-    
+            getinfeas, self._cplex.indicator_constraints._conv, args)
+
     def SOS_constraints(self, x, *args):
         """Returns the amount by which SOS constraints are violated by x.
 
@@ -4604,34 +4804,38 @@ class InfeasibilityInterface(AdvancedInterface):
         >>> c.solution.infeasibility.SOS_constraints(c.solution.get_values())
         [0.0]
         """
-        def getinfeas(a, b = self._cplex.SOS.get_num() - 1):
+        def getinfeas(a, b=self._cplex.SOS.get_num() - 1):
             return CPX_PROC.getsosinfeas(self._env._e, self._cplex._lp, x, a, b)
         return apply_freeform_two_args(
-            getinfeas, self._cplex.SOS.get_indices, args)
+            getinfeas, self._cplex.SOS._conv, args)
 
 
-class CutType:
+class CutType(object):
     """Identifiers for types of cuts."""
-
-    cover                 = _constants.CPX_CUT_COVER
-    GUB_cover             = _constants.CPX_CUT_GUBCOVER
-    flow_cover            = _constants.CPX_CUT_FLOWCOVER
-    clique                = _constants.CPX_CUT_CLIQUE
-    fractional            = _constants.CPX_CUT_FRAC
-    MIR                   = _constants.CPX_CUT_MIR
-    flow_path             = _constants.CPX_CUT_FLOWPATH
-    disjunctive           = _constants.CPX_CUT_DISJ
-    implied_bound         = _constants.CPX_CUT_IMPLBD
-    zero_half             = _constants.CPX_CUT_ZEROHALF
-    multi_commodity_flow  = _constants.CPX_CUT_MCF
-    _local_cover           = _constants.CPX_CUT_LOCALCOVER
-    _tighten               = _constants.CPX_CUT_TIGHTEN
+    # NB: If you edit these, look at MIPInfoCallback.cut_type too!
+    cover = _constants.CPX_CUT_COVER
+    GUB_cover = _constants.CPX_CUT_GUBCOVER
+    flow_cover = _constants.CPX_CUT_FLOWCOVER
+    clique = _constants.CPX_CUT_CLIQUE
+    fractional = _constants.CPX_CUT_FRAC
+    MIR = _constants.CPX_CUT_MIR
+    flow_path = _constants.CPX_CUT_FLOWPATH
+    disjunctive = _constants.CPX_CUT_DISJ
+    implied_bound = _constants.CPX_CUT_IMPLBD
+    zero_half = _constants.CPX_CUT_ZEROHALF
+    multi_commodity_flow = _constants.CPX_CUT_MCF
+    _local_cover = _constants.CPX_CUT_LOCALCOVER
+    _tighten = _constants.CPX_CUT_TIGHTEN
     _objective_disjunctive = _constants.CPX_CUT_OBJDISJ
-    lift_and_project      = _constants.CPX_CUT_LANDP
-    user                  = _constants.CPX_CUT_USER
-    table                 = _constants.CPX_CUT_TABLE
-    solution_pool         = _constants.CPX_CUT_SOLNPOOL
-    __num_types           = _constants.CPX_CUT_NUM_TYPES
+    lift_and_project = _constants.CPX_CUT_LANDP
+    user = _constants.CPX_CUT_USER
+    table = _constants.CPX_CUT_TABLE
+    solution_pool = _constants.CPX_CUT_SOLNPOOL
+    local_implied_bound = _constants.CPX_CUT_LOCALIMPLBD
+    BQP = _constants.CPX_CUT_BQP
+    RLT = _constants.CPX_CUT_RLT
+    benders = _constants.CPX_CUT_BENDERS
+    __num_types = _constants.CPX_CUT_NUM_TYPES
 
     def __iter__(self):
         return list(range(self.__num_types)).__iter__()
@@ -4687,13 +4891,31 @@ class CutType:
             return 'table'
         if item == _constants.CPX_CUT_SOLNPOOL:
             return 'solution_pool'
-        
+        if item == _constants.CPX_CUT_LOCALIMPLBD:
+            return 'local_implied_bound'
+        if item == _constants.CPX_CUT_BQP:
+            return 'BQP'
+        if item == _constants.CPX_CUT_RLT:
+            return 'RLT'
+        if item == _constants.CPX_CUT_BENDERS:
+            return 'benders'
 
-class MIPSolutionInterface(AdvancedInterface):
+
+class MIPSolutionInterface(BaseInterface):
     """Methods for accessing solutions to a MIP."""
 
     cut_type = CutType()
     """See `CutType()` """
+
+    def __init__(self, parent):
+        """Creates a new MIPSolutionInterface.
+
+        The MIP solution interface is exposed by the top-level `Cplex`
+        class as Cplex.solution.MIP.  This constructor is not meant to
+        be used externally.
+        """
+        super(MIPSolutionInterface, self).__init__(cplex=parent._cplex,
+                                                   advanced=True)
 
     def get_best_objective(self):
         """Returns the currently best known bound of all the remaining open nodes in a branch-and-cut tree.
@@ -4723,7 +4945,7 @@ class MIPSolutionInterface(AdvancedInterface):
         True
         """
         return CPX_PROC.getbestobjval(self._env._e, self._cplex._lp)
-    
+
     def get_cutoff(self):
         """Returns the MIP cutoff value.
 
@@ -4740,7 +4962,7 @@ class MIPSolutionInterface(AdvancedInterface):
         True
         """
         return CPX_PROC.getcutoff(self._env._e, self._cplex._lp)
-        
+
     def get_mip_relative_gap(self):
         """Returns the MIP relative gap.
 
@@ -4756,7 +4978,7 @@ class MIPSolutionInterface(AdvancedInterface):
         0.0
         """
         return CPX_PROC.getmiprelgap(self._env._e, self._cplex._lp)
-        
+
     def get_incumbent_node(self):
         """Returns the node number of the best solution found. 
 
@@ -4788,12 +5010,12 @@ class MIPSolutionInterface(AdvancedInterface):
         >>> out = c.set_log_stream(None)
         >>> c.read("ind.lp")
         >>> c.solve()
-        >>> c.solution.MIP.get_num_cuts(c.solution.MIP.cut_type.zero_half)
-        5
+        >>> ncuts = c.solution.MIP.get_num_cuts(
+        ...     c.solution.MIP.cut_type.zero_half)
 
         """
         return CPX_PROC.getnumcuts(self._env._e, self._cplex._lp, cut_type)
-        
+
     def get_subproblem_status(self):
         """Returns the solution status of the last subproblem optimization.
 
@@ -4816,12 +5038,13 @@ class MIPSolutionInterface(AdvancedInterface):
         return CPX_PROC.getsubstat(self._env._e, self._cplex._lp)
 
 
-class BasisVarStatus:
+class BasisVarStatus(object):
     """Status values returned by basis query methods."""
     at_lower_bound = _constants.CPX_AT_LOWER
-    basic          = _constants.CPX_BASIC
+    basic = _constants.CPX_BASIC
     at_upper_bound = _constants.CPX_AT_UPPER
-    free_nonbasic  = _constants.CPX_FREE_SUPER
+    free_nonbasic = _constants.CPX_FREE_SUPER
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -4844,45 +5067,51 @@ class BasisVarStatus:
             return 'free_nonbasic'
 
 
-class BasisInterface(AdvancedInterface):
+class BasisInterface(BaseInterface):
     """Methods for accessing the basis of a solution."""
 
     status = BasisVarStatus()
     """See `BasisVarStatus()` """
-    
-    def get_col_basis(self):
-        """Returns the status of structural variables.
 
-        Returns a list of attributes of solution.basis.status of
-        length equal to the number of variables.
+    def __init__(self, parent):
+        """Creates a new BasisInterface.
 
+        The basis interface is exposed by the top-level `Cplex` class as
+        Cplex.solution.basis.  This constructor is not meant to be used
+        externally.
         """
-        return CPX_PROC.getbase_c(self._env._e, self._cplex._lp)
-    
-    def get_row_basis(self):
-        """Returns the status of slack variables.
+        super(BasisInterface, self).__init__(cplex=parent._cplex,
+                                             advanced=True)
 
-        Returns a list of attributes of solution.basis.status of
-        length equal to the number of linear constraints.
-
-        """
-        return CPX_PROC.getbase_r(self._env._e, self._cplex._lp)
-    
     def get_basis(self):
         """Returns the status of structural and slack variables.
 
         Returns a pair of lists of attributes of solution.basis.status.
-        The first lists the status of the structural variables, the
-        second lists the status of the slack variables.
+        The first lists the status of the structural variables (of length
+        equal to the number of variables), the second lists the status of
+        the slack variables (of length equal to the number of linear
+        constraints).
 
+        See CPXgetbase in the Callable Library Reference Manual for
+        more detail.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> out = c.set_results_stream(None)
+        >>> out = c.set_log_stream(None)
+        >>> c.read("lpex.mps")
+        >>> c.solve()
+        >>> pair_of_lists = c.solution.basis.get_basis()
         """
         return CPX_PROC.getbase(self._env._e, self._cplex._lp)
-    
+
     def write(self, filename):
         """Writes the basis to a file."""
         CPX_PROC.mbasewrite(self._env._e, self._cplex._lp, filename,
                             enc=self._env._apienc)
-    
+
     def get_header(self):
         """Returns the basis header.
 
@@ -4892,7 +5121,7 @@ class BasisInterface(AdvancedInterface):
         -rowindex - 1.
         """
         return CPX_PROC.getbhead(self._env._e, self._cplex._lp)
-    
+
     def get_basic_row_index(self, row):
         """Returns the position of a basic slack variable in the basis header.
 
@@ -4908,7 +5137,7 @@ class BasisInterface(AdvancedInterface):
         3
         """
         return CPX_PROC.getijrow(self._env._e, self._cplex._lp, row, "R")
-    
+
     def get_basic_col_index(self, col):
         """Returns the position of a basic structural variable in the basis header.
 
@@ -4924,7 +5153,7 @@ class BasisInterface(AdvancedInterface):
         1
         """
         return CPX_PROC.getijrow(self._env._e, self._cplex._lp, col, "C")
-    
+
     def get_primal_norms(self):
         """Returns norms from the primal steepest edge.
 
@@ -4949,7 +5178,7 @@ class BasisInterface(AdvancedInterface):
         True
         """
         return CPX_PROC.getpnorms(self._env._e, self._cplex._lp)
-    
+
     def get_dual_norms(self):
         """Returns norms from the dual steepest edge.
 
@@ -4966,7 +5195,7 @@ class BasisInterface(AdvancedInterface):
         ([1.0, 1.0, 1.0, 1.0], [1, 2, 3, -3])
         """
         return CPX_PROC.getdnorms(self._env._e, self._cplex._lp)
-    
+
     def get_basis_dual_norms(self):
         """Returns basis and dual norms.
 
@@ -4983,7 +5212,7 @@ class BasisInterface(AdvancedInterface):
         ([2, 1, 1, 1], [0, 0, 1, 0], [1.0, 1.0, 1.0, 1.0])
         """
         return CPX_PROC.getbasednorms(self._env._e, self._cplex._lp)
-    
+
     def get_num_primal_superbasic(self):
         """Returns the number of primal superbasic variables.
 
@@ -4995,10 +5224,20 @@ class BasisInterface(AdvancedInterface):
 
         """
         return CPX_PROC.getdsbcnt(self._env._e, self._cplex._lp)
-        
 
-class SensitivityInterface(AdvancedInterface):
+
+class SensitivityInterface(BaseInterface):
     """Methods for sensitivity analysis."""
+
+    def __init__(self, parent):
+        """Creates a new SensitivityInterface.
+
+        The sensitivity interface is exposed by the top-level `Cplex`
+        class as Cplex.solution.sensitivity.  This constructor is not
+        meant to be used externally.
+        """
+        super(SensitivityInterface, self).__init__(cplex=parent._cplex,
+                                                   advanced=True)
 
     def lower_bounds(self, *args):
         """Returns the sensitivity of a set of lower bounds.
@@ -5020,10 +5259,10 @@ class SensitivityInterface(AdvancedInterface):
         >>> c.solution.sensitivity.lower_bounds()
         [(-1e+20, 40.0), (-1e+20, 17.5), (-1e+20, 42.5), (-1e+20, 0.625)]
         """
-        def sa(a, b = self._cplex.variables.get_num() - 1):
+        def sa(a, b=self._cplex.variables.get_num() - 1):
             return list(zip(*CPX_PROC.boundsa_lower(self._env._e, self._cplex._lp, a, b)))
         return apply_freeform_two_args(
-            sa, self._cplex.variables.get_indices, args)
+            sa, self._cplex.variables._conv, args)
 
     def upper_bounds(self, *args):
         """Returns the sensitivity of a set of upper bounds.
@@ -5053,11 +5292,11 @@ class SensitivityInterface(AdvancedInterface):
         True
         True
         """
-        def sa(a, b = self._cplex.variables.get_num() - 1):
+        def sa(a, b=self._cplex.variables.get_num() - 1):
             return list(zip(*CPX_PROC.boundsa_upper(self._env._e, self._cplex._lp, a, b)))
         return apply_freeform_two_args(
-            sa, self._cplex.variables.get_indices, args)
-    
+            sa, self._cplex.variables._conv, args)
+
     def bounds(self, *args):
         """Returns the sensitivity of a set of both lower and upper bounds.
 
@@ -5079,10 +5318,10 @@ class SensitivityInterface(AdvancedInterface):
         >>> bd[1]
         (-1e+20, 17.5, 17.5, 1e+20)
         """
-        def sa(a, b = self._cplex.variables.get_num() - 1):
+        def sa(a, b=self._cplex.variables.get_num() - 1):
             return list(zip(*CPX_PROC.boundsa(self._env._e, self._cplex._lp, a, b)))
         return apply_freeform_two_args(
-            sa, self._cplex.variables.get_indices, args)
+            sa, self._cplex.variables._conv, args)
 
     def objective(self, *args):
         """Returns the sensitivity of part of the objective function.
@@ -5104,10 +5343,10 @@ class SensitivityInterface(AdvancedInterface):
         >>> c.solution.sensitivity.objective()
         [(-1e+20, 2.5), (-3.0, 5.0), (-1e+20, -2.0), (0.0, 4.0)]
         """
-        def sa(a, b = self._cplex.variables.get_num() - 1):
+        def sa(a, b=self._cplex.variables.get_num() - 1):
             return list(zip(*CPX_PROC.objsa(self._env._e, self._cplex._lp, a, b)))
         return apply_freeform_two_args(
-            sa, self._cplex.variables.get_indices, args)
+            sa, self._cplex.variables._conv, args)
 
     def rhs(self, *args):
         """Returns the sensitivity of the righthand side of a set of linear constraints.
@@ -5141,15 +5380,17 @@ class SensitivityInterface(AdvancedInterface):
         True
         True
         """
-        def sa(a, b = self._cplex.linear_constraints.get_num() - 1):
+        def sa(a, b=self._cplex.linear_constraints.get_num() - 1):
             return list(zip(*CPX_PROC.rhssa(self._env._e, self._cplex._lp, a, b)))
         return apply_freeform_two_args(
-            sa, self._cplex.linear_constraints.get_indices, args)
-        
-class FilterType:
+            sa, self._cplex.linear_constraints._conv, args)
+
+
+class FilterType(object):
     """Attributes define the filter types."""
     diversity = _constants.CPX_SOLNPOOL_FILTER_DIVERSITY
-    range     = _constants.CPX_SOLNPOOL_FILTER_RANGE
+    range = _constants.CPX_SOLNPOOL_FILTER_RANGE
+
     def __getitem__(self, item):
         """Convert a constant to a string.
 
@@ -5168,34 +5409,34 @@ class FilterType:
             return 'range'
 
 
-class SolnPoolFilterInterface(AdvancedInterface, IndexedInterface):
-    """Methods for solution pool filters.
-
-    """
+class SolnPoolFilterInterface(BaseInterface):
+    """Methods for solution pool filters."""
 
     type = FilterType()
     """See `FilterType()` """
 
-    def _setup(self, *args, **kwargs):
-        """non-public"""
-        # AdvancedInterface._setup would ordinarly override
-        # IndexedInterface due to method resolution order (this is what we
-        # want).  Since we're overriding _setup, let's keep it that way.
-        AdvancedInterface._setup(self, *args, **kwargs)
-        # For IndexedInterface.get_indices().
-        self._get_index_function = CPX_PROC.getsolnpoolfilterindex
+    def __init__(self, parent):
+        """Creates a new SolnPoolFilterInterface.
+
+        The solution pool filter interface is exposed by the top-level
+        `Cplex` class as Cplex.solution.pool.filter.  This constructor
+        is not meant to be used externally.
+        """
+        super(SolnPoolFilterInterface, self).__init__(
+            cplex=parent._cplex, advanced=True,
+            getindexfunc=CPX_PROC.getsolnpoolfilterindex)
 
     def _add_diversity_filter(self, lb, ub, expression, weights, name):
         """non-public"""
-        ind, val = self._unpack_pair(expression)
+        ind, val = unpack_pair(expression)
         validate_arg_lengths([ind, val, weights])
         CPX_PROC.addsolnpooldivfilter(
             self._env._e, self._cplex._lp, lb, ub,
-            [self._cplex.variables._conv(x) for x in ind],
+            self._cplex.variables._conv(ind),
             weights, val, name,
             self._env._apienc)
 
-    def add_diversity_filter(self, lb, ub, expression, weights=[],
+    def add_diversity_filter(self, lb, ub, expression, weights=None,
                              name=''):
         """Adds a diversity filter to the solution pool.
 
@@ -5226,15 +5467,16 @@ class SolnPoolFilterInterface(AdvancedInterface, IndexedInterface):
         ...     300, 600, [['x1','x2'], [1,1]], [2,1], "")
         0
         """
+        (weights,) = init_list_args(weights)
         return self._add_single(self.get_num, self._add_diversity_filter,
                                 lb, ub, expression, weights, name)
 
     def _add_range_filter(self, lb, ub, expression, name):
         """non-public"""
-        ind, val = self._unpack_pair(expression)
+        ind, val = unpack_pair(expression)
         CPX_PROC.addsolnpoolrngfilter(
             self._env._e, self._cplex._lp, lb, ub,
-            [self._cplex.variables._conv(x) for x in ind],
+            self._cplex.variables._conv(ind),
             val, name, self._env._apienc)
 
     def add_range_filter(self, lb, ub, expression, name=''):
@@ -5292,18 +5534,19 @@ class SolnPoolFilterInterface(AdvancedInterface, IndexedInterface):
         [(SparsePair(ind = [0], val = [1.0]), [1.0]), (SparsePair(ind = [0], val = [1.0]), [1.0])]
         """
         def getflt(a):
-            ret = CPX_PROC.getsolnpooldivfilter(self._env._e, self._cplex._lp, a)
+            ret = CPX_PROC.getsolnpooldivfilter(
+                self._env._e, self._cplex._lp, a)
             return (SparsePair(ret[2], ret[4]), ret[3])
         return apply_freeform_one_arg(
-            getflt, self.get_indices, self.get_num(), args)
-    
+            getflt, self._conv, self.get_num(), args)
+
     def get_range_filters(self, *args):
         """Returns a set of range filters.
 
         Returns filters as SparsePair instances.
 
         Can be called by four forms.
-        
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> indices = c.variables.add(names = ['x','y'], types = ["II"])
@@ -5321,11 +5564,12 @@ class SolnPoolFilterInterface(AdvancedInterface, IndexedInterface):
         [SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [0], val = [1.0])]
         """
         def getflt(a):
-            ret = CPX_PROC.getsolnpoolrngfilter(self._env._e, self._cplex._lp, a)
+            ret = CPX_PROC.getsolnpoolrngfilter(
+                self._env._e, self._cplex._lp, a)
             return SparsePair(ret[2], ret[3])
         return apply_freeform_one_arg(
-            getflt, self.get_indices, self.get_num(), args)
-    
+            getflt, self._conv, self.get_num(), args)
+
     def get_bounds(self, *args):
         """Returns (lb, ub) pairs for a set of filters.
 
@@ -5353,7 +5597,7 @@ class SolnPoolFilterInterface(AdvancedInterface, IndexedInterface):
             if self.get_types(a) == self.type.range:
                 return tuple(CPX_PROC.getsolnpoolrngfilter_constant(self._env._e, self._cplex._lp, a)[0:2])
         return apply_freeform_one_arg(
-            getbds, self.get_indices, self.get_num(), args)
+            getbds, self._conv, self.get_num(), args)
 
     def get_num_nonzeros(self, *args):
         """Returns the number of variables specified by a set of filters.
@@ -5382,7 +5626,7 @@ class SolnPoolFilterInterface(AdvancedInterface, IndexedInterface):
             if self.get_types(a) == self.type.range:
                 return CPX_PROC.getsolnpoolrngfilter_constant(self._env._e, self._cplex._lp, a)[2]
         return apply_freeform_one_arg(
-            getnnz, self.get_indices, self.get_num(), args)
+            getnnz, self._conv, self.get_num(), args)
 
     def delete(self, *args):
         """Deletes a set of filters.
@@ -5391,8 +5635,8 @@ class SolnPoolFilterInterface(AdvancedInterface, IndexedInterface):
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = ['x','y'], types = ["II"])
-        >>> f = cplex.SparsePair(ind = ['x'],val = [1.0])
+        >>> indices = c.variables.add(names=['x', 'y'], types=['II'])
+        >>> f = cplex.SparsePair(ind=['x'], val=[1.0])
         >>> [c.solution.pool.filter.add_range_filter(
         ...      0.0, 1.0, f, str(i)) for i in range(10)]
         [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
@@ -5401,20 +5645,21 @@ class SolnPoolFilterInterface(AdvancedInterface, IndexedInterface):
         >>> c.solution.pool.filter.delete(8)
         >>> c.solution.pool.filter.get_names()
         ['0', '1', '2', '3', '4', '5', '6', '7', '9']
-        >>> c.solution.pool.filter.delete("1",3)
+        >>> c.solution.pool.filter.delete('1', 3)
         >>> c.solution.pool.filter.get_names()
         ['0', '4', '5', '6', '7', '9']
-        >>> c.solution.pool.filter.delete([2,"0",5])
+        >>> c.solution.pool.filter.delete([2, '0', 5])
         >>> c.solution.pool.filter.get_names()
         ['4', '6', '7']
         >>> c.solution.pool.filter.delete()
         >>> c.solution.pool.filter.get_names()
         []
         """
-        def delonef(a):
-            CPX_PROC.delsolnpoolfilters(self._env._e, self._cplex._lp, a, a)
-        delete_set(delonef, self._conv, self.get_num(), *args)
-    
+        def _delete(begin, end=None):
+            CPX_PROC.delsolnpoolfilters(self._env._e, self._cplex._lp,
+                                        begin, end)
+        delete_set_by_range(_delete, self._conv, self.get_num(), *args)
+
     def get_types(self, *args):
         """Returns the types of a set of filters.
 
@@ -5439,7 +5684,7 @@ class SolnPoolFilterInterface(AdvancedInterface, IndexedInterface):
         def gettype(a):
             return CPX_PROC.getsolnpoolfiltertype(self._env._e, self._cplex._lp, a)
         return apply_freeform_one_arg(
-            gettype, self.get_indices, self.get_num(), args)
+            gettype, self._conv, self.get_num(), args)
 
     def get_names(self, *args):
         """Returns the names of filters, given their indices.
@@ -5462,7 +5707,7 @@ class SolnPoolFilterInterface(AdvancedInterface, IndexedInterface):
           <= end.  Returns the names of the solution pool filter with
           indices between begin and end, inclusive of end.
           Equivalent to solution.pool.filter.get_names(range(begin, end + 1)).
-          
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> indices = c.variables.add(names = ['x','y'], types = ["II"])
@@ -5484,8 +5729,8 @@ class SolnPoolFilterInterface(AdvancedInterface, IndexedInterface):
                 self._env._e, self._cplex._lp, a,
                 self._env._apienc)
         return apply_freeform_one_arg(
-            getname, self.get_indices, self.get_num(), args)
-            
+            getname, self._conv, self.get_num(), args)
+
     def write(self, filename):
         """Writes the filters to a file.
 
@@ -5504,7 +5749,7 @@ class SolnPoolFilterInterface(AdvancedInterface, IndexedInterface):
         """
         CPX_PROC.fltwrite(self._env._e, self._cplex._lp, filename,
                           enc=self._env._apienc)
-    
+
     def read(self, filename):
         """Reads filters from a file.
 
@@ -5524,7 +5769,7 @@ class SolnPoolFilterInterface(AdvancedInterface, IndexedInterface):
         """
         CPX_PROC.readcopysolnpoolfilters(self._env._e, self._cplex._lp,
                                          filename, enc=self._env._apienc)
-    
+
     def get_num(self):
         """Returns the number of filters in the problem.
 
@@ -5543,65 +5788,66 @@ class SolnPoolFilterInterface(AdvancedInterface, IndexedInterface):
         1
         """
         return CPX_PROC.getsolnpoolnumfilters(self._env._e, self._cplex._lp)
-        
 
-class QualityMetric:
+
+class QualityMetric(object):
     """Measures of solution quality."""
-    max_primal_infeasibility           = _constants.CPX_MAX_PRIMAL_INFEAS
-    max_scaled_primal_infeasibility    = _constants.CPX_MAX_SCALED_PRIMAL_INFEAS
-    sum_primal_infeasibilities         = _constants.CPX_SUM_PRIMAL_INFEAS
-    sum_scaled_primal_infeasibilities  = _constants.CPX_SUM_SCALED_PRIMAL_INFEAS
-    max_dual_infeasibility             = _constants.CPX_MAX_DUAL_INFEAS
-    max_scaled_dual_infeasibility      = _constants.CPX_MAX_SCALED_DUAL_INFEAS
-    sum_dual_infeasibilities           = _constants.CPX_SUM_DUAL_INFEAS
-    sum_scaled_dual_infeasibilities    = _constants.CPX_SUM_SCALED_DUAL_INFEAS
-    max_int_infeasibility              = _constants.CPX_MAX_INT_INFEAS
-    sum_integer_infeasibilities        = _constants.CPX_SUM_INT_INFEAS
-    max_primal_residual                = _constants.CPX_MAX_PRIMAL_RESIDUAL
-    max_scaled_primal_residual         = _constants.CPX_MAX_SCALED_PRIMAL_RESIDUAL
-    sum_primal_residual                = _constants.CPX_SUM_PRIMAL_RESIDUAL
-    sum_scaled_primal_residual         = _constants.CPX_SUM_SCALED_PRIMAL_RESIDUAL
-    max_dual_residual                  = _constants.CPX_MAX_DUAL_RESIDUAL
-    max_scaled_dual_residual           = _constants.CPX_MAX_SCALED_DUAL_RESIDUAL
-    sum_dual_residual                  = _constants.CPX_SUM_DUAL_RESIDUAL
-    sum_scaled_dual_residual           = _constants.CPX_SUM_SCALED_DUAL_RESIDUAL
-    max_comp_slack                     = _constants.CPX_MAX_COMP_SLACK
-    sum_comp_slack                     = _constants.CPX_SUM_COMP_SLACK
-    max_x                              = _constants.CPX_MAX_X
-    max_scaled_x                       = _constants.CPX_MAX_SCALED_X
-    max_pi                             = _constants.CPX_MAX_PI
-    max_scaled_pi                      = _constants.CPX_MAX_SCALED_PI
-    max_slack                          = _constants.CPX_MAX_SLACK
-    max_scaled_slack                   = _constants.CPX_MAX_SCALED_SLACK
-    max_reduced_cost                   = _constants.CPX_MAX_RED_COST
-    max_scaled_reduced_cost            = _constants.CPX_MAX_SCALED_RED_COST
-    sum_x                              = _constants.CPX_SUM_X
-    sum_scaled_x                       = _constants.CPX_SUM_SCALED_X
-    sum_pi                             = _constants.CPX_SUM_PI
-    sum_scaled_pi                      = _constants.CPX_SUM_SCALED_PI
-    sum_slack                          = _constants.CPX_SUM_SLACK
-    sum_scaled_slack                   = _constants.CPX_SUM_SCALED_SLACK
-    sum_reduced_cost                   = _constants.CPX_SUM_RED_COST
-    sum_scaled_reduced_cost            = _constants.CPX_SUM_SCALED_RED_COST
-    kappa                              = _constants.CPX_KAPPA
-    objective_gap                      = _constants.CPX_OBJ_GAP
-    dual_objective                     = _constants.CPX_DUAL_OBJ
-    primal_objective                   = _constants.CPX_PRIMAL_OBJ
-    max_quadratic_primal_residual      = _constants.CPX_MAX_QCPRIMAL_RESIDUAL
-    sum_quadratic_primal_residual      = _constants.CPX_SUM_QCPRIMAL_RESIDUAL
-    max_quadratic_slack_infeasibility  = _constants.CPX_MAX_QCSLACK_INFEAS   
-    sum_quadratic_slack_infeasibility  = _constants.CPX_SUM_QCSLACK_INFEAS   
-    max_quadratic_slack                = _constants.CPX_MAX_QCSLACK          
-    sum_quadratic_slack                = _constants.CPX_SUM_QCSLACK          
-    max_indicator_slack_infeasibility  = _constants.CPX_MAX_INDSLACK_INFEAS  
-    sum_indicator_slack_infeasibility  = _constants.CPX_SUM_INDSLACK_INFEAS  
-    exact_kappa                        = _constants.CPX_EXACT_KAPPA
-    kappa_stable                       = _constants.CPX_KAPPA_STABLE
-    kappa_suspicious                   = _constants.CPX_KAPPA_SUSPICIOUS
-    kappa_unstable                     = _constants.CPX_KAPPA_UNSTABLE
-    kappa_illposed                     = _constants.CPX_KAPPA_ILLPOSED
-    kappa_max                          = _constants.CPX_KAPPA_MAX
-    kappa_attention                    = _constants.CPX_KAPPA_ATTENTION
+    max_primal_infeasibility = _constants.CPX_MAX_PRIMAL_INFEAS
+    max_scaled_primal_infeasibility = _constants.CPX_MAX_SCALED_PRIMAL_INFEAS
+    sum_primal_infeasibilities = _constants.CPX_SUM_PRIMAL_INFEAS
+    sum_scaled_primal_infeasibilities = _constants.CPX_SUM_SCALED_PRIMAL_INFEAS
+    max_dual_infeasibility = _constants.CPX_MAX_DUAL_INFEAS
+    max_scaled_dual_infeasibility = _constants.CPX_MAX_SCALED_DUAL_INFEAS
+    sum_dual_infeasibilities = _constants.CPX_SUM_DUAL_INFEAS
+    sum_scaled_dual_infeasibilities = _constants.CPX_SUM_SCALED_DUAL_INFEAS
+    max_int_infeasibility = _constants.CPX_MAX_INT_INFEAS
+    sum_integer_infeasibilities = _constants.CPX_SUM_INT_INFEAS
+    max_primal_residual = _constants.CPX_MAX_PRIMAL_RESIDUAL
+    max_scaled_primal_residual = _constants.CPX_MAX_SCALED_PRIMAL_RESIDUAL
+    sum_primal_residual = _constants.CPX_SUM_PRIMAL_RESIDUAL
+    sum_scaled_primal_residual = _constants.CPX_SUM_SCALED_PRIMAL_RESIDUAL
+    max_dual_residual = _constants.CPX_MAX_DUAL_RESIDUAL
+    max_scaled_dual_residual = _constants.CPX_MAX_SCALED_DUAL_RESIDUAL
+    sum_dual_residual = _constants.CPX_SUM_DUAL_RESIDUAL
+    sum_scaled_dual_residual = _constants.CPX_SUM_SCALED_DUAL_RESIDUAL
+    max_comp_slack = _constants.CPX_MAX_COMP_SLACK
+    sum_comp_slack = _constants.CPX_SUM_COMP_SLACK
+    max_x = _constants.CPX_MAX_X
+    max_scaled_x = _constants.CPX_MAX_SCALED_X
+    max_pi = _constants.CPX_MAX_PI
+    max_scaled_pi = _constants.CPX_MAX_SCALED_PI
+    max_slack = _constants.CPX_MAX_SLACK
+    max_scaled_slack = _constants.CPX_MAX_SCALED_SLACK
+    max_reduced_cost = _constants.CPX_MAX_RED_COST
+    max_scaled_reduced_cost = _constants.CPX_MAX_SCALED_RED_COST
+    sum_x = _constants.CPX_SUM_X
+    sum_scaled_x = _constants.CPX_SUM_SCALED_X
+    sum_pi = _constants.CPX_SUM_PI
+    sum_scaled_pi = _constants.CPX_SUM_SCALED_PI
+    sum_slack = _constants.CPX_SUM_SLACK
+    sum_scaled_slack = _constants.CPX_SUM_SCALED_SLACK
+    sum_reduced_cost = _constants.CPX_SUM_RED_COST
+    sum_scaled_reduced_cost = _constants.CPX_SUM_SCALED_RED_COST
+    kappa = _constants.CPX_KAPPA
+    objective_gap = _constants.CPX_OBJ_GAP
+    dual_objective = _constants.CPX_DUAL_OBJ
+    primal_objective = _constants.CPX_PRIMAL_OBJ
+    max_quadratic_primal_residual = _constants.CPX_MAX_QCPRIMAL_RESIDUAL
+    sum_quadratic_primal_residual = _constants.CPX_SUM_QCPRIMAL_RESIDUAL
+    max_quadratic_slack_infeasibility = _constants.CPX_MAX_QCSLACK_INFEAS
+    sum_quadratic_slack_infeasibility = _constants.CPX_SUM_QCSLACK_INFEAS
+    max_quadratic_slack = _constants.CPX_MAX_QCSLACK
+    sum_quadratic_slack = _constants.CPX_SUM_QCSLACK
+    max_indicator_slack_infeasibility = _constants.CPX_MAX_INDSLACK_INFEAS
+    sum_indicator_slack_infeasibility = _constants.CPX_SUM_INDSLACK_INFEAS
+    exact_kappa = _constants.CPX_EXACT_KAPPA
+    kappa_stable = _constants.CPX_KAPPA_STABLE
+    kappa_suspicious = _constants.CPX_KAPPA_SUSPICIOUS
+    kappa_unstable = _constants.CPX_KAPPA_UNSTABLE
+    kappa_illposed = _constants.CPX_KAPPA_ILLPOSED
+    kappa_max = _constants.CPX_KAPPA_MAX
+    kappa_attention = _constants.CPX_KAPPA_ATTENTION
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -5724,7 +5970,17 @@ class QualityMetric:
             return 'kappa_max'
         if item == _constants.CPX_KAPPA_ATTENTION:
             return 'kappa_attention'
-        
+
+
+@contextmanager
+def _temp_results_stream(cpx, temp_stream):
+    old_results_stream = cpx._env._get_results_stream()
+    try:
+        cpx._env.set_results_stream(temp_stream)
+        yield
+    finally:
+        cpx._env.set_results_stream(old_results_stream)
+
 
 class QualityMetrics(object):
     """A class containing measures of the quality of a solution.
@@ -5812,7 +6068,7 @@ class QualityMetrics(object):
     quadratic_slack_bound_error_max
     normalized_error_max
 
-    
+
     If self.quality_type is "barrier" this instance has the following
     members:
 
@@ -5882,7 +6138,7 @@ class QualityMetrics(object):
 
     indicator_slack_bound_error_total
     indicator_slack_bound_error_max
-    
+
 
     If solver is "MIQCP" this instance also has the members:
 
@@ -5892,14 +6148,17 @@ class QualityMetrics(object):
     quadratic_slack_bound_error_max
     """
 
-    def __init__(self, c, soln = -1):
+    def __init__(self, c, soln=-1):
         idata, data = CPX_PROC.getqualitymetrics(c._env._e, c._lp, soln)
-        if   idata[0] == 0:
+        # We get the "to string" from showquality by temporarily
+        # hijacking the results stream.
+        with closing(cStringIO()) as output, \
+             _temp_results_stream(c, output):
+            CPX_PROC.showquality(c._env._e, c._lp, soln)
+            self._tostring = output.getvalue()
+        if idata[0] == 0:
             self.quality_type = "feasopt"
-            if idata[1] == 0:
-                self.scaled = False
-            if idata[1] == 1:
-                self.scaled = True
+            self.scaled = idata[1] == 1
             if idata[2] == 1:
                 self.max_bound_infeas = data[0]
                 if self.scaled:
@@ -5915,7 +6174,7 @@ class QualityMetrics(object):
             else:
                 self.max_Ax_minus_b = 0.0
                 if self.scaled:
-                    self.max_scaled_Ax_minus_b = 0.0                
+                    self.max_scaled_Ax_minus_b = 0.0
             self.max_x = data[4]
             if self.scaled:
                 self.max_scaled_x = data[5]
@@ -5929,10 +6188,7 @@ class QualityMetrics(object):
                     self.max_scaled_slack = 0.0
         elif idata[0] == 1:
             self.quality_type = "simplex"
-            if idata[1] == 0:
-                self.scaled = False
-            if idata[1] == 1:
-                self.scaled = True
+            self.scaled = idata[1] == 1
             if idata[2] == 1:
                 self.max_bound_infeas = data[0]
                 if self.scaled:
@@ -5948,7 +6204,7 @@ class QualityMetrics(object):
             else:
                 self.max_reduced_cost_infeas = 0.0
                 if self.scaled:
-                    self.max_scaled_reduced_cost_infeas = 0.0                
+                    self.max_scaled_reduced_cost_infeas = 0.0
             if idata[6] == 1:
                 self.max_Ax_minus_b = data[4]
                 if self.scaled:
@@ -5986,308 +6242,112 @@ class QualityMetrics(object):
                 self.kappa = data[16]
         elif idata[0] == 2:
             self.quality_type = "quadratically_constrained"
-            self.objective                         = data[0]
-            self.norm_total                        = data[1]
-            self.norm_max                          = data[2]
-            self.error_Ax_b_total                  = data[3]
-            self.error_Ax_b_max                    = data[4]
-            self.error_xQx_dx_f_total              = data[5]
-            self.error_xQx_dx_f_max                = data[6]
-            self.x_bound_error_total               = data[7]
-            self.x_bound_error_max                 = data[8]
-            self.slack_bound_error_total           = data[9]
-            self.slack_bound_error_max             = data[10]
+            self.objective = data[0]
+            self.norm_total = data[1]
+            self.norm_max = data[2]
+            self.error_Ax_b_total = data[3]
+            self.error_Ax_b_max = data[4]
+            self.error_xQx_dx_f_total = data[5]
+            self.error_xQx_dx_f_max = data[6]
+            self.x_bound_error_total = data[7]
+            self.x_bound_error_max = data[8]
+            self.slack_bound_error_total = data[9]
+            self.slack_bound_error_max = data[10]
             self.quadratic_slack_bound_error_total = data[11]
-            self.quadratic_slack_bound_error_max   = data[12]
-            self.normalized_error_max              = data[13]
+            self.quadratic_slack_bound_error_max = data[12]
+            self.normalized_error_max = data[13]
         elif idata[0] == 3:
             self.quality_type = "barrier"
-            self.primal_objective                    = data[0]
-            self.dual_objective                      = data[1]
-            self.duality_gap                         = data[2]
-            self.complementarity_total               = data[3]
-            self.column_complementarity_total        = data[4]
-            self.column_complementarity_max          = data[5]
-            self.row_complementarity_total           = data[6]
-            self.row_complementarity_max             = data[7]
-            self.primal_norm_total                   = data[8]
-            self.primal_norm_max                     = data[9]
-            self.dual_norm_total                     = data[10]
-            self.dual_norm_max                       = data[11]
-            self.primal_error_total                  = data[12]
-            self.primal_error_max                    = data[13]
-            self.dual_error_total                    = data[14]
-            self.dual_error_max                      = data[15]
-            self.primal_x_bound_error_total          = data[16]
-            self.primal_x_bound_error_max            = data[17]
-            self.primal_slack_bound_error_total      = data[18]
-            self.primal_slack_bound_error_max        = data[19]
-            self.dual_pi_bound_error_total           = data[20]
-            self.dual_pi_bound_error_max             = data[21]
+            self.primal_objective = data[0]
+            self.dual_objective = data[1]
+            self.duality_gap = data[2]
+            self.complementarity_total = data[3]
+            self.column_complementarity_total = data[4]
+            self.column_complementarity_max = data[5]
+            self.row_complementarity_total = data[6]
+            self.row_complementarity_max = data[7]
+            self.primal_norm_total = data[8]
+            self.primal_norm_max = data[9]
+            self.dual_norm_total = data[10]
+            self.dual_norm_max = data[11]
+            self.primal_error_total = data[12]
+            self.primal_error_max = data[13]
+            self.dual_error_total = data[14]
+            self.dual_error_max = data[15]
+            self.primal_x_bound_error_total = data[16]
+            self.primal_x_bound_error_max = data[17]
+            self.primal_slack_bound_error_total = data[18]
+            self.primal_slack_bound_error_max = data[19]
+            self.dual_pi_bound_error_total = data[20]
+            self.dual_pi_bound_error_max = data[21]
             self.dual_reduced_cost_bound_error_total = data[22]
-            self.dual_reduced_cost_bound_error_max   = data[23]
-            self.primal_normalized_error             = data[24]
-            self.dual_normalized_error               = data[25]
+            self.dual_reduced_cost_bound_error_max = data[23]
+            self.primal_normalized_error = data[24]
+            self.dual_normalized_error = data[25]
         elif idata[0] == 4:
             self.quality_type = "MIP"
             if soln >= 0:
                 self.solution_name = c.solution.pool.get_names(soln)
                 self.num_solutions = c.solution.pool.get_num()
             if idata[4] == 1:
-                if   idata[2] == 0:
+                if idata[2] == 0:
                     self.solver = "MILP"
                 elif idata[2] == 1:
                     self.solver = "MIQP"
                 elif idata[2] == 2:
                     self.solver = "MIQCP"
-                    self.error_xQx_dx_f_total              = data[6]
-                    self.error_xQx_dx_f_max                = data[7]
+                    self.error_xQx_dx_f_total = data[6]
+                    self.error_xQx_dx_f_max = data[7]
                     self.quadratic_slack_bound_error_total = data[14]
-                    self.quadratic_slack_bound_error_max   = data[15]
-                self.objective               = data[1]
-                self.x_norm_total            = data[2]
-                self.x_norm_max              = data[3]
-                self.error_Ax_b_total        = data[4]
-                self.error_Ax_b_max          = data[5]
-                self.x_bound_error_total     = data[8]
-                self.x_bound_error_max       = data[9]
+                    self.quadratic_slack_bound_error_max = data[15]
+                self.objective = data[1]
+                self.x_norm_total = data[2]
+                self.x_norm_max = data[3]
+                self.error_Ax_b_total = data[4]
+                self.error_Ax_b_max = data[5]
+                self.x_bound_error_total = data[8]
+                self.x_bound_error_max = data[9]
                 self.integrality_error_total = data[10]
-                self.integrality_error_max   = data[11]
+                self.integrality_error_max = data[11]
                 self.slack_bound_error_total = data[12]
-                self.slack_bound_error_max   = data[13]
+                self.slack_bound_error_max = data[13]
                 if idata[3] == 1:
                     self.indicator_slack_bound_error_total = data[16]
-                    self.indicator_slack_bound_error_max   = data[17]
+                    self.indicator_slack_bound_error_max = data[17]
             if idata[1] == 1:
-                self.max_kappa            = data[18]
-                self.pct_kappa_stable     = data[19]
+                self.max_kappa = data[18]
+                self.pct_kappa_stable = data[19]
                 self.pct_kappa_suspicious = data[20]
-                self.pct_kappa_unstable   = data[21]
-                self.pct_kappa_illposed   = data[22]
-                self.kappa_attention      = data[23]
+                self.pct_kappa_unstable = data[21]
+                self.pct_kappa_illposed = data[22]
+                self.kappa_attention = data[23]
 
     def __str__(self):
-        ret = ""
-        if self.quality_type == "feasopt":
-            if self.max_bound_infeas != 0.0:
-                if self.scaled:
-                    ret = ret + "Max. unscaled (scaled) bound infeas.        = %g (%g)\n" % (self.max_bound_infeas, self.max_scaled_bound_infeas)
-                else:
-                    ret = ret + "Maximum bound infeasibility        = %g\n" % self.max_bound_infeas
-            else:
-                ret = ret + "There are no bound infeasibilities.\n"
-            if self.max_Ax_minus_b != 0.0:
-                if self.scaled:
-                    ret = ret + "Max. unscaled (scaled) Ax-b resid.          = %g (%g)\n" % (self.max_Ax_minus_b, self.max_scaled_Ax_minus_b)
-                else:
-                    ret = ret + "Maximum Ax-b residual              = %g\n" % self.max_Ax_minus_b
-            if self.scaled:
-                ret = ret + "Max. unscaled (scaled) |x|                  = %g (%g)\n" % (self.max_x, self.max_scaled_x)
-            else:
-                ret = ret + "Maximum |x|                        = %g\n" % self.max_x
-            if self.max_slack != 0.0:
-                if self.scaled:
-                    ret = ret + "Max. unscaled (scaled) |slack|              = %g (%g)\n" % (self.max_slack, self.max_scaled_slack)
-                else:
-                    ret = ret + "Maximum |slack|                    = %g\n" % self.max_slack
-        elif self.quality_type == "simplex":
-            if self.max_bound_infeas == 0.0:
-                ret = ret + "There are no bound infeasibilities.\n"
-            if self.max_reduced_cost_infeas == 0.0:
-                ret = ret + "There are no reduced cost infeasibilities.\n"
-            if self.max_bound_infeas != 0.0:
-                if self.scaled:
-                    ret = ret + "Max. unscaled (scaled) bound infeas.        = %g (%g)\n" % (self.max_bound_infeas, self.max_scaled_bound_infeas)
-                else:
-                    ret = ret + "Maximum bound infeasibility        = %g\n" % self.max_bound_infeas
-            if self.max_reduced_cost_infeas != 0.0:
-                if self.scaled:
-                    ret = ret + "Max. unscaled (scaled) reduced cost infeas. = %g (%g)\n" % (self.max_reduced_cost_infeas, self.max_scaled_reduced_cost_infeas)
-                else:
-                    ret = ret + "Maximum reduced cost infeasibility = %g\n" % self.max_reduced_cost_infeas
-            if self.max_Ax_minus_b != 0.0:
-                if self.scaled:
-                    ret = ret + "Max. unscaled (scaled) Ax-b resid.          = %g (%g)\n" % (self.max_Ax_minus_b, self.max_scaled_Ax_minus_b)
-                else:
-                    ret = ret + "Maximum Ax-b residual              = %g\n" % self.max_Ax_minus_b
-            if self.max_c_minus_Bpi != 0.0:
-                if self.scaled:
-                    ret = ret + "Max. unscaled (scaled) c-B'pi resid.        = %g (%g)\n" % (self.max_c_minus_Bpi, self.max_scaled_c_minus_Bpi)
-                else:
-                    ret = ret + "Maximum c-B'pi residual            = %g\n" % self.max_c_minus_Bpi
-            if self.scaled:
-                ret = ret + "Max. unscaled (scaled) |x|                  = %g (%g)\n" % (self.max_x, self.max_scaled_x)
-            else:
-                ret = ret + "Maximum |x|                        = %g\n" % self.max_x
-            if self.max_slack != 0.0:
-                if self.scaled:
-                    ret = ret + "Max. unscaled (scaled) |slack|              = %g (%g)\n" % (self.max_slack, self.max_scaled_slack)
-                else:
-                    ret = ret + "Maximum |slack|                    = %g\n" % self.max_slack
-            if self.scaled:
-                ret = ret + "Max. unscaled (scaled) |pi|                 = %g (%g)\n" % (self.max_pi, self.max_scaled_pi)
-            else:
-                ret = ret + "Maximum |pi|                       = %g\n" % self.max_pi
-            if self.scaled:
-                ret = ret + "Max. unscaled (scaled) |red-cost|           = %g (%g)\n" % (self.max_reduced_cost, self.max_scaled_reduced_cost)
-            else:
-                ret = ret + "Maximum |red-cost|                 = %g\n" % self.max_reduced_cost
-            if hasattr(self, "kappa"):
-                if self.scaled:
-                    ret = ret + "Condition number of scaled basis            = %.1e\n" % self.kappa
-                else:
-                    ret = ret + "Condition number of unscaled basis          = %.1e\n" % self.kappa
-        elif self.quality_type == "quadratically_constrained":
-            ret = ret + "%-46s%17.10e\n" % ("Primal objective",
-                                            self.objective)
-            ret = ret + "%-46s%12.5e %12.5e\n" % ("Primal norm |x| (Total, Max)",
-                                                 self.norm_total,
-                                                 self.norm_max)
-            ret = ret + "%-46s%12.5e %12.5e\n" % ("Primal error (Ax=b) (Total, Max)",
-                                                 self.error_Ax_b_total,
-                                                 self.error_Ax_b_max)
-            ret = ret + "%-46s%12.5e %12.5e\n" % ("Primal error (x'Qx+dx=f) (Total, Max)",
-                                                 self.error_xQx_dx_f_total,
-                                                 self.error_xQx_dx_f_max)
-            ret = ret + "%-46s%12.5e %12.5e\n" % ("Primal x bound error (Total, Max)",
-                                                 self.x_bound_error_total,
-                                                 self.x_bound_error_max)
-            ret = ret + "%-46s%12.5e %12.5e\n" % ("Primal slack bound error (Total, Max)",
-                                                 self.slack_bound_error_total,
-                                                 self.slack_bound_error_max)
-            ret = ret + "%-46s%12.5e %12.5e\n" % ("Primal quad. slack bound error (Total, Max)",
-                                                 self.quadratic_slack_bound_error_total,
-                                                 self.quadratic_slack_bound_error_max)
-            ret = ret + "%-46s%12.5e\n" % ("Primal normalized error (Ax=b) (Max)",
-                                                 self.normalized_error_max)
-        elif self.quality_type == "barrier":
-            ret = ret + "%-40s%17.10e\n" % ("Primal objective",
-                                            self.primal_objective)
-            ret = ret + "%-40s%17.10e\n" % ("Dual objective",
-                                            self.dual_objective)
-            ret = ret + "%-40s%12.5e\n" % ("Duality gap",
-                                            self.duality_gap)
-            ret = ret + "%-40s%12.5e\n" % ("Complementarity (Total)",
-                                            self.complementarity_total)
-            ret = ret + "%-40s%12.5e %12.5e\n" % ("Column complementarity (Total, Max)",
-                                                  self.column_complementarity_total,
-                                                  self.column_complementarity_max)
-            ret = ret + "%-40s%12.5e %12.5e\n" % ("Row complementarity (Total, Max)",
-                                                  self.row_complementarity_total,
-                                                  self.row_complementarity_max)
-            ret = ret + "%-40s%12.5e %12.5e\n" % ("Primal norm |x| (Total, Max)",
-                                                  self.primal_norm_total,
-                                                  self.primal_norm_max)
-            ret = ret + "%-40s%12.5e %12.5e\n" % ("Dual norm |rc| (Total, Max)",
-                                                  self.dual_norm_total,
-                                                  self.dual_norm_max)
-            ret = ret + "%-40s%12.5e %12.5e\n" % ("Primal error (Ax=b) (Total, Max)",
-                                                  self.primal_error_total,
-                                                  self.primal_error_max)
-            ret = ret + "%-40s%12.5e %12.5e\n" % ("Dual error (A'pi+rc=c) (Total, Max)",
-                                                  self.dual_error_total,
-                                                  self.dual_error_max)
-            ret = ret + "%-40s%12.5e %12.5e\n" % ("Primal x bound error (Total, Max)",
-                                                  self.primal_x_bound_error_total,
-                                                  self.primal_x_bound_error_max)
-            ret = ret + "%-40s%12.5e %12.5e\n" % ("Primal slack bound error (Total, Max)",
-                                                  self.primal_slack_bound_error_total,
-                                                  self.primal_slack_bound_error_max)
-            ret = ret + "%-40s%12.5e %12.5e\n" % ("Dual pi bound error (Total, Max)",
-                                                  self.dual_pi_bound_error_total,
-                                                  self.dual_pi_bound_error_max)
-            ret = ret + "%-40s%12.5e %12.5e\n" % ("Dual rc bound error (Total, Max)",
-                                                  self.dual_reduced_cost_bound_error_total,
-                                                  self.dual_reduced_cost_bound_error_max)
-            ret = ret + "%-40s%12.5e\n" % ("Primal normalized error (Ax=b) (Max)",
-                                            self.primal_normalized_error)
-            ret = ret + "%-40s%12.5e\n" % ("Dual normalized error (A'pi+rc=c) (Max)",
-                                            self.dual_normalized_error)
-        elif self.quality_type == "MIP":
-            if not hasattr(self, "solver"):
-                ret = ret + "No incumbent solution exists.\n"
-            else:
-                if hasattr(self, "solution_name"):
-                    ret = ret + "Solution pool solution '%s' (of %d):\n" % (self.solution_name,
-                                                                            self.num_solutions)
-                else:
-                    ret = ret + "Incumbent solution:\n";
-                msg = str("%s objective" % self.solver)
-                ret = ret + "%-46s%17.10e\n" % (msg, self.objective)
-                msg = "%s solution norm |x| (Total, Max)" % self.solver
-                ret = ret + "%-46s%12.5e %12.5e\n" % (msg,
-                                                      self.x_norm_total,
-                                                      self.x_norm_max)
-                msg = "%s solution error (Ax=b) (Total, Max)" % self.solver
-                ret = ret + "%-46s%12.5e %12.5e\n" % (msg,
-                                                      self.error_Ax_b_total,
-                                                      self.error_Ax_b_max)
-                if self.solver == "MIQCP":
-                    msg = "%s solution error (x'Qx+dx=f) (Total, Max)" % self.solver
-                    ret = ret + "%-46s%12.5e %12.5e\n" % (msg,
-                                                          self.error_xQx_dx_f_total,
-                                                          self.error_xQx_dx_f_max)
-                msg = "%s x bound error (Total, Max)" % self.solver
-                ret = ret + "%-46s%12.5e %12.5e\n" % (msg,
-                                                      self.x_bound_error_total,
-                                                      self.x_bound_error_max)
-                msg = "%s x integrality error (Total, Max)" % self.solver
-                ret = ret + "%-46s%12.5e %12.5e\n" % (msg,
-                                                      self.integrality_error_total,
-                                                      self.integrality_error_max)
-                msg = "%s slack bound error (Total, Max)" % self.solver
-                ret = ret + "%-46s%12.5e %12.5e\n" % (msg,
-                                                      self.slack_bound_error_total,
-                                                      self.slack_bound_error_max)
-                if self.solver == "MIQCP":
-                    msg = "%s quad. slack bound error (Total, Max)" % self.solver
-                    ret = ret + "%-46s%12.5e %12.5e\n" % (msg,
-                                                          self.quadratic_slack_bound_error_total,
-                                                          self.quadratic_slack_bound_error_max)
-                if hasattr(self, "indicator_slack_bound_error_total"):
-                    msg = "%s indicator slack bound error (Total, Max)" % self.solver
-                    ret = ret + "%-46s%12.5e %12.5e\n" % (msg,
-                                                          self.indicator_slack_bound_error_total,
-                                                          self.indicator_slack_bound_error_max)
-            if hasattr(self, "max_kappa"):
-                ret = ret + "\nBranch-and-cut subproblem optimization:\n"
-                ret = ret + "Max condition number:             %.4e\n" % self.max_kappa
-                ret = ret + "Percentage of stable bases:       %.1f%%\n" % self.pct_kappa_stable
-                ret = ret + "Percentage of suspicious bases:   %.1f%%\n" % self.pct_kappa_suspicious
-                ret = ret + "Percentage of unstable bases:     %.1f%%\n" % self.pct_kappa_unstable
-                ret = ret + "Percentage of illposed bases:     %.1f%%\n" % self.pct_kappa_illposed
-                if self.kappa_attention > 1e-6:
-                    ret = ret + "Attention level:                  %f\n" % self.kappa_attention
-                    ret = ret + "CPLEX encountered numerical difficulties while solving this model.\n"
-        return ret
-    
+        # See __init__ (above) to see how this is constructed.
+        return self._tostring
 
-class SolnPoolInterface(AdvancedInterface):
-    """Methods for accessing the solution pool.
 
-    """
-
-    filter = SolnPoolFilterInterface()
-    """See `SolnPoolFilterInterface()` """
+class SolnPoolInterface(BaseInterface):
+    """Methods for accessing the solution pool."""
 
     incumbent = _constants.CPX_INCUMBENT_ID
     """See `_constants.CPX_INCUMBENT_ID` """
-    
+
     quality_metric = QualityMetric()
     """See `QualityMetric()` """
 
-    def _setup(self, parent):
-        """non-public"""
-        AdvancedInterface._setup(self, parent)
-        self.filter = SolnPoolFilterInterface()
-        self.filter._setup(self)
+    def __init__(self, parent):
+        """Creates a new SolnPoolInterface.
 
-    def _conv(self, name):
-        """non-public"""
-        if isinstance(name, six.string_types):
-            return self.get_indices(name)
-        else:
-            return name
+        The solution pool interface is exposed by the top-level `Cplex`
+        class as Cplex.solution.pool.  This constructor is not meant to
+        be used externally.
+        """
+        super(SolnPoolInterface, self).__init__(
+            cplex=parent._cplex, advanced=True,
+            getindexfunc=CPX_PROC.getsolnpoolsolnindex)
+        self.filter = SolnPoolFilterInterface(self)
+        """See `SolnPoolFilterInterface()` """
 
     def get_objective_value(self, soln):
         """Returns the objective value for a member of the solution pool.
@@ -6334,11 +6394,12 @@ class SolnPoolInterface(AdvancedInterface):
 
         if not isinstance(soln, six.integer_types):
             soln = self.get_indices(soln)
-        def getx(a, b = self._cplex.variables.get_num() - 1):
+
+        def getx(a, b=self._cplex.variables.get_num() - 1):
             return CPX_PROC.getsolnpoolx(self._env._e, self._cplex._lp, soln, a, b)
         return apply_freeform_two_args(
-            getx, self._cplex.variables.get_indices, args)
-        
+            getx, self._cplex.variables._conv, args)
+
     def get_linear_slacks(self, soln, *args):
         """Returns a set of linear slacks for a given solution.
 
@@ -6362,11 +6423,12 @@ class SolnPoolInterface(AdvancedInterface):
         """
         if not isinstance(soln, six.integer_types):
             soln = self.get_indices(soln)
-        def getslacks(a, b = self._cplex.linear_constraints.get_num() - 1):
+
+        def getslacks(a, b=self._cplex.linear_constraints.get_num() - 1):
             return CPX_PROC.getsolnpoolslack(self._env._e, self._cplex._lp, soln, a, b)
         return apply_freeform_two_args(
-            getslacks, self._cplex.linear_constraints.get_indices, args)
-    
+            getslacks, self._cplex.linear_constraints._conv, args)
+
     def get_quadratic_slacks(self, soln, *args):
         """Returns a set of quadratic slacks for a given solution.
 
@@ -6386,11 +6448,12 @@ class SolnPoolInterface(AdvancedInterface):
         """
         if not isinstance(soln, six.integer_types):
             soln = self.get_indices(soln)
-        def getqslacks(a, b = self._cplex.quadratic_constraints.get_num() - 1):
+
+        def getqslacks(a, b=self._cplex.quadratic_constraints.get_num() - 1):
             return CPX_PROC.getsolnpoolqconstrslack(self._env._e, self._cplex._lp, soln, a, b)
         return apply_freeform_two_args(
-            getqslacks, self._cplex.quadratic_constraints.get_indices, args)
-    
+            getqslacks, self._cplex.quadratic_constraints._conv, args)
+
     def get_integer_quality(self, soln, which):
         """Returns the integer quality of a given solution.
 
@@ -6468,11 +6531,9 @@ class SolnPoolInterface(AdvancedInterface):
         >>> c.read("ind.lp")
         >>> c.solve()
         >>> mov = c.solution.pool.get_mean_objective_value()
-        >>> abs(mov - 526.833333) < 1e-6
-        True
         """
         return CPX_PROC.getsolnpoolmeanobjval(self._env._e, self._cplex._lp)
-    
+
     def delete(self, *args):
         """Deletes a set of solutions from the solution pool.
 
@@ -6483,6 +6544,7 @@ class SolnPoolInterface(AdvancedInterface):
         >>> out = c.set_results_stream(None)
         >>> out = c.set_log_stream(None)
         >>> c.read("ind.lp")
+        >>> c.parameters.randomseed.set(1)
         >>> c.parameters.mip.limits.populate.set(5)
         >>> c.populate_solution_pool()
         >>> names = c.solution.pool.get_names()
@@ -6506,42 +6568,10 @@ class SolnPoolInterface(AdvancedInterface):
         >>> c.solution.pool.get_names()
         []
         """
-        def delones(a):
-            CPX_PROC.delsolnpoolsolns(self._env._e, self._cplex._lp, a, a)
-        delete_set(delones, self._conv, self.get_num(), *args)
-    
-    def get_indices(self, name):
-        """Returns the index of a set of solutions given their names.
-
-        If name is a string, get_indices returns the index of the
-        solution with that name.  If no such solution exists, an
-        exception is raised.
-
-        If name is a sequence of strings, get_indices returns a list
-        of the solution indices corresponding to the strings in name.
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> out = c.set_results_stream(None)
-        >>> out = c.set_log_stream(None)
-        >>> c.read("ind.lp")
-        >>> c.parameters.mip.limits.populate.set(10)
-        >>> c.populate_solution_pool()
-        >>> names = c.solution.pool.get_names()
-        >>> c.solution.pool.get_indices(names[1])
-        1
-        >>> c.solution.pool.get_indices([names[4], names[2]])
-        [4, 2]
-        """
-        if isinstance(name, six.string_types):
-            return CPX_PROC.getsolnpoolsolnindex(
-                self._env._e, self._cplex._lp, name,
-                self._env._apienc)
-        else:
-            return [CPX_PROC.getsolnpoolsolnindex(
-                    self._env._e, self._cplex._lp, a,
-                    self._env._apienc)
-                    for a in name]
+        def _delete(begin, end=None):
+            CPX_PROC.delsolnpoolsolns(self._env._e, self._cplex._lp,
+                                      begin, end)
+        delete_set_by_range(_delete, self._conv, self.get_num(), *args)
 
     def get_names(self, *args):
         """Returns the names of a set of solutions.
@@ -6570,6 +6600,7 @@ class SolnPoolInterface(AdvancedInterface):
         >>> out = c.set_results_stream(None)
         >>> out = c.set_log_stream(None)
         >>> c.read("ind.lp")
+        >>> c.parameters.randomseed.set(1)
         >>> c.parameters.mip.limits.populate.set(10)
         >>> c.populate_solution_pool()
         >>> names = c.solution.pool.get_names()
@@ -6585,7 +6616,7 @@ class SolnPoolInterface(AdvancedInterface):
                                                 self._cplex._lp,
                                                 a, self._env._apienc)
         return apply_freeform_one_arg(
-            getname, self.get_indices, self.get_num(), args)
+            getname, self._conv, self.get_num(), args)
 
     def get_num_replaced(self):
         """Returns the number of solution pool members that have been replaced.
@@ -6619,8 +6650,8 @@ class SolnPoolInterface(AdvancedInterface):
         6
         """
         return CPX_PROC.getsolnpoolnumsolns(self._env._e, self._cplex._lp)
-    
-    def write(self, filename, which = None):
+
+    def write(self, filename, which=None):
         """Writes solutions to a file.
 
         If no second argument is provided, all solutions are written
@@ -6629,12 +6660,13 @@ class SolnPoolInterface(AdvancedInterface):
         If a second argument is provided, it is the index of a
         solution in the solution pool.  Only that solution will be
         written to file.
-        
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> out = c.set_results_stream(None)
         >>> out = c.set_log_stream(None)
         >>> c.read("ind.lp")
+        >>> c.parameters.randomseed.set(1)
         >>> c.parameters.mip.limits.populate.set(10)
         >>> c.populate_solution_pool()
         >>> c.solution.pool.write("ind.sol",4)
@@ -6654,9 +6686,9 @@ class SolnPoolInterface(AdvancedInterface):
         if not isinstance(soln, six.integer_types):
             soln = self.get_indices(soln)
         return QualityMetrics(self._cplex, soln)
-        
 
-class AdvancedSolutionInterface(AdvancedInterface):
+
+class AdvancedSolutionInterface(BaseInterface):
     """Advanced methods for accessing solution information.
 
     Example usage:
@@ -6686,6 +6718,16 @@ class AdvancedSolutionInterface(AdvancedInterface):
     >>> ftran[0]
     2.891
     """
+
+    def __init__(self, parent):
+        """Creates a new AdvancedSolutionInterface.
+
+        The advanced solution interface is exposed by the top-level
+        `Cplex` class as Cplex.solution.advanced.  This constructor is
+        not meant to be used externally.
+        """
+        super(AdvancedSolutionInterface, self).__init__(
+            cplex=parent._cplex, advanced=True)
 
     def binvcol(self, *args):
         """Returns a set of columns of the inverted basis matrix.
@@ -6726,7 +6768,7 @@ class AdvancedSolutionInterface(AdvancedInterface):
         def inv(a):
             return CPX_PROC.binvcol(self._env._e, self._cplex._lp, a)
         return apply_freeform_one_arg(
-            inv, self._cplex.linear_constraints.get_indices,
+            inv, self._cplex.linear_constraints._conv,
             self._cplex.linear_constraints.get_num(), args)
 
     def binvrow(self, *args):
@@ -6740,7 +6782,7 @@ class AdvancedSolutionInterface(AdvancedInterface):
         solution.advanced.binvrow(i)
           i must be a linear constraint name or index.  Returns the
           row of the inverted basis matrix associated with i.
-           
+
         solution.advanced.binvrow(s)
           s must be a sequence of linear constraint names or indices.
           Returns the rows of the inverted basis matrix associated
@@ -6768,7 +6810,7 @@ class AdvancedSolutionInterface(AdvancedInterface):
         def inv(a):
             return CPX_PROC.binvrow(self._env._e, self._cplex._lp, a)
         return apply_freeform_one_arg(
-            inv, self._cplex.linear_constraints.get_indices,
+            inv, self._cplex.linear_constraints._conv,
             self._cplex.linear_constraints.get_num(), args)
 
     def binvacol(self, *args):
@@ -6808,9 +6850,9 @@ class AdvancedSolutionInterface(AdvancedInterface):
         def inv(a):
             return CPX_PROC.binvacol(self._env._e, self._cplex._lp, a)
         return apply_freeform_one_arg(
-            inv, self._cplex.variables.get_indices,
+            inv, self._cplex.variables._conv,
             self._cplex.variables.get_num(), args)
-    
+
     def binvarow(self, *args):
         """Returns a set of rows of the tableau.
 
@@ -6850,7 +6892,7 @@ class AdvancedSolutionInterface(AdvancedInterface):
         def inv(a):
             return CPX_PROC.binvarow(self._env._e, self._cplex._lp, a)
         return apply_freeform_one_arg(
-            inv, self._cplex.linear_constraints.get_indices,
+            inv, self._cplex.linear_constraints._conv,
             self._cplex.linear_constraints.get_num(), args)
 
     def btran(self, y):
@@ -6918,9 +6960,9 @@ class AdvancedSolutionInterface(AdvancedInterface):
         def getgrad(a):
             return SparsePair(*CPX_PROC.getgrad(self._env._e, self._cplex._lp, a))
         return apply_freeform_one_arg(
-            getgrad, self._cplex.variables.get_indices,
+            getgrad, self._cplex.variables._conv,
             self._cplex.variables.get_num(), args)
-  
+
     def get_linear_slacks_from_x(self, x):
         """Computes the slack values from the given solution x
 
@@ -6937,7 +6979,7 @@ class AdvancedSolutionInterface(AdvancedInterface):
         True
         """
         return CPX_PROC.slackfromx(self._env._e, self._cplex._lp, x)
-        
+
     def get_quadratic_slacks_from_x(self, x):
         """Computes the slack values for quadratic constraints from the given solution x
 
@@ -6991,7 +7033,7 @@ class AdvancedSolutionInterface(AdvancedInterface):
         True
         """
         return CPX_PROC.qpdjfrompi(self._env._e, self._cplex._lp, pi, x)
-    
+
     def get_Driebeek_penalties(self, basic_variables):
         """Returns values known as Driebeek penalties for a sequence of basic variables.
 
@@ -7003,17 +7045,16 @@ class AdvancedSolutionInterface(AdvancedInterface):
         >>> out = c.set_log_stream(None)
         >>> c.read("lpex.mps")
         >>> c.solve()
-        >>> c_stat = c.solution.basis.get_col_basis()
+        >>> c_stat, _ = c.solution.basis.get_basis()
         >>> b = [i for i, v in enumerate(c_stat) if v == c.solution.basis.status.basic]
         >>> penalties = c.solution.advanced.get_Driebeek_penalties(b)
         >>> penalties[0]
         (0.34477142857142856, 8.021494102228047)
         """
-
         return list(zip(*CPX_PROC.mdleave(
                     self._env._e, self._cplex._lp,
-                    [self._cplex.variables._conv(x) for x in basic_variables])))
-    
+                    self._cplex.variables._conv(basic_variables))))
+
     def get_quadratic_indefinite_certificate(self):
         """Compute a vector x that satisfies x'Qx < 0
 
@@ -7110,19 +7151,20 @@ class AdvancedSolutionInterface(AdvancedInterface):
         -1.0
         """
         return CPX_PROC.getray(self._env._e, self._cplex._lp)
-        
 
-class SolutionMethod:
+
+class SolutionMethod(object):
     """Solution methods."""
-    none       = _constants.CPX_ALG_NONE
-    primal     = _constants.CPX_ALG_PRIMAL
-    dual       = _constants.CPX_ALG_DUAL
-    barrier    = _constants.CPX_ALG_BARRIER
-    feasopt    = _constants.CPX_ALG_FEASOPT
-    MIP        = _constants.CPX_ALG_MIP
-    pivot      = _constants.CPX_ALG_PIVOT
-    pivot_in   = _constants.CPX_ALG_PIVOTIN
-    pivot_out  = _constants.CPX_ALG_PIVOTOUT
+    none = _constants.CPX_ALG_NONE
+    primal = _constants.CPX_ALG_PRIMAL
+    dual = _constants.CPX_ALG_DUAL
+    barrier = _constants.CPX_ALG_BARRIER
+    feasopt = _constants.CPX_ALG_FEASOPT
+    MIP = _constants.CPX_ALG_MIP
+    pivot = _constants.CPX_ALG_PIVOT
+    pivot_in = _constants.CPX_ALG_PIVOTIN
+    pivot_out = _constants.CPX_ALG_PIVOTOUT
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -7155,82 +7197,83 @@ class SolutionMethod:
             return 'pivot_out'
 
 
-class SolutionStatus:
+class SolutionStatus(object):
     """Solution status codes.
 
     For documentation of each status code, see the reference manual 
     of the CPLEX Callable Library, especially the group
     optim.cplex.callable.solutionstatus.
     """
-    optimal                        = _constants.CPX_STAT_OPTIMAL
-    unbounded                      = _constants.CPX_STAT_UNBOUNDED
-    infeasible                     = _constants.CPX_STAT_INFEASIBLE
-    feasible                       = _constants.CPX_STAT_FEASIBLE
-    infeasible_or_unbounded        = _constants.CPX_STAT_INForUNBD
-    optimal_infeasible             = _constants.CPX_STAT_OPTIMAL_INFEAS
-    num_best                       = _constants.CPX_STAT_NUM_BEST
-    feasible_relaxed_sum           = _constants.CPX_STAT_FEASIBLE_RELAXED_SUM
-    optimal_relaxed_sum            = _constants.CPX_STAT_OPTIMAL_RELAXED_SUM
-    feasible_relaxed_inf           = _constants.CPX_STAT_FEASIBLE_RELAXED_INF
-    optimal_relaxed_inf            = _constants.CPX_STAT_OPTIMAL_RELAXED_INF
-    feasible_relaxed_quad          = _constants.CPX_STAT_FEASIBLE_RELAXED_QUAD
-    optimal_relaxed_quad           = _constants.CPX_STAT_OPTIMAL_RELAXED_QUAD
-    abort_obj_limit                = _constants.CPX_STAT_ABORT_OBJ_LIM
-    abort_primal_obj_limit         = _constants.CPX_STAT_ABORT_PRIM_OBJ_LIM
-    abort_dual_obj_limit           = _constants.CPX_STAT_ABORT_DUAL_OBJ_LIM
-    first_order                    = _constants.CPX_STAT_FIRSTORDER
-    abort_iteration_limit          = _constants.CPX_STAT_ABORT_IT_LIM
-    abort_time_limit               = _constants.CPX_STAT_ABORT_TIME_LIM
-    abort_dettime_limit            = _constants.CPX_STAT_ABORT_DETTIME_LIM
-    abort_user                     = _constants.CPX_STAT_ABORT_USER
-    optimal_face_unbounded         = _constants.CPX_STAT_OPTIMAL_FACE_UNBOUNDED
-    conflict_feasible              = _constants.CPX_STAT_CONFLICT_FEASIBLE
-    conflict_minimal               = _constants.CPX_STAT_CONFLICT_MINIMAL
-    conflict_abort_contradiction   = _constants.CPX_STAT_CONFLICT_ABORT_CONTRADICTION
-    conflict_abort_time_limit      = _constants.CPX_STAT_CONFLICT_ABORT_TIME_LIM
-    conflict_abort_dettime_limit   = _constants.CPX_STAT_CONFLICT_ABORT_DETTIME_LIM
+    unknown = 0  # There is no constant for this.
+    optimal = _constants.CPX_STAT_OPTIMAL
+    unbounded = _constants.CPX_STAT_UNBOUNDED
+    infeasible = _constants.CPX_STAT_INFEASIBLE
+    feasible = _constants.CPX_STAT_FEASIBLE
+    infeasible_or_unbounded = _constants.CPX_STAT_INForUNBD
+    optimal_infeasible = _constants.CPX_STAT_OPTIMAL_INFEAS
+    num_best = _constants.CPX_STAT_NUM_BEST
+    feasible_relaxed_sum = _constants.CPX_STAT_FEASIBLE_RELAXED_SUM
+    optimal_relaxed_sum = _constants.CPX_STAT_OPTIMAL_RELAXED_SUM
+    feasible_relaxed_inf = _constants.CPX_STAT_FEASIBLE_RELAXED_INF
+    optimal_relaxed_inf = _constants.CPX_STAT_OPTIMAL_RELAXED_INF
+    feasible_relaxed_quad = _constants.CPX_STAT_FEASIBLE_RELAXED_QUAD
+    optimal_relaxed_quad = _constants.CPX_STAT_OPTIMAL_RELAXED_QUAD
+    abort_obj_limit = _constants.CPX_STAT_ABORT_OBJ_LIM
+    abort_primal_obj_limit = _constants.CPX_STAT_ABORT_PRIM_OBJ_LIM
+    abort_dual_obj_limit = _constants.CPX_STAT_ABORT_DUAL_OBJ_LIM
+    first_order = _constants.CPX_STAT_FIRSTORDER
+    abort_iteration_limit = _constants.CPX_STAT_ABORT_IT_LIM
+    abort_time_limit = _constants.CPX_STAT_ABORT_TIME_LIM
+    abort_dettime_limit = _constants.CPX_STAT_ABORT_DETTIME_LIM
+    abort_user = _constants.CPX_STAT_ABORT_USER
+    optimal_face_unbounded = _constants.CPX_STAT_OPTIMAL_FACE_UNBOUNDED
+    conflict_feasible = _constants.CPX_STAT_CONFLICT_FEASIBLE
+    conflict_minimal = _constants.CPX_STAT_CONFLICT_MINIMAL
+    conflict_abort_contradiction = _constants.CPX_STAT_CONFLICT_ABORT_CONTRADICTION
+    conflict_abort_time_limit = _constants.CPX_STAT_CONFLICT_ABORT_TIME_LIM
+    conflict_abort_dettime_limit = _constants.CPX_STAT_CONFLICT_ABORT_DETTIME_LIM
     conflict_abort_iteration_limit = _constants.CPX_STAT_CONFLICT_ABORT_IT_LIM
-    conflict_abort_node_limit      = _constants.CPX_STAT_CONFLICT_ABORT_NODE_LIM
-    conflict_abort_obj_limit       = _constants.CPX_STAT_CONFLICT_ABORT_OBJ_LIM
-    conflict_abort_memory_limit    = _constants.CPX_STAT_CONFLICT_ABORT_MEM_LIM
-    conflict_abort_user            = _constants.CPX_STAT_CONFLICT_ABORT_USER
-    relaxation_unbounded           = _constants.CPXMIP_ABORT_RELAXATION_UNBOUNDED
-    abort_relaxed                  = _constants.CPXMIP_ABORT_RELAXED
-    optimal_tolerance              = _constants.CPXMIP_OPTIMAL_TOL
-    solution_limit                 = _constants.CPXMIP_SOL_LIM
-    populate_solution_limit        = _constants.CPXMIP_POPULATESOL_LIM
-    node_limit_feasible            = _constants.CPXMIP_NODE_LIM_FEAS
-    node_limit_infeasible          = _constants.CPXMIP_NODE_LIM_INFEAS
-    fail_feasible                  = _constants.CPXMIP_FAIL_FEAS
-    fail_infeasible                = _constants.CPXMIP_FAIL_INFEAS
-    mem_limit_feasible             = _constants.CPXMIP_MEM_LIM_FEAS
-    mem_limit_infeasible           = _constants.CPXMIP_MEM_LIM_INFEAS
-    fail_feasible_no_tree          = _constants.CPXMIP_FAIL_FEAS_NO_TREE
-    fail_infeasible_no_tree        = _constants.CPXMIP_FAIL_INFEAS_NO_TREE
-    optimal_populated              = _constants.CPXMIP_OPTIMAL_POPULATED
-    optimal_populated_tolerance    = _constants.CPXMIP_OPTIMAL_POPULATED_TOL
-    benders_master_unbounded       = _constants.CPX_STAT_BENDERS_MASTER_UNBOUNDED
-    benders_num_best               = _constants.CPX_STAT_BENDERS_NUM_BEST
+    conflict_abort_node_limit = _constants.CPX_STAT_CONFLICT_ABORT_NODE_LIM
+    conflict_abort_obj_limit = _constants.CPX_STAT_CONFLICT_ABORT_OBJ_LIM
+    conflict_abort_memory_limit = _constants.CPX_STAT_CONFLICT_ABORT_MEM_LIM
+    conflict_abort_user = _constants.CPX_STAT_CONFLICT_ABORT_USER
+    relaxation_unbounded = _constants.CPXMIP_ABORT_RELAXATION_UNBOUNDED
+    abort_relaxed = _constants.CPXMIP_ABORT_RELAXED
+    optimal_tolerance = _constants.CPXMIP_OPTIMAL_TOL
+    solution_limit = _constants.CPXMIP_SOL_LIM
+    populate_solution_limit = _constants.CPXMIP_POPULATESOL_LIM
+    node_limit_feasible = _constants.CPXMIP_NODE_LIM_FEAS
+    node_limit_infeasible = _constants.CPXMIP_NODE_LIM_INFEAS
+    fail_feasible = _constants.CPXMIP_FAIL_FEAS
+    fail_infeasible = _constants.CPXMIP_FAIL_INFEAS
+    mem_limit_feasible = _constants.CPXMIP_MEM_LIM_FEAS
+    mem_limit_infeasible = _constants.CPXMIP_MEM_LIM_INFEAS
+    fail_feasible_no_tree = _constants.CPXMIP_FAIL_FEAS_NO_TREE
+    fail_infeasible_no_tree = _constants.CPXMIP_FAIL_INFEAS_NO_TREE
+    optimal_populated = _constants.CPXMIP_OPTIMAL_POPULATED
+    optimal_populated_tolerance = _constants.CPXMIP_OPTIMAL_POPULATED_TOL
+    benders_master_unbounded = _constants.CPX_STAT_BENDERS_MASTER_UNBOUNDED
+    benders_num_best = _constants.CPX_STAT_BENDERS_NUM_BEST
 
-    MIP_optimal                    = _constants.CPXMIP_OPTIMAL
-    MIP_infeasible                 = _constants.CPXMIP_INFEASIBLE
-    MIP_time_limit_feasible        = _constants.CPXMIP_TIME_LIM_FEAS
-    MIP_time_limit_infeasible      = _constants.CPXMIP_TIME_LIM_INFEAS
-    MIP_dettime_limit_feasible     = _constants.CPXMIP_DETTIME_LIM_FEAS
-    MIP_dettime_limit_infeasible   = _constants.CPXMIP_DETTIME_LIM_INFEAS
-    MIP_abort_feasible             = _constants.CPXMIP_ABORT_FEAS
-    MIP_abort_infeasible           = _constants.CPXMIP_ABORT_INFEAS
-    MIP_optimal_infeasible         = _constants.CPXMIP_OPTIMAL_INFEAS
-    MIP_unbounded                  = _constants.CPXMIP_UNBOUNDED
-    MIP_infeasible_or_unbounded    = _constants.CPXMIP_INForUNBD
-    MIP_feasible_relaxed_sum       = _constants.CPXMIP_FEASIBLE_RELAXED_SUM
-    MIP_optimal_relaxed_sum        = _constants.CPXMIP_OPTIMAL_RELAXED_SUM
-    MIP_feasible_relaxed_inf       = _constants.CPXMIP_FEASIBLE_RELAXED_INF
-    MIP_optimal_relaxed_inf        = _constants.CPXMIP_OPTIMAL_RELAXED_INF
-    MIP_feasible_relaxed_quad      = _constants.CPXMIP_FEASIBLE_RELAXED_QUAD
-    MIP_optimal_relaxed_quad       = _constants.CPXMIP_OPTIMAL_RELAXED_QUAD
-    MIP_feasible                   = _constants.CPXMIP_FEASIBLE
-    MIP_benders_master_unbounded   = _constants.CPXMIP_BENDERS_MASTER_UNBOUNDED
+    MIP_optimal = _constants.CPXMIP_OPTIMAL
+    MIP_infeasible = _constants.CPXMIP_INFEASIBLE
+    MIP_time_limit_feasible = _constants.CPXMIP_TIME_LIM_FEAS
+    MIP_time_limit_infeasible = _constants.CPXMIP_TIME_LIM_INFEAS
+    MIP_dettime_limit_feasible = _constants.CPXMIP_DETTIME_LIM_FEAS
+    MIP_dettime_limit_infeasible = _constants.CPXMIP_DETTIME_LIM_INFEAS
+    MIP_abort_feasible = _constants.CPXMIP_ABORT_FEAS
+    MIP_abort_infeasible = _constants.CPXMIP_ABORT_INFEAS
+    MIP_optimal_infeasible = _constants.CPXMIP_OPTIMAL_INFEAS
+    MIP_unbounded = _constants.CPXMIP_UNBOUNDED
+    MIP_infeasible_or_unbounded = _constants.CPXMIP_INForUNBD
+    MIP_feasible_relaxed_sum = _constants.CPXMIP_FEASIBLE_RELAXED_SUM
+    MIP_optimal_relaxed_sum = _constants.CPXMIP_OPTIMAL_RELAXED_SUM
+    MIP_feasible_relaxed_inf = _constants.CPXMIP_FEASIBLE_RELAXED_INF
+    MIP_optimal_relaxed_inf = _constants.CPXMIP_OPTIMAL_RELAXED_INF
+    MIP_feasible_relaxed_quad = _constants.CPXMIP_FEASIBLE_RELAXED_QUAD
+    MIP_optimal_relaxed_quad = _constants.CPXMIP_OPTIMAL_RELAXED_QUAD
+    MIP_feasible = _constants.CPXMIP_FEASIBLE
+    MIP_benders_master_unbounded = _constants.CPXMIP_BENDERS_MASTER_UNBOUNDED
 
     def __getitem__(self, item):
         """Converts a constant to a string.
@@ -7244,6 +7287,8 @@ class SolutionStatus:
         >>> c.solution.status[1]
         'optimal'
         """
+        if item == 0:
+            return 'unknown'
         if item == _constants.CPX_STAT_OPTIMAL:
             return 'optimal'
         if item == _constants.CPX_STAT_UNBOUNDED:
@@ -7383,12 +7428,13 @@ class SolutionStatus:
         raise CplexError("Unexpected solution status code!")
 
 
-class SolutionType:
+class SolutionType(object):
     """Solution types"""
-    none     = _constants.CPX_NO_SOLN
-    basic    = _constants.CPX_BASIC_SOLN
+    none = _constants.CPX_NO_SOLN
+    basic = _constants.CPX_BASIC_SOLN
     nonbasic = _constants.CPX_NONBASIC_SOLN
-    primal   = _constants.CPX_PRIMAL_SOLN
+    primal = _constants.CPX_PRIMAL_SOLN
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -7412,52 +7458,39 @@ class SolutionType:
 
 
 class SolutionInterface(BaseInterface):
-    """Methods for querying the solution to an optimization problem.
+    """Methods for querying the solution to an optimization problem."""
 
-    """
-
-    progress      = ProgressInterface()
-    """See `ProgressInterface()` """
-    infeasibility = InfeasibilityInterface()
-    """See `InfeasibilityInterface()` """
-    MIP           = MIPSolutionInterface()
-    """See `MIPSolutionInterface()` """
-    basis         = BasisInterface()
-    """See `BasisInterface()` """
-    sensitivity   = SensitivityInterface()
-    """See `SensitivityInterface()` """
-    pool          = SolnPoolInterface()
-    """See `SolnPoolInterface()` """
-    advanced      = AdvancedSolutionInterface()
-    """See `AdvancedSolutionInterface()` """
-    
-    method         = SolutionMethod()
+    method = SolutionMethod()
     """See `SolutionMethod()` """
     quality_metric = QualityMetric()
     """See `QualityMetric()` """
-    status         = SolutionStatus()
+    status = SolutionStatus()
     """See `SolutionStatus()` """
-    type           = SolutionType()
+    type = SolutionType()
     """See `SolutionType()` """
 
-    def _setup(self, cplex):
-        """non-public"""
-        BaseInterface._setup(self, cplex)
-        self.progress      = ProgressInterface()
-        self.infeasibility = InfeasibilityInterface()
-        self.MIP           = MIPSolutionInterface()
-        self.basis         = BasisInterface()
-        self.sensitivity   = SensitivityInterface()
-        self.pool          = SolnPoolInterface()
-        self.advanced      = AdvancedSolutionInterface()
-        self.progress._setup(self)
-        self.infeasibility._setup(self)
-        self.MIP._setup(self)
-        self.basis._setup(self)
-        self.sensitivity._setup(self)
-        self.pool._setup(self)
-        self.advanced._setup(self)
+    def __init__(self, cplex):
+        """Creates a new SolutionInterface.
 
+        The solution interface is exposed by the top-level `Cplex` class
+        as Cplex.solution.  This constructor is not meant to be used
+        externally.
+        """
+        super(SolutionInterface, self).__init__(cplex)
+        self.progress = ProgressInterface(self)
+        """See `ProgressInterface()` """
+        self.infeasibility = InfeasibilityInterface(self)
+        """See `InfeasibilityInterface()` """
+        self.MIP = MIPSolutionInterface(self)
+        """See `MIPSolutionInterface()` """
+        self.basis = BasisInterface(self)
+        """See `BasisInterface()` """
+        self.sensitivity = SensitivityInterface(self)
+        """See `SensitivityInterface()` """
+        self.pool = SolnPoolInterface(self)
+        """See `SolnPoolInterface()` """
+        self.advanced = AdvancedSolutionInterface(self)
+        """See `AdvancedSolutionInterface()` """
 
     def get_status(self):
         """Returns the status of the solution.
@@ -7493,8 +7526,8 @@ class SolutionInterface(BaseInterface):
         2
         """
         return CPX_PROC.getmethod(self._env._e, self._cplex._lp)
-    
-    def get_status_string(self, status_code = None):
+
+    def get_status_string(self, status_code=None):
         """Returns a string describing the status of the solution.
 
         Example usage:
@@ -7562,11 +7595,11 @@ class SolutionInterface(BaseInterface):
         >>> c.solution.get_values([0, 4, 5])
         [25.5, 0.0, 80.0]
         """
-        def getx(a, b = self._cplex.variables.get_num() - 1):
+        def getx(a, b=self._cplex.variables.get_num() - 1):
             return CPX_PROC.getx(self._env._e, self._cplex._lp, a, b)
         return apply_freeform_two_args(
-            getx, self._cplex.variables.get_indices, args)
-        
+            getx, self._cplex.variables._conv, args)
+
     def get_reduced_costs(self, *args):
         """Returns the reduced costs of a set of variables.
 
@@ -7604,10 +7637,10 @@ class SolutionInterface(BaseInterface):
         >>> c.solution.get_reduced_costs([0, 4, 5])
         [0.0, 10.0, 0.0]
         """
-        def getdj(a, b = self._cplex.variables.get_num() - 1):
+        def getdj(a, b=self._cplex.variables.get_num() - 1):
             return CPX_PROC.getdj(self._env._e, self._cplex._lp, a, b)
         return apply_freeform_two_args(
-            getdj, self._cplex.variables.get_indices, args)
+            getdj, self._cplex.variables._conv, args)
 
     def get_dual_values(self, *args):
         """Returns a set of dual values.
@@ -7655,12 +7688,12 @@ class SolutionInterface(BaseInterface):
         True
         True
         """
-        def getpi(a, b = self._cplex.linear_constraints.get_num() - 1):
+        def getpi(a, b=self._cplex.linear_constraints.get_num() - 1):
             return CPX_PROC.getpi(self._env._e, self._cplex._lp, a, b)
         return apply_freeform_two_args(
-            getpi, self._cplex.linear_constraints.get_indices, args)
+            getpi, self._cplex.linear_constraints._conv, args)
 
-    def get_quadratic_dualslack(self,*args):
+    def get_quadratic_dualslack(self, *args):
         """Returns the dual slack for a quadratic constraint.
 
         The function returns the dual slack vector of its arguments as a
@@ -7676,7 +7709,7 @@ class SolutionInterface(BaseInterface):
                 return SparsePair(res[0], res[1])
         return apply_freeform_one_arg(
             getqconstrdslack,
-            self._cplex.quadratic_constraints.get_indices,
+            self._cplex.quadratic_constraints._conv,
             CPX_PROC.getnumqconstrs(self._env._e, self._cplex._lp),
             args)
 
@@ -7716,10 +7749,10 @@ class SolutionInterface(BaseInterface):
         >>> abs(c.solution.get_linear_slacks(5)) < 1e-6
         True
         """
-        def getslack(a, b = self._cplex.linear_constraints.get_num() - 1):
+        def getslack(a, b=self._cplex.linear_constraints.get_num() - 1):
             return CPX_PROC.getslack(self._env._e, self._cplex._lp, a, b)
         return apply_freeform_two_args(
-            getslack, self._cplex.linear_constraints.get_indices, args)
+            getslack, self._cplex.linear_constraints._conv, args)
 
     def get_indicator_slacks(self, *args):
         """Returns a set of indicator slacks.
@@ -7757,10 +7790,10 @@ class SolutionInterface(BaseInterface):
         >>> c.solution.get_indicator_slacks([0, 18])
         [1e+20, 0.0]
         """
-        def getindslack(a, b = self._cplex.indicator_constraints.get_num() - 1):
+        def getindslack(a, b=self._cplex.indicator_constraints.get_num() - 1):
             return CPX_PROC.getindconstrslack(self._env._e, self._cplex._lp, a, b)
         return apply_freeform_two_args(
-            getindslack, self._cplex.indicator_constraints.get_indices,
+            getindslack, self._cplex.indicator_constraints._conv,
             args)
 
     def get_quadratic_slacks(self, *args):
@@ -7799,10 +7832,10 @@ class SolutionInterface(BaseInterface):
         >>> abs(slack) < 1e-6
         True
         """
-        def getqslack(a, b = self._cplex.quadratic_constraints.get_num() - 1):
+        def getqslack(a, b=self._cplex.quadratic_constraints.get_num() - 1):
             return CPX_PROC.getqconstrslack(self._env._e, self._cplex._lp, a, b)
         return apply_freeform_two_args(
-            getqslack, self._cplex.quadratic_constraints.get_indices, args)
+            getqslack, self._cplex.quadratic_constraints._conv, args)
 
     def get_integer_quality(self, which):
         """Returns a measure of the quality of the solution.
@@ -7946,11 +7979,11 @@ class SolutionInterface(BaseInterface):
         >>> c.solution.get_activity_levels([2, 3, 12])
         [80.0, 0.0, 500.0]
         """
-        def getax(a, b = self._cplex.linear_constraints.get_num() - 1):
+        def getax(a, b=self._cplex.linear_constraints.get_num() - 1):
             return CPX_PROC.getax(self._env._e, self._cplex._lp, a, b)
         return apply_freeform_two_args(
-            getax, self._cplex.linear_constraints.get_indices, args)
-    
+            getax, self._cplex.linear_constraints._conv, args)
+
     def get_quadratic_activity_levels(self, *args):
         """Returns the activity levels for set of quadratic constraints.
 
@@ -7988,10 +8021,10 @@ class SolutionInterface(BaseInterface):
         >>> abs(xqxax[0] - 2.015616) < 1e-6
         True
         """
-        def getxqxax(a, b = self._cplex.quadratic_constraints.get_num() - 1):
+        def getxqxax(a, b=self._cplex.quadratic_constraints.get_num() - 1):
             return CPX_PROC.getxqxax(self._env._e, self._cplex._lp, a, b)
         return apply_freeform_two_args(
-            getxqxax, self._cplex.quadratic_constraints.get_indices, args)
+            getxqxax, self._cplex.quadratic_constraints._conv, args)
 
     def get_quality_metrics(self):
         """Returns an object containing measures of the solution quality.
@@ -7999,7 +8032,7 @@ class SolutionInterface(BaseInterface):
         See `QualityMetrics`
         """
         return QualityMetrics(self._cplex)
-    
+
     def write(self, filename):
         """Writes the incumbent solution to a file.
 
@@ -8019,12 +8052,13 @@ class SolutionInterface(BaseInterface):
     # FIXME: Do we really not have a way to read these solution
     #        files back in?
 
-    
-class PresolveStatus:
+
+class PresolveStatus(object):
     """Presolve status codes"""
     no_reductions = 0
-    has_problem   = 1
+    has_problem = 1
     empty_problem = 2
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -8044,13 +8078,14 @@ class PresolveStatus:
         if item == 2:
             return 'empty_problem'
 
-        
-class PresolveMethod:
+
+class PresolveMethod(object):
     """Presolve solution methods"""
-    none    = _constants.CPX_ALG_NONE
-    primal  = _constants.CPX_ALG_PRIMAL
-    dual    = _constants.CPX_ALG_DUAL
+    none = _constants.CPX_ALG_NONE
+    primal = _constants.CPX_ALG_PRIMAL
+    dual = _constants.CPX_ALG_DUAL
     barrier = _constants.CPX_ALG_BARRIER
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -8073,13 +8108,14 @@ class PresolveMethod:
             return 'barrier'
 
 
-class PresolveColStatus:
+class PresolveColStatus(object):
     """Presolve variable status codes"""
     lower_bound = _constants.CPX_PRECOL_LOW
     upper_bound = _constants.CPX_PRECOL_UP
-    fixed       = _constants.CPX_PRECOL_FIX
-    aggregated  = _constants.CPX_PRECOL_AGG
-    other   = _constants.CPX_PRECOL_OTHER
+    fixed = _constants.CPX_PRECOL_FIX
+    aggregated = _constants.CPX_PRECOL_AGG
+    other = _constants.CPX_PRECOL_OTHER
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -8104,11 +8140,12 @@ class PresolveColStatus:
             return 'other'
 
 
-class PresolveRowStatus:
+class PresolveRowStatus(object):
     """Presolve linear constraint status codes"""
-    reduced    = _constants.CPX_PREROW_RED
+    reduced = _constants.CPX_PREROW_RED
     aggregated = _constants.CPX_PREROW_AGG
-    other      = _constants.CPX_PREROW_OTHER
+    other = _constants.CPX_PREROW_OTHER
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -8132,9 +8169,9 @@ class PresolveRowStatus:
 class PresolveInterface(BaseInterface):
     """Methods for dealing with the presolved problem."""
 
-    status     = PresolveStatus()
+    status = PresolveStatus()
     """See `PresolveStatus()` """
-    method     = PresolveMethod()
+    method = PresolveMethod()
     """See `PresolveMethod()` """
     col_status = PresolveColStatus()
     """See `PresolveColStatus()` """
@@ -8154,7 +8191,7 @@ class PresolveInterface(BaseInterface):
         formula in terms of the presolved variables and offset is the
         value of the linear formula corresponding to variables that
         have been removed in the presolved problem.
-        
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> out = c.set_results_stream(None)
@@ -8164,7 +8201,7 @@ class PresolveInterface(BaseInterface):
         >>> c.presolve.crush_formula(cplex.SparsePair(ind = [1, 2], val = [1.0] * 2))
         (SparsePair(ind = [1, 2], val = [1.0, 1.0]), 0.0)
         """
-        ind, val = self._unpack_pair(formula)
+        ind, val = unpack_pair(formula)
         ret = CPX_PROC.crushform(self._env._e, self._cplex._lp, ind, val)
         return (SparsePair(ret[1], ret[2]), ret[0])
 
@@ -8175,7 +8212,7 @@ class PresolveInterface(BaseInterface):
         variables in the original problem.  Returns a list of floats
         with length equal to the number of variables in the presolved
         problem.
-        
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> out = c.set_results_stream(None)
@@ -8194,7 +8231,7 @@ class PresolveInterface(BaseInterface):
         linear constraints in the original problem.  Returns a list of
         floats with length equal to the number of linear constraints
         in the presolved problem.
-        
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> out = c.set_results_stream(None)
@@ -8205,7 +8242,7 @@ class PresolveInterface(BaseInterface):
         [1.0, 1.0, 1.0]
         """
         return CPX_PROC.crushpi(self._env._e, self._cplex._lp, pi)
-        
+
     def uncrush_formula(self, pre_formula):
         """Uncrushes a linear formula up from the presolved space.
 
@@ -8219,7 +8256,7 @@ class PresolveInterface(BaseInterface):
         in the original problem and offset is the value of the linear
         formula corresponding to variables that have been removed in
         the presolved problem.
-        
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> out = c.set_results_stream(None)
@@ -8229,7 +8266,7 @@ class PresolveInterface(BaseInterface):
         >>> c.presolve.uncrush_formula(cplex.SparsePair(ind = [1, 2], val = [1.0] * 2))
         (SparsePair(ind = [1, 2], val = [1.0, 1.0]), 0.0)
         """
-        ind, val = self._unpack_pair(pre_formula)
+        ind, val = unpack_pair(pre_formula)
         ret = CPX_PROC.uncrushform(self._env._e, self._cplex._lp, ind, val)
         return (SparsePair(ret[1], ret[2]), ret[0])
 
@@ -8240,7 +8277,7 @@ class PresolveInterface(BaseInterface):
         variables in the presolved problem.  Returns a list of floats
         with length equal to the number of variables in the original
         problem.
-        
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> out = c.set_results_stream(None)
@@ -8259,7 +8296,7 @@ class PresolveInterface(BaseInterface):
         linear constraints in the presolved problem.  Returns a list
         of floats with length equal to the number of linear
         constraints in the original problem.
-        
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> out = c.set_results_stream(None)
@@ -8270,7 +8307,7 @@ class PresolveInterface(BaseInterface):
         [1.0, 1.0, 1.0, 0.0]
         """
         return CPX_PROC.uncrushpi(self._env._e, self._cplex._lp, pre_pi)
-        
+
     def free(self):
         """Frees the presolved problem.
 
@@ -8396,7 +8433,7 @@ class PresolveInterface(BaseInterface):
         """
         return CPX_PROC.getprestat_oc(self._env._e, self._cplex._lp)
 
-    def add_rows(self, lin_expr = [], senses = "", rhs = [], names = []):
+    def add_rows(self, lin_expr=None, senses="", rhs=None, names=None):
         """Adds linear constraints to the presolved problem.
 
         presolve.add_rows accepts the keyword arguments lin_expr,
@@ -8425,10 +8462,11 @@ class PresolveInterface(BaseInterface):
         The specified constraints are added to both the original
         problem and the presolved problem.
         """
+        lin_expr, senses, rhs, names = init_list_args(
+            lin_expr, senses, rhs, names)
         if not isinstance(senses, six.string_types):
             senses = "".join(senses)
-        # TODO: num_new_rows not used.
-        num_new_rows = validate_arg_lengths([rhs, senses, names, lin_expr])
+        validate_arg_lengths([rhs, senses, names, lin_expr])
         if isinstance(lin_expr, list):
             rmat = _HBMatrix(lin_expr)
         CPX_PROC.preaddrows(self._env._e, self._cplex._lp, rhs, senses,
@@ -8446,9 +8484,9 @@ class PresolveInterface(BaseInterface):
 
         The objective function of both the original problem and the
         presolved problem are changed.
-        
+
         """
-        ind, val = self._unpack_pair(objective)
+        ind, val = unpack_pair(objective)
         CPX_PROC.prechgobj(self._env._e, self._cplex._lp, ind, val)
 
     def presolve(self, method):
@@ -8471,13 +8509,14 @@ class PresolveInterface(BaseInterface):
                                     filename, enc=self._env._apienc)
 
 
-class FeasoptConstraintType:
+class FeasoptConstraintType(object):
     """Types of constraints"""
     lower_bound = _constants.CPX_CON_LOWER_BOUND
     upper_bound = _constants.CPX_CON_UPPER_BOUND
-    linear      = _constants.CPX_CON_LINEAR
-    quadratic   = _constants.CPX_CON_QUADRATIC
-    indicator   = _constants.CPX_CON_INDICATOR        
+    linear = _constants.CPX_CON_LINEAR
+    quadratic = _constants.CPX_CON_QUADRATIC
+    indicator = _constants.CPX_CON_INDICATOR
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -8498,7 +8537,7 @@ class FeasoptConstraintType:
             return 'linear'
         if item == _constants.CPX_CON_QUADRATIC:
             return 'quadratic'
-        if item == _constants.CPX_CON_INDICATOR        :
+        if item == _constants.CPX_CON_INDICATOR:
             return 'indicator'
 
 
@@ -8514,7 +8553,7 @@ class FeasoptInterface(BaseInterface):
     conflict.upper_bound(), conflict.lower_bound(), conflict.linear(),
     conflict.quadratic(), or conflict.indicator() may be used to
     specify the constraints to consider.
-    
+
     Constraint groups are sequences of length two, the first entry of
     which is the preference for the group (a float), the second of
     which is a sequence of pairs (type, id), where type is an
@@ -8535,16 +8574,15 @@ class FeasoptInterface(BaseInterface):
 
     constraint_type = FeasoptConstraintType()
     """See `FeasoptConstraintType()` """
-    
+
     def all_constraints(self):
         """Returns an object instructing feasopt to relax all constraints.
 
         Calling Cplex.feasopt(Cplex.feasopt.all_constraints()) will
         result in every constraint being relaxed independently with
         equal weight.
-
         """
-        gp  = self.upper_bound_constraints()._gp
+        gp = self.upper_bound_constraints()._gp
         gp += self.lower_bound_constraints()._gp
         gp += self.linear_constraints()._gp
         gp += self.quadratic_constraints()._gp
@@ -8569,12 +8607,8 @@ class FeasoptInterface(BaseInterface):
         inclusive, can be relaxed.  If a sequence of variable names or
         indices is passed in, all of their upper bounds can be
         relaxed.
-        
         """
-        conv    = self._cplex.variables._conv
-        max_num = self._cplex.variables.get_num()
-        c_type  = self.constraint_type.upper_bound
-        return make_group(conv, max_num, c_type, *args)
+        return self._make_group(self.constraint_type.upper_bound, *args)
 
     def lower_bound_constraints(self, *args):
         """Returns an object instructing feasopt to relax all lower bounds.
@@ -8594,12 +8628,8 @@ class FeasoptInterface(BaseInterface):
         inclusive, can be relaxed.  If a sequence of variable names or
         indices is passed in, all of their lower bounds can be
         relaxed.
-        
         """
-        conv    = self._cplex.variables._conv
-        max_num = self._cplex.variables.get_num()
-        c_type  = self.constraint_type.lower_bound
-        return make_group(conv, max_num, c_type, *args)
+        return self._make_group(self.constraint_type.lower_bound, *args)
 
     def linear_constraints(self, *args):
         """Returns an object instructing feasopt to relax all linear constraints.
@@ -8620,12 +8650,8 @@ class FeasoptInterface(BaseInterface):
         be relaxed.  If a sequence of linear constraint names or
         indices is passed in, all of their linear constraints can be
         relaxed.
-        
         """
-        conv    = self._cplex.linear_constraints._conv
-        max_num = self._cplex.linear_constraints.get_num()
-        c_type  = self.constraint_type.linear
-        return make_group(conv, max_num, c_type, *args)
+        return self._make_group(self.constraint_type.linear, *args)
 
     def quadratic_constraints(self, *args):
         """Returns an object instructing feasopt to relax all quadratic constraints.
@@ -8646,12 +8672,8 @@ class FeasoptInterface(BaseInterface):
         inclusive, can be relaxed.  If a sequence of quadratic
         constraint names or indices is passed in, all of their
         quadratic constraints can be relaxed.
-        
         """
-        conv    = self._cplex.quadratic_constraints._conv
-        max_num = self._cplex.quadratic_constraints.get_num()
-        c_type  = self.constraint_type.quadratic
-        return make_group(conv, max_num, c_type, *args)
+        return self._make_group(self.constraint_type.quadratic, *args)
 
     def indicator_constraints(self, *args):
         """Returns an object instructing feasopt to relax all indicator constraints.
@@ -8672,12 +8694,8 @@ class FeasoptInterface(BaseInterface):
         inclusive, can be relaxed.  If a sequence of indicator
         constraint names or indices is passed in, all of their
         indicator constraints can be relaxed.
-        
         """
-        conv    = self._cplex.indicator_constraints._conv
-        max_num = self._cplex.indicator_constraints.get_num()
-        c_type  = self.constraint_type.indicator
-        return make_group(conv, max_num, c_type, *args)
+        return self._make_group(self.constraint_type.indicator, *args)
 
     def __call__(self, *args):
         """Finds a minimal relaxation of the problem that is feasible.
@@ -8689,27 +8707,18 @@ class FeasoptInterface(BaseInterface):
         conflict.linear(), conflict.quadratic(), or
         conflict.indicator() may be used to specify the constraints to
         consider.
-    
+
         Constraint groups are sequences of length two, the first entry
         of which is the preference for the group (a float), the second
         of which is a sequence of pairs (type, id), where type is an
         attribute of feasopt.constraint_type and id is either an index
         or a valid name for the type.
-
         """
         if len(args) == 0:
             raise WrongNumberOfArgumentsError(
                 "Requires at least one argument")
-        gpref = []
-        gbeg  = []
-        ind   = []
-        indt  = []
-        fdict = {self.constraint_type.lower_bound:   self._cplex.variables._conv,
-                 self.constraint_type.upper_bound:   self._cplex.variables._conv,
-                 self.constraint_type.linear:  self._cplex.linear_constraints._conv,
-                 self.constraint_type.quadratic: self._cplex.quadratic_constraints._conv,
-                 self.constraint_type.indicator:  self._cplex.indicator_constraints._conv}
-        args = list(args)
+        gpref, gbeg, ind, indt = [], [], [], []
+        args = list(args)  # so we can call extend() below
         for group in args:
             if isinstance(group, _group):
                 args.extend(group._gp)
@@ -8717,17 +8726,52 @@ class FeasoptInterface(BaseInterface):
             gpref.append(group[0])
             gbeg.append(len(ind))
             for con in group[1]:
-                tran = fdict[con[0]]
+                tran = self._getconvfunc(con[0])
                 indt.append(con[0])
                 ind.append(tran(con[1]))
-        CPX_PROC.feasoptext(self._env._e, self._cplex._lp, gpref, gbeg, ind, indt)
+        CPX_PROC.feasoptext(self._env._e, self._cplex._lp,
+                            gpref, gbeg, ind, indt)
+
+    def _make_group(self, which, *args):
+        conv = self._getconvfunc(which)
+        max_num = self._getnum(which)
+        return make_group(conv, max_num, which, *args)
+
+    def _getnum(self, which):
+        contype = self.constraint_type
+        if (which == contype.lower_bound or
+                which == contype.upper_bound):
+            return self._cplex.variables.get_num()
+        elif which == contype.linear:
+            return self._cplex.linear_constraints.get_num()
+        elif which == contype.quadratic:
+            return self._cplex.quadratic_constraints.get_num()
+        elif which == contype.indicator:
+            return self._cplex.indicator_constraints.get_num()
+        else:
+            raise ValueError("Unexpected constraint_type!")
+
+    def _getconvfunc(self, which):
+        contype = self.constraint_type
+        if (which == contype.lower_bound or
+                which == contype.upper_bound):
+            return self._cplex.variables._conv
+        elif which == contype.linear:
+            return self._cplex.linear_constraints._conv
+        elif which == contype.quadratic:
+            return self._cplex.quadratic_constraints._conv
+        elif which == contype.indicator:
+            return self._cplex.indicator_constraints._conv
+        else:
+            raise ValueError("Unexpected constraint_type!")
 
 
-class ConflictStatus:
+class ConflictStatus(object):
     """Status codes returned by conflict.get"""
-    excluded             = _constants.CPX_CONFLICT_EXCLUDED
-    possible_member      = _constants.CPX_CONFLICT_POSSIBLE_MEMBER
-    member               = _constants.CPX_CONFLICT_MEMBER
+    excluded = _constants.CPX_CONFLICT_EXCLUDED
+    possible_member = _constants.CPX_CONFLICT_POSSIBLE_MEMBER
+    member = _constants.CPX_CONFLICT_MEMBER
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -8748,14 +8792,15 @@ class ConflictStatus:
             return 'member'
 
 
-class ConflictConstraintType:
+class ConflictConstraintType(object):
     """Types of constraints"""
     lower_bound = _constants.CPX_CON_LOWER_BOUND
     upper_bound = _constants.CPX_CON_UPPER_BOUND
-    linear      = _constants.CPX_CON_LINEAR
-    quadratic   = _constants.CPX_CON_QUADRATIC
-    indicator   = _constants.CPX_CON_INDICATOR
-    SOS         = _constants.CPX_CON_SOS
+    linear = _constants.CPX_CON_LINEAR
+    quadratic = _constants.CPX_CON_QUADRATIC
+    indicator = _constants.CPX_CON_INDICATOR
+    SOS = _constants.CPX_CON_SOS
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -8783,18 +8828,21 @@ class ConflictConstraintType:
 
 
 class ConflictInterface(BaseInterface):
-    """Methods for identifying conflicts among constraints.
-
-    """
+    """Methods for identifying conflicts among constraints."""
 
     group_status = ConflictStatus()
     """See `ConflictStatus()` """
     constraint_type = ConflictConstraintType()
     """See `ConflictConstraintType()` """
 
-    def _setup(self, cplex):
-        """non-public"""
-        BaseInterface._setup(self, cplex)
+    def __init__(self, cplex):
+        """Creates a new ConflictInterface.
+
+        The conflict interface is exposed by the top-level `Cplex` class
+        as Cplex.conflict.  This constructor is not meant to be used
+        externally.
+        """
+        super(ConflictInterface, self).__init__(cplex)
         self.__num_groups = 0
 
     def all_constraints(self):
@@ -8806,7 +8854,7 @@ class ConflictInterface(BaseInterface):
         will result in every constraint being included in the search
         for conflicts with equal preference.
         """
-        gp  = self.upper_bound_constraints()._gp
+        gp = self.upper_bound_constraints()._gp
         gp += self.lower_bound_constraints()._gp
         gp += self.linear_constraints()._gp
         gp += self.quadratic_constraints()._gp
@@ -8833,10 +8881,7 @@ class ConflictInterface(BaseInterface):
         variable names or indices is passed in, all of their upper
         bounds will be included.
         """
-        conv    = self._cplex.variables._conv
-        max_num = self._cplex.variables.get_num()
-        c_type  = self.constraint_type.upper_bound
-        return make_group(conv, max_num, c_type, *args)
+        return self._make_group(self.constraint_type.upper_bound, *args)
 
     def lower_bound_constraints(self, *args):
         """Returns an object instructing the conflict refiner to include all lower bounds.
@@ -8857,10 +8902,7 @@ class ConflictInterface(BaseInterface):
         variable names or indices is passed in, all of their lower
         bounds will be included.
         """
-        conv    = self._cplex.variables._conv
-        max_num = self._cplex.variables.get_num()
-        c_type  = self.constraint_type.lower_bound
-        return make_group(conv, max_num, c_type, *args)
+        return self._make_group(self.constraint_type.lower_bound, *args)
 
     def linear_constraints(self, *args):
         """Returns an object instructing the conflict refiner to include all linear constraints.
@@ -8881,10 +8923,7 @@ class ConflictInterface(BaseInterface):
         If a sequence of linear constraint names or indices is passed
         in, they will all be included.
         """
-        conv    = self._cplex.linear_constraints._conv
-        max_num = self._cplex.linear_constraints.get_num()
-        c_type  = self.constraint_type.linear
-        return make_group(conv, max_num, c_type, *args)
+        return self._make_group(self.constraint_type.linear, *args)
 
     def quadratic_constraints(self, *args):
         """Returns an object instructing the conflict refiner to include all quadratic constraints.
@@ -8905,10 +8944,7 @@ class ConflictInterface(BaseInterface):
         be included.  If a sequence of quadratic constraint names or
         indices is passed in, they will all be included.
         """
-        conv    = self._cplex.quadratic_constraints._conv
-        max_num = self._cplex.quadratic_constraints.get_num()
-        c_type  = self.constraint_type.quadratic
-        return make_group(conv, max_num, c_type, *args)
+        return self._make_group(self.constraint_type.quadratic, *args)
 
     def indicator_constraints(self, *args):
         """Returns an object instructing the conflict refiner to include all indicator constraints.
@@ -8929,10 +8965,7 @@ class ConflictInterface(BaseInterface):
         be included.  If a sequence of indicator constraint names or
         indices is passed in, they will all be included.
         """
-        conv    = self._cplex.indicator_constraints._conv
-        max_num = self._cplex.indicator_constraints.get_num()
-        c_type  = self.constraint_type.indicator
-        return make_group(conv, max_num, c_type, *args)
+        return self._make_group(self.constraint_type.indicator, *args)
 
     def SOS_constraints(self, *args):
         """Returns an object instructing the conflict refiner to include all SOS constraints.
@@ -8953,10 +8986,7 @@ class ConflictInterface(BaseInterface):
         constraint names or indices is passed in, they will all be
         included.
         """
-        conv    = self._cplex.SOS._conv
-        max_num = self._cplex.SOS.get_num()
-        c_type  = self.constraint_type.SOS
-        return make_group(conv, max_num, c_type, *args)
+        return self._make_group(self.constraint_type.SOS, *args)
 
     @staticmethod
     def _expand_groups(args):
@@ -8987,16 +9017,11 @@ class ConflictInterface(BaseInterface):
         This, so they can be passed into the callable library in the
         expected format.
         """
-        # NB: we reset the instance variables (__num_groups and __groups here)!
+        # NB: we reset the instance variables (__num_groups and
+        #     __groups here)!
         self.__num_groups = 0
         self.__groups = []
         gpref, gbeg, ind, indt = [], [], [], []
-        fdict = {self.constraint_type.lower_bound:self._cplex.variables._conv,
-                 self.constraint_type.upper_bound:self._cplex.variables._conv,
-                 self.constraint_type.linear:self._cplex.linear_constraints._conv,
-                 self.constraint_type.quadratic:self._cplex.quadratic_constraints._conv,
-                 self.constraint_type.SOS:self._cplex.SOS._conv,
-                 self.constraint_type.indicator:self._cplex.indicator_constraints._conv}
         groups = self._expand_groups(args)
         for group in groups:
             self.__num_groups += 1
@@ -9005,10 +9030,47 @@ class ConflictInterface(BaseInterface):
             gpref.append(pref)
             gbeg.append(len(ind))
             for contype, conid in contpl:
-                tran = fdict[contype]
+                tran = self._getconvfunc(contype)
                 indt.append(contype)
                 ind.append(tran(conid))
         return gpref, gbeg, ind, indt
+
+    def _make_group(self, which, *args):
+        conv = self._getconvfunc(which)
+        max_num = self._getnum(which)
+        return make_group(conv, max_num, which, *args)
+
+    def _getnum(self, which):
+        contype = self.constraint_type
+        if (which == contype.lower_bound or
+                which == contype.upper_bound):
+            return self._cplex.variables.get_num()
+        elif which == contype.linear:
+            return self._cplex.linear_constraints.get_num()
+        elif which == contype.quadratic:
+            return self._cplex.quadratic_constraints.get_num()
+        elif which == contype.SOS:
+            return self._cplex.SOS.get_num()
+        elif which == contype.indicator:
+            return self._cplex.indicator_constraints.get_num()
+        else:
+            raise ValueError("Unexpected constraint_type!")
+
+    def _getconvfunc(self, which):
+        contype = self.constraint_type
+        if (which == contype.lower_bound or
+                which == contype.upper_bound):
+            return self._cplex.variables._conv
+        elif which == contype.linear:
+            return self._cplex.linear_constraints._conv
+        elif which == contype.quadratic:
+            return self._cplex.quadratic_constraints._conv
+        elif which == contype.SOS:
+            return self._cplex.SOS._conv
+        elif which == contype.indicator:
+            return self._cplex.indicator_constraints._conv
+        else:
+            raise ValueError("Unexpected constraint_type!")
 
     def refine_MIP_start(self, MIP_start, *args):
         """Identifies a minimal conflict among a set of constraints for a given MIP start.
@@ -9027,7 +9089,7 @@ class ConflictInterface(BaseInterface):
         of which is a sequence of pairs (type, id), where type is an
         attribute of conflict.constraint_type and id is either an index
         or a valid name for the type.
-        
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> out = c.set_results_stream(None)
@@ -9052,7 +9114,8 @@ class ConflictInterface(BaseInterface):
 
         gpref, gbeg, ind, indt = self._separate_groups(args)
         CPX_PROC.refinemipstartconflictext(self._env._e, self._cplex._lp,
-                                           self._cplex.MIP_starts._conv(MIP_start),
+                                           self._cplex.MIP_starts._conv(
+                                               MIP_start),
                                            gpref, gbeg, ind, indt)
 
     def refine(self, *args):
@@ -9089,7 +9152,8 @@ class ConflictInterface(BaseInterface):
                 "Requires at least one argument")
 
         gpref, gbeg, ind, indt = self._separate_groups(args)
-        CPX_PROC.refineconflictext(self._env._e, self._cplex._lp, gpref, gbeg,
+        CPX_PROC.refineconflictext(self._env._e, self._cplex._lp,
+                                   gpref, gbeg,
                                    ind, indt)
 
     def get(self, *args):
@@ -9109,18 +9173,18 @@ class ConflictInterface(BaseInterface):
 
         If called with a sequence of integers as its argument, returns
         the status of all constraint groups in the sequence.
-        
+
         The status codes are attributes of
         Cplex.conflict.group_status.
-        
+
         """
-        def getconflict(a, b = self.__num_groups - 1):
+        def getconflict(a, b=self.__num_groups - 1):
             return CPX_PROC.getconflictext(self._env._e, self._cplex._lp, a, b)
         return apply_freeform_two_args(getconflict, None, args)
-            
+
     def get_groups(self, *args):
         """Returns the groups of constraints used in the last call to conflict.refine.
-        
+
         Can be called by four forms.
 
         If called with no arguments, returns a list containing all
@@ -9134,28 +9198,29 @@ class ConflictInterface(BaseInterface):
 
         If called with a sequence of integers as its argument, returns
         all constraint groups in the sequence.
-    
+
         Constraint groups are tuples of length two, the first entry of
         which is the preference for the group (a float), the second of
         which is a tuple of pairs (type, id), where type is an
         attribute of conflict.constraint_type and id is either an index
         or a valid name for the type.
-        
+
         """
-        def getgroups(a, b = self.__num_groups - 1):
+        def getgroups(a, b=self.__num_groups - 1):
             return self.__groups[a:b + 1]
         return apply_freeform_two_args(getgroups, None, args)
-    
+
     def write(self, filename):
         """Writes the conflict to a file."""
         CPX_PROC.clpwrite(self._env._e, self._cplex._lp, filename,
                           enc=self._env._apienc)
 
 
-class PivotVarStatus:
+class PivotVarStatus(object):
     """Use as input to pivoting methods."""
     at_lower_bound = _constants.CPX_AT_LOWER
     at_upper_bound = _constants.CPX_AT_UPPER
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -9185,7 +9250,7 @@ class AdvancedCplexInterface(BaseInterface):
     def delete_names(self):
         """Deletes all names from the problem and its objects."""
         CPX_PROC.delnames(self._env._e, self._cplex._lp)
-            
+
     def basic_presolve(self):
         """Performs bound strengthening and detects redundant rows.
 
@@ -9200,7 +9265,7 @@ class AdvancedCplexInterface(BaseInterface):
 
     def pivot(self, enter, leave, status):
         """Pivots a variable into the basis.
-        
+
         enter is a name or index of a variable or linear constraint.
         The index of a slack variable is specified by a negative
         integer; -i - 1 refers to the slack associated with the ith
@@ -9228,8 +9293,8 @@ class AdvancedCplexInterface(BaseInterface):
         def conv(var):
             try:
                 return self._cplex.variables._conv(var)
-            except: # name not found
-                return  -self._cplex.linear_constraints._conv(var) - 1
+            except:  # name not found
+                return -self._cplex.linear_constraints._conv(var) - 1
         CPX_PROC.pivot(self._env._e, self._cplex._lp, conv(enter),
                        conv(leave), status)
 
@@ -9240,14 +9305,8 @@ class AdvancedCplexInterface(BaseInterface):
         or a sequence of linear constraint indices or names.
 
         """
-        if isinstance(self._cplex.linear_constraints._conv(which),
-                      six.integer_types):
-            CPX_PROC.pivotin(self._env._e, self._cplex._lp,
-                             [self._cplex.linear_constraints._conv(which)])
-        else:
-            CPX_PROC.pivotin(self._env._e, self._cplex._lp,
-                             [self._cplex.linear_constraints._conv(x)
-                              for x in which])
+        x = listify(self._cplex.linear_constraints._conv(which))
+        CPX_PROC.pivotin(self._env._e, self._cplex._lp, x)
 
     def pivot_fixed_variables_out(self, which):
         """Forcibly pivots structural variables out of the basis.
@@ -9256,12 +9315,8 @@ class AdvancedCplexInterface(BaseInterface):
         sequence of variable indices or names.
 
         """
-        if isinstance(self._cplex.variables._conv(which), six.integer_types):
-            CPX_PROC.pivotout(self._env._e, self._cplex._lp,
-                              [self._cplex.variables._conv(which)])
-        else:
-            CPX_PROC.pivotout(self._env._e, self._cplex._lp,
-                              [self._cplex.variables._conv(x) for x in which])
+        x = listify(self._cplex.variables._conv(which))
+        CPX_PROC.pivotout(self._env._e, self._cplex._lp, x)
 
     def strong_branching(self, variables, it_limit):
         """Performs strong branching.
@@ -9286,23 +9341,23 @@ class AdvancedCplexInterface(BaseInterface):
         def conv(var):
             try:
                 return self._cplex.variables._conv(var)
-            except: # name not found
-                return  -self._cplex.linear_constraints._conv(var) - 1
+            except:  # name not found
+                return -self._cplex.linear_constraints._conv(var) - 1
         return list(zip(*CPX_PROC.strongbranch(
                     self._env._e, self._cplex._lp,
-                    [conv(x) for x in variables],
-                    it_limit)))
+                    conv(variables), it_limit)))
 
     def complete(self):
         """See CPXcompletelp in the Callable Library Reference Manual."""
         CPX_PROC.completelp(self._env._e, self._cplex.lp)
 
 
-class BranchDirection:
+class BranchDirection(object):
     """Constants defining branch directions"""
     default = _constants.CPX_BRANCH_GLOBAL
-    down    = _constants.CPX_BRANCH_DOWN
-    up      = _constants.CPX_BRANCH_UP 
+    down = _constants.CPX_BRANCH_DOWN
+    up = _constants.CPX_BRANCH_UP
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -9319,8 +9374,9 @@ class BranchDirection:
             return 'default'
         if item == _constants.CPX_BRANCH_DOWN:
             return 'down'
-        if item == _constants.CPX_BRANCH_UP :
+        if item == _constants.CPX_BRANCH_UP:
             return 'up'
+
 
 class OrderInterface(BaseInterface):
     """Methods for setting and querying a priority order for branching.
@@ -9340,7 +9396,7 @@ class OrderInterface(BaseInterface):
 
     branch_direction = BranchDirection()
     """See `BranchDirection()` """
-    
+
     def get(self):
         """Returns a list of triples (variable, priority, direction) representing the priority order for branching."""
         return list(zip(*CPX_PROC.getorder(self._env._e, self._cplex._lp)))
@@ -9361,9 +9417,9 @@ class OrderInterface(BaseInterface):
         direction must be an attribute of order.branch_direction.
         """
         ord = list(zip(*order))
-        ord[0] = [self._cplex.variables._conv(x) for x in ord[0]]
+        ord[0] = self._cplex.variables._conv(ord[0])
         CPX_PROC.copyorder(self._env._e, self._cplex._lp, *ord)
-    
+
     def read(self, filename):
         """Reads a priority order from a file."""
         CPX_PROC.readcopyorder(self._env._e, self._cplex._lp, filename,
@@ -9386,7 +9442,7 @@ class InitialInterface(BaseInterface):
 
     status = BasisVarStatus()
     """See `BasisVarStatus()` """
-    
+
     def set_start(self, col_status, row_status, col_primal, row_primal,
                   col_dual, row_dual):
         """Sets basis statuses, primal values, and dual values.
@@ -9434,24 +9490,6 @@ class InitialInterface(BaseInterface):
         """Reads the starting information from a file."""
         CPX_PROC.readcopysol(self._env._e, self._cplex._lp, filename,
                              enc=self._env._apienc)
-
-    def set_basis(self, col, row):
-        """Sets the starting basis.
-
-        The first argument is a list with length equal to the number
-        of variables.  The second argument is a list with length equal
-        to the number of linear constraints.  Each entry of these
-        lists must be an attribute of Cplex.start.status.
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = ["v" + str(i) for i in range(5)])
-        >>> indices = c.linear_constraints.add(names = ["r" + str(i) for i in range(2)])
-        >>> s = c.start.status
-        >>> c.start.set_basis([s.basic] * 3 + [s.at_lower_bound] * 2, [s.basic, s.at_upper_bound])        
-        """
-        CPX_PROC.copystart(self._env._e, self._cplex._lp, col, row,
-                           [], [], [], [])
 
     def read_basis(self, filename):
         """Reads the starting basis from a file."""

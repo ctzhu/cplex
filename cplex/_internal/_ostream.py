@@ -1,9 +1,9 @@
 # --------------------------------------------------------------------------
-# File: _ostream.py 
+# File: _ostream.py
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2016. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -17,6 +17,7 @@ import weakref
 from ._procedural import check_status
 from ..exceptions import CplexError, ErrorChannelMessage
 from .. import six
+
 
 class OutputStream(object):
     """Class to parse and write strings to a file object.
@@ -104,7 +105,6 @@ class OutputStream(object):
         See SWIG_callback.c:messagewrap.
         """
         try:
-            self._terminate = 0
             self.write(str_)
             self.flush()
             # Check to see if something was written to the error
@@ -129,7 +129,6 @@ class OutputStream(object):
         except Exception as exc:
             self._env._callback_exception = exc
             check_status._pyenv = self._env
-            self._terminate = 1
 
     def write(self, msg):
         """Parses and writes a string.

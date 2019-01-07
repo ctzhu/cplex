@@ -3,14 +3,14 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2016. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 # ------------------------------------------------------------------------
 """Annotation API"""
-from ._subinterfaces import IndexedInterface
+from ._subinterfaces import BaseInterface
 from . import _procedural as _proc
 from . import _aux_functions as _aux
 from . import _constants
@@ -24,6 +24,7 @@ class AnnotationObjectType(object):
     sos_constraint = _constants.CPX_ANNOTATIONOBJ_SOS
     indicator_constraint = _constants.CPX_ANNOTATIONOBJ_IND
     quadratic_constraint = _constants.CPX_ANNOTATIONOBJ_QC
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -50,7 +51,7 @@ class AnnotationObjectType(object):
             return "quadratic_constraint"
 
 
-class AnnotationInterface(IndexedInterface):
+class AnnotationInterface(BaseInterface):
     """Methods for adding, querying, and modifying annotations."""
 
     object_type = AnnotationObjectType()
@@ -76,9 +77,21 @@ class AnnotationInterface(IndexedInterface):
 class LongAnnotationInterface(AnnotationInterface):
     """Methods for adding, querying, and modifying long annotations."""
 
-    def _setup(self, cpx):
-        AnnotationInterface._setup(self, cpx)
-        self._get_index_function = _proc.getlongannoindex
+    benders_annotation = _constants.CPX_BENDERS_ANNOTATION
+    """String constant for the name of the Benders annotation."""
+
+    benders_mastervalue = _constants.CPX_BENDERS_MASTERVALUE
+    """Default value for the Benders master partition."""
+
+    def __init__(self, cpx):
+        """Creates a new LongAnnotationInterface.
+
+        The long annotation interface is exposed by the top-level `Cplex`
+        class as `Cplex.long_annotations`.  This constructor is not meant
+        to be used externally.
+        """
+        super(LongAnnotationInterface, self).__init__(
+            cplex=cpx, getindexfunc=_proc.getlongannoindex)
 
     def get_num(self):
         """Returns the number of long annotations in the problem.
@@ -157,9 +170,9 @@ class LongAnnotationInterface(AnnotationInterface):
         >>> c.long_annotations.get_num()
         0
         """
-        def _delete(idx):
-            _proc.dellonganno(self._env._e, self._cplex._lp, idx)
-        _aux.delete_set(_delete, self._conv, self.get_num(), *args)
+        def _delete(begin, end=None):
+            _proc.dellonganno(self._env._e, self._cplex._lp, begin, end)
+        _aux.delete_set_by_range(_delete, self._conv, self.get_num(), *args)
 
     def get_names(self, *args):
         """Returns the names of a set of long annotations.
@@ -207,7 +220,7 @@ class LongAnnotationInterface(AnnotationInterface):
                 self._env._e, self._cplex._lp, idx,
                 self._env._apienc)
         return _aux.apply_freeform_one_arg(
-            _get_names, self.get_indices, self.get_num(), args)
+            _get_names, self._conv, self.get_num(), args)
 
     def get_default_values(self, *args):
         """Returns the default value of a set of long annotations.
@@ -248,7 +261,7 @@ class LongAnnotationInterface(AnnotationInterface):
             return _proc.getlongannodefval(
                 self._env._e, self._cplex._lp, idx)
         return _aux.apply_freeform_one_arg(
-            _getdefval, self.get_indices, self.get_num(), args)
+            _getdefval, self._conv, self.get_num(), args)
 
     def set_values(self, idx, objtype, *args):
         """Sets the values for objects in the specified long annotation.
@@ -286,7 +299,7 @@ class LongAnnotationInterface(AnnotationInterface):
         def _set_values(ind, val):
             _proc.setlonganno(self._env._e, self._cplex._lp,
                               self._conv(idx), objtype, ind, val)
-        _aux.apply_pairs(_set_values, self.get_indices, *args)
+        _aux.apply_pairs(_set_values, self._conv, *args)
 
     def get_values(self, idx, objtype, *args):
         """Returns the long annotation values for the specified objects.
@@ -338,15 +351,21 @@ class LongAnnotationInterface(AnnotationInterface):
                                      self._conv(idx), objtype,
                                      begin, end)
         return _aux.apply_freeform_two_args(
-            _get_values, self.get_indices, args)
+            _get_values, self._conv, args)
 
 
 class DoubleAnnotationInterface(AnnotationInterface):
     """Methods for adding, querying, and modifying double annotations."""
 
-    def _setup(self, cpx):
-        AnnotationInterface._setup(self, cpx)
-        self._get_index_function = _proc.getdblannoindex
+    def __init__(self, cpx):
+        """Creates a new DoubleAnnotationInterface.
+
+        The double annotation interface is exposed by the top-level
+        `Cplex` class as `Cplex.double_annotations`.  This constructor is
+        not meant to be used externally.
+        """
+        super(DoubleAnnotationInterface, self).__init__(
+            cplex=cpx, getindexfunc=_proc.getdblannoindex)
 
     def get_num(self):
         """Returns the number of double annotations in the problem.
@@ -422,9 +441,9 @@ class DoubleAnnotationInterface(AnnotationInterface):
         >>> c.double_annotations.get_num()
         0
         """
-        def _delete(idx):
-            _proc.deldblanno(self._env._e, self._cplex._lp, idx)
-        _aux.delete_set(_delete, self._conv, self.get_num(), *args)
+        def _delete(begin, end=None):
+            _proc.deldblanno(self._env._e, self._cplex._lp, begin, end)
+        _aux.delete_set_by_range(_delete, self._conv, self.get_num(), *args)
 
     def get_names(self, *args):
         """Returns the names of a set of double annotations.
@@ -472,7 +491,7 @@ class DoubleAnnotationInterface(AnnotationInterface):
                 self._env._e, self._cplex._lp, idx,
                 self._env._apienc)
         return _aux.apply_freeform_one_arg(
-            _get_names, self.get_indices, self.get_num(), args)
+            _get_names, self._conv, self.get_num(), args)
 
     def get_default_values(self, *args):
         """Returns the default value of a set of double annotations.
@@ -513,7 +532,7 @@ class DoubleAnnotationInterface(AnnotationInterface):
             return _proc.getdblannodefval(
                 self._env._e, self._cplex._lp, idx)
         return _aux.apply_freeform_one_arg(
-            _getdefval, self.get_indices, self.get_num(), args)
+            _getdefval, self._conv, self.get_num(), args)
 
     def set_values(self, idx, objtype, *args):
         """Sets the values for objects in the specified double annotation.
@@ -552,7 +571,7 @@ class DoubleAnnotationInterface(AnnotationInterface):
         def _set_values(ind, val):
             _proc.setdblanno(self._env._e, self._cplex._lp,
                              self._conv(idx), objtype, ind, val)
-        _aux.apply_pairs(_set_values, self.get_indices, *args)
+        _aux.apply_pairs(_set_values, self._conv, *args)
 
     def get_values(self, idx, objtype, *args):
         """Returns the double annotation values for the specified objects.
@@ -604,4 +623,4 @@ class DoubleAnnotationInterface(AnnotationInterface):
                                     self._conv(idx), objtype,
                                     begin, end)
         return _aux.apply_freeform_two_args(
-            _get_values, self.get_indices, args)
+            _get_values, self._conv, args)

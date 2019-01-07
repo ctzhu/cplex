@@ -1,9 +1,9 @@
 # --------------------------------------------------------------------------
-# File: _parameter_classes.py 
+# File: _parameter_classes.py
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2016. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -19,24 +19,27 @@ CPLEX Parameters Reference Manual.
 
 import weakref
 
+from ._aux_functions import init_list_args
 from . import _procedural as CPX_PROC
 from ._parameters_auto import *
 from . import _constants
-from .. import exceptions
+from ..exceptions import CplexError, CplexSolverError, error_codes
 from .. import six
+
 
 class Parameter(object):
     """Base class for Cplex parameters.
 
     """
 
-    def __init__(self, env, about, parent, name, constants = None):
+    def __init__(self, env, about, parent, name, constants=None):
         """non-public"""
         self._env = weakref.proxy(env)
-        self._id = about[0]
-        self._help = lambda : about[1]
+        self._id, self._help, self._type = about
         self._parent = parent
         self._name = name
+        if self._id == _constants.CPX_PARAM_APIENCODING:
+            self._apiencoding_value = CPX_PROC.default_encoding
         if constants is not None:
             self.values = constants()
 
@@ -50,76 +53,80 @@ class Parameter(object):
             if not self._isvalid(value):
                 self._raiseInvalidArgument()
             self._apiencoding_value = value
-            value = CPX_PROC.default_encoding
+            # The apiencoding parameter is disabled in the Python API.
+            # We only allow the user to change the cosmetic value of
+            # this parameter. Search for CPX_PARAM_APIENCODING for more
+            # comments below.
+            return
         if self._id == _constants.CPX_PARAM_FILEENCODING:
             if not self._isvalid(value):
                 self._raiseInvalidArgument()
-        if self._isvalid(value):
-            self._env.parameters._set(self._id, value)
-        else:
+        if not self._isvalid(value):
             self._raiseInvalidArgument()
+        self._env.parameters._set(self._id, value, self._type)
 
     def get(self):
         """Returns the current value of the parameter."""
         if self._id == _constants.CPX_PARAM_APIENCODING:
-            if hasattr(self, "_apiencoding_value"):
-                return self._apiencoding_value
+            return self._apiencoding_value
         if self._id == _constants.CPX_PARAM_FILEENCODING:
-            return CPX_PROC.cpx_encode(self._env.parameters._get(self._id),
-                                       self._env._apienc)
-        return self._env.parameters._get(self._id)
+            return CPX_PROC.cpx_encode(
+                self._env.parameters._get(self._id, self._type),
+                self._env._apienc)
+        return self._env.parameters._get(self._id, self._type)
 
     def reset(self):
         """Sets the parameter to its default value."""
         try:
             self.set(self._defval)
-        except exceptions.CplexSolverError as cse:
-            errcodes = exceptions.error_codes
+        except CplexSolverError as cse:
             if ((self._id == _constants.CPX_PARAM_CPUMASK) and
-                cse.args[2] == errcodes.CPXERR_UNSUPPORTED_OPERATION):
+                    cse.args[2] == error_codes.CPXERR_UNSUPPORTED_OPERATION):
                 pass
             else:
                 raise
 
     def default(self):
         """Returns the default value of the parameter."""
-        if self._id == _constants.CPX_PARAM_DATACHECK:
-            return _constants.CPX_DATACHECK_WARN
-        elif self._id == _constants.CPX_PARAM_APIENCODING:
-            return CPX_PROC.default_encoding
-        else:
-            return self._defval
+        return self._defval
 
     def type(self):
         """Returns the type of the parameter.
 
-        Allowed types are float, int, and string.
+        Allowed types are float, int (and long in Python 2.x), and str.
         """
         return type(self._defval)
 
     def help(self):
         """Returns the documentation for the parameter."""
-        return self._help()
+        return self._help
 
     def _raiseInvalidArgument(self):
         """Raise invalid argument exception."""
-        raise exceptions.CplexError("Invalid argument to "+self.__repr__()+".set")
+        raise CplexError("Invalid argument to " + self.__repr__() + ".set")
+
 
 class NumParameter(Parameter):
     """Class for integer and float parameters.
 
     """
 
-    def __init__(self, env, about, parent, name, constants = None):
+    def __init__(self, env, about, parent, name, constants=None):
         """non-public"""
-        Parameter.__init__(self, env, about, parent, name, constants)
-        (self._defval, self._minval, self._maxval) = self._env.parameters._get_info(self._id)
+        super(NumParameter, self).__init__(env, about, parent, name, constants)
+        (self._defval,
+         self._minval,
+         self._maxval) = self._env.parameters._get_info(self._id, self._type)
+        # Override some default values for the Python API.
         if self._id == _constants.CPX_PARAM_CLONELOG:
             self._minval = 0
-            
+        elif self._id == _constants.CPX_PARAM_DATACHECK:
+            self._defval = CPX_DATACHECK_WARN
+
     def _isvalid(self, value):
         """Returns whether value is a valid value for the parameter."""
-        # If value is not a number then return False (thus avoiding an ugly TypeError).
+        # If value is not a number then return False (thus avoiding an ugly
+        # TypeError).
         for i in six.integer_types:
             if isinstance(value, i):
                 break
@@ -129,7 +136,7 @@ class NumParameter(Parameter):
         # As we define a special min value for CPX_PARAM_CLONELOG in the Python API
         # we have to have special handling for it.
         if (self._id == _constants.CPX_PARAM_CLONELOG and
-            value < self._minval):
+                value < self._minval):
             return False
         return True
 
@@ -147,10 +154,13 @@ class StrParameter(Parameter):
 
     """
 
-    def __init__(self, env, about, parent, name, constants = None):
+    def __init__(self, env, about, parent, name, constants=None):
         """non-public"""
-        Parameter.__init__(self, env, about, parent, name, constants)
-        self._defval = self._env.parameters._get_info(self._id)
+        super(StrParameter, self).__init__(env, about, parent, name, constants)
+        if self._id == _constants.CPX_PARAM_APIENCODING:
+            self._defval = CPX_PROC.default_encoding
+        else:
+            self._defval = self._env.parameters._get_info(self._id, self._type)
 
     def _isvalid(self, value):
         """Returns whether value is a valid value for the parameter."""
@@ -181,7 +191,9 @@ class ParameterGroup(object):
     def reset(self):
         """Sets the parameters in the group to their default values."""
         for member in self.__dict__.values():
-            if (isinstance(member, ParameterGroup) or isinstance(member, Parameter)) and member != self._parent:
+            if ((isinstance(member, ParameterGroup) or
+                 isinstance(member, Parameter)) and
+                    member != self._parent):
                 member.reset()
 
     def get_changed(self):
@@ -200,19 +212,20 @@ class ParameterGroup(object):
                 if member.get() != member.default():
                     retval.append((member, member.get()))
         return retval
-                    
 
-class TuningConstants:
+
+class TuningConstants(object):
     """Status codes returned by tuning methods.
 
     For an explanation of tuning, see that topic in
     the CPLEX User's Manual.
     """
 
-    abort      = _constants.CPX_TUNE_ABORT
+    completed = 0  # There is no constant for this.
+    abort = _constants.CPX_TUNE_ABORT
     time_limit = _constants.CPX_TUNE_TILIM
     dettime_limit = _constants.CPX_TUNE_DETTILIM
-    
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -233,7 +246,7 @@ class TuningConstants:
             return 'time_limit'
         if item == _constants.CPX_TUNE_DETTILIM:
             return 'dettime_limit'
-        
+
 
 class RootParameterGroup(ParameterGroup):
     """Class containing all the Cplex parameters.
@@ -246,169 +259,184 @@ class RootParameterGroup(ParameterGroup):
         if env is None and members is None:
             return
         env.parameters = self
-        ParameterGroup.__init__(self, env, members, None)
-        self._override_defaults()
-
-    def _get_overrides(self):
-        """non-public"""
-        # These parameters are overridden for the Python API and should always
-        # retain these values no matter what (except for datacheck, which can
-        # be turned off if the user desires).
-        return {_constants.CPX_PARAM_APIENCODING : CPX_PROC.default_encoding,
-                _constants.CPX_PARAM_DATACHECK : _constants.CPX_DATACHECK_WARN,
-                # turn off access to presolved problem in callbacks
-                _constants.CPX_PARAM_MIPCBREDLP : 0}
-
-    def _check_overrides(self):
-        """non-public"""
-        # After every reset, tune_problem, and tune_problem_set, verify that
-        # the default overrides have been applied.
-        overrides = self._get_overrides()
-        for key in overrides:
-            actual = self._get(key)
-            expected = overrides[key]
-            assert (actual == expected), "Unexpected value for overridden parameter!"
-        # Make sure that the Parameter._apiencoding_value has been overridden too.
-        assert (self._env._apienc == CPX_PROC.default_encoding), \
+        super(RootParameterGroup, self).__init__(env, members, None)
+        # At the C-level, the apiencoding parameter is always UTF-8 in
+        # the Python API. However, we allow the user to change it
+        # cosmetically. That is, the user can change the parameter
+        # through the Python API, but this only changes the value of
+        # Parameter._apiencoding_value and is used to encode/decode
+        # strings at the Python-level when interfacing with the callable
+        # library.
+        self._set(_constants.CPX_PARAM_APIENCODING, CPX_PROC.default_encoding,
+                  _constants.CPX_PARAMTYPE_STRING)
+        CPX_PROC.fixparam(self._env._e, _constants.CPX_PARAM_APIENCODING)
+        # Make sure that the Parameter._apiencoding_value has been
+        # initialized correctly too.
+        assert self.read.apiencoding.get() == CPX_PROC.default_encoding, \
             "Expecting value for read.apiencoding to have been overridden!"
-
-    def _override_defaults(self):
-        """non-public"""
-        overrides = self._get_overrides()
-        for key in overrides:
-            self._set(key, overrides[key])
-        # This is required to make sure that the Parameter._apiencoding_value
-        # attribute is overridden too.
-        self.read.apiencoding.set(CPX_PROC.default_encoding)
+        # Turn off access to presolved problem in callbacks in the Python API.
+        # CPX_PARAM_MIPCBREDLP is hidden so we have to set it via the
+        # parameter ID.
+        self._set(_constants.CPX_PARAM_MIPCBREDLP, 0,
+                  _constants.CPX_PARAMTYPE_INT)
+        CPX_PROC.fixparam(self._env._e, _constants.CPX_PARAM_MIPCBREDLP)
+        # By default, the datacheck parameter is "on" in the Python API.
+        self.read.datacheck.set(_constants.CPX_DATACHECK_WARN)
 
     def reset(self):
         """Sets the parameters in the group to their default values."""
         ParameterGroup.reset(self)
-        self._override_defaults()
-        self._check_overrides()
 
     def __repr__(self):
         """Return 'parameters'."""
         return self._name
 
-    def _set(self, which_parameter, value):
-        """non-public"""
-        if which_parameter in intParameterSet:
-            if isinstance(value, type(float())):
-                value = int(value) # will upconvert to long, if necc.
-            # prevent access to presolved problem in MIP callbacks
-            if which_parameter == 2055 and value != 0:
-                return
-            param_type = CPX_PROC.getparamtype(self._env._e, which_parameter)
-            if param_type == _constants.CPX_PARAMTYPE_INT:
-                CPX_PROC.setintparam(self._env._e, which_parameter, value)
-            else:
-                CPX_PROC.setlongparam(self._env._e, which_parameter, value)
-        elif which_parameter in dblParameterSet:
+    def _set(self, which_parameter, value, paramtype=None):
+        # RTC-34595
+        if paramtype is None:
+            paramtype = CPX_PROC.getparamtype(self._env._e,
+                                              which_parameter)
+        if paramtype == _constants.CPX_PARAMTYPE_INT:
+            if isinstance(value, float):
+                value = int(value)  # will upconvert to long, if necc.
+            CPX_PROC.setintparam(self._env._e, which_parameter, value)
+        elif paramtype == _constants.CPX_PARAMTYPE_DOUBLE:
             if isinstance(value, six.integer_types):
                 value = float(value)
             CPX_PROC.setdblparam(self._env._e, which_parameter, value)
-        elif which_parameter in strParameterSet:
+        elif paramtype == _constants.CPX_PARAMTYPE_STRING:
             CPX_PROC.setstrparam(self._env._e, which_parameter, value)
         else:
-            raise exceptions.CplexError("Bad parameter identifier")
+            assert paramtype == _constants.CPX_PARAMTYPE_LONG
+            if isinstance(value, float):
+                value = int(value)  # will upconvert to long, if necc.
+            CPX_PROC.setlongparam(self._env._e, which_parameter, value)
 
-    def _get(self, which_parameter):
-        """non-public"""
-        if which_parameter in intParameterSet:
-            param_type = CPX_PROC.getparamtype(self._env._e, which_parameter)
-            if param_type == _constants.CPX_PARAMTYPE_INT:
-                return CPX_PROC.getintparam(self._env._e, which_parameter)
-            else:
-                return CPX_PROC.getlongparam(self._env._e, which_parameter)
-        elif which_parameter in dblParameterSet:
+    def _get(self, which_parameter, paramtype=None):
+        # RTC-34595
+        if paramtype is None:
+            paramtype = CPX_PROC.getparamtype(self._env._e,
+                                              which_parameter)
+        if paramtype == _constants.CPX_PARAMTYPE_INT:
+            return CPX_PROC.getintparam(self._env._e, which_parameter)
+        elif paramtype == _constants.CPX_PARAMTYPE_DOUBLE:
             return CPX_PROC.getdblparam(self._env._e, which_parameter)
-        elif which_parameter in strParameterSet:
+        elif paramtype == _constants.CPX_PARAMTYPE_STRING:
             return CPX_PROC.getstrparam(self._env._e, which_parameter)
         else:
-            raise exceptions.CplexError("Bad parameter identifier")
+            assert paramtype == _constants.CPX_PARAMTYPE_LONG
+            return CPX_PROC.getlongparam(self._env._e, which_parameter)
 
-    def _get_info(self, which_parameter):
-        """non-public"""
-        if which_parameter in intParameterSet:
-            param_type = CPX_PROC.getparamtype(self._env._e, which_parameter)
-            if param_type == _constants.CPX_PARAMTYPE_INT:
-                return CPX_PROC.infointparam(self._env._e, which_parameter)
-            else:
-                return CPX_PROC.infolongparam(self._env._e, which_parameter)
-        elif which_parameter in dblParameterSet:
+    def _get_info(self, which_parameter, paramtype=None):
+        # RTC-34595
+        if paramtype is None:
+            paramtype = CPX_PROC.getparamtype(self._env._e,
+                                              which_parameter)
+        if paramtype == _constants.CPX_PARAMTYPE_INT:
+            return CPX_PROC.infointparam(self._env._e, which_parameter)
+        elif paramtype == _constants.CPX_PARAMTYPE_DOUBLE:
             return CPX_PROC.infodblparam(self._env._e, which_parameter)
-        elif which_parameter in strParameterSet:
+        elif paramtype == _constants.CPX_PARAMTYPE_STRING:
             return CPX_PROC.infostrparam(self._env._e, which_parameter)
         else:
-            raise exceptions.CplexError("Bad parameter identifier")
+            assert paramtype == _constants.CPX_PARAMTYPE_LONG
+            return CPX_PROC.infolongparam(self._env._e, which_parameter)
+
+    def _validate_fixed_args(self, fixed_parameters_and_values):
+        valid = False  # guilty until proven innocent
+        try:
+            paramset = set()
+            for (param, value) in fixed_parameters_and_values:
+                param_id, param_type = param._id, param._type
+                if param_id in paramset:
+                    raise CplexError("duplicate parameters detected")
+                else:
+                    paramset.add(param_id)
+            # If we can iterate over fixed_parameters_and_values and
+            # access the _id and _type attributes of the parameters,
+            # then it's considered valid.
+            valid = True
+        except (AttributeError, TypeError):
+            pass
+        if not valid:
+            raise TypeError("invalid fixed_parameters_and_values arg detected")
 
     def _process_fixed_args(self, fixed_parameters_and_values):
         """non-public"""
-        # Make sure that we always pass in the default overrides to
-        # the tuning tool.
-        result = {}
-        overrides = self._get_overrides()
-        isincluded = set()
+        if __debug__:
+            self._validate_fixed_args(fixed_parameters_and_values)
+        int_params_and_values = []
+        dbl_params_and_values = []
+        str_params_and_values = []
+        has_datacheck = False
         for (param, value) in fixed_parameters_and_values:
-            if param._id in result:
-                raise exceptions.CplexError("Duplicate parameters detected!")
-            if param._id in overrides:
-                result[param._id] = overrides[param._id];
-                isincluded.add(param._id)
+            param_id, param_type = param._id, param._type
+            if param_id == _constants.CPX_PARAM_DATACHECK:
+                has_datacheck = True
+            if (param_type == _constants.CPX_PARAMTYPE_INT or
+                    param_type == _constants.CPX_PARAMTYPE_LONG):
+                int_params_and_values.append((param_id, value))
+            elif param_type == _constants.CPX_PARAMTYPE_DOUBLE:
+                dbl_params_and_values.append((param_id, value))
             else:
-                result[param._id] = value
-        for key in overrides:
-            if key not in isincluded:
-                result[key] = overrides[key]
-        return result
+                assert param_type == _constants.CPX_PARAMTYPE_STRING, \
+                    "unexpected parameter type"
+                str_params_and_values.append((param_id, value))
+        # In the Python API, the datacheck parameter defaults to "on".
+        # When calling the tuning functions the datacheck parameter can
+        # be changed as a side effect. Here, we ensure that the value of
+        # the datacheck parameter is the same before and after. That is,
+        # _unless_ the user overrides it here, explicitly, by passing the
+        # datacheck parameter in as a fixed parameter.
+        if not has_datacheck:
+            int_params_and_values.append(
+                (_constants.CPX_PARAM_DATACHECK,
+                 self.read.datacheck.get()))
+        return (int_params_and_values, dbl_params_and_values,
+                str_params_and_values)
 
-    def tune_problem_set(self, filenames, filetypes = [], fixed_parameters_and_values= []):
+    def tune_problem_set(self, filenames, filetypes=None,
+                         fixed_parameters_and_values=None):
         """Tunes parameters for a set of problems.
 
         filenames must be a sequence of strings specifying a set of
         problems to tune.
-        
+
         If filetypes is given, it must be a sequence of the same
         length as filenames also consisting of strings that specify
         the types of the corresponding files.
-        
+
         fixed_parameters_and_values is a sequence of sequences of
         length 2 containing instances of the Parameter class that are
         to be fixed during the tuning process and the values at which
         they are to be fixed.
 
         tune_problem_set returns the status of the tuning procedure,
-        which is an attribute of parameters.tuning.
+        which is an attribute of parameters.tuning_status.
 
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> out = c.set_results_stream(None)
         >>> out = c.set_log_stream(None)
-        >>> status = c.parameters.tune_problem_set(["lpex.mps", "example.mps"],\
-                                                   fixed_parameters_and_values = [(c.parameters.lpmethod, 0)])
+        >>> status = c.parameters.tune_problem_set(
+        ...     ["lpex.mps", "example.mps"],
+        ...     fixed_parameters_and_values=[(c.parameters.lpmethod, 0)])
         >>> c.parameters.tuning_status[status]
         'completed'
         """
-        int_params_and_values = []
-        dbl_params_and_values = []
-        str_params_and_values = []
-        fixedpvs = self._process_fixed_args(fixed_parameters_and_values)
-        for param_id in fixedpvs:
-            if param_id in intParameterSet:
-                int_params_and_values.append((param_id, fixedpvs[param_id]))
-            elif param_id in dblParameterSet:
-                dbl_params_and_values.append((param_id, fixedpvs[param_id]))
-            elif param_id in strParameterSet:
-                str_params_and_values.append((param_id, fixedpvs[param_id]))
-            else:
-                raise exceptions.CplexError("Bad input to parameters.tune_problem_set")
-        status = CPX_PROC.tuneparamprobset(self._env._e, filenames, filetypes, int_params_and_values,
-                                           dbl_params_and_values, str_params_and_values)
-        self._check_overrides()
-        return status
+        filetypes, fixed_parameters_and_values = init_list_args(
+            filetypes, fixed_parameters_and_values)
+        (int_params_and_values,
+         dbl_params_and_values,
+         str_params_and_values) = self._process_fixed_args(
+             fixed_parameters_and_values)
+        return CPX_PROC.tuneparamprobset(self._env._e,
+                                         filenames, filetypes,
+                                         int_params_and_values,
+                                         dbl_params_and_values,
+                                         str_params_and_values)
 
-    def tune_problem(self, fixed_parameters_and_values = []):
+    def tune_problem(self, fixed_parameters_and_values=None):
         """Tunes parameters for a Cplex problem.
 
         fixed_parameters_and_values is a sequence of sequences of
@@ -417,7 +445,7 @@ class RootParameterGroup(ParameterGroup):
         they are to be fixed.
 
         tune_problem returns the status of the tuning procedure, which
-        is an attribute of parameters.tuning.
+        is an attribute of parameters.tuning_status.
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -429,26 +457,17 @@ class RootParameterGroup(ParameterGroup):
         >>> c.parameters.tuning_status[status]
         'completed'
         """
-        int_params_and_values = []
-        dbl_params_and_values = []
-        str_params_and_values = []
-        fixedpvs = self._process_fixed_args(fixed_parameters_and_values)
-        for param_id in fixedpvs:
-            if param_id in  intParameterSet:
-                int_params_and_values.append((param_id, fixedpvs[param_id]))
-            elif param_id in dblParameterSet:
-                dbl_params_and_values.append((param_id, fixedpvs[param_id]))
-            elif param_id in strParameterSet:
-                str_params_and_values.append((param_id, fixedpvs[param_id]))
-            else:
-                raise exceptions.CplexError("Bad input to parameters.tune_problem")
-        status = CPX_PROC.tuneparam(self._env._e, self._cplex._lp,
-                                    int_params_and_values,
-                                    dbl_params_and_values,
-                                    str_params_and_values)
-        self._check_overrides()
-        return status
-    
+        (fixed_parameters_and_values,) = init_list_args(
+            fixed_parameters_and_values)
+        (int_params_and_values,
+         dbl_params_and_values,
+         str_params_and_values) = self._process_fixed_args(
+             fixed_parameters_and_values)
+        return CPX_PROC.tuneparam(self._env._e, self._cplex._lp,
+                                  int_params_and_values,
+                                  dbl_params_and_values,
+                                  str_params_and_values)
+
     def read_file(self, filename):
         """Reads a set of parameters from the file filename."""
         CPX_PROC.readcopyparam(self._env._e, filename,
@@ -460,9 +479,10 @@ class RootParameterGroup(ParameterGroup):
                             enc=self._env._apienc)
 
 
-class off_on_constants:
+class off_on_constants(object):
     off = _constants.CPX_OFF
-    on  = _constants.CPX_ON
+    on = _constants.CPX_ON
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -480,10 +500,12 @@ class off_on_constants:
         if item == _constants.CPX_ON:
             return 'on'
 
-class auto_off_on_constants:
+
+class auto_off_on_constants(object):
     auto = _constants.CPX_AUTO
     off = _constants.CPX_OFF
     on = _constants.CPX_ON
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -503,12 +525,14 @@ class auto_off_on_constants:
         if item == _constants.CPX_ON:
             return 'on'
 
-class writelevel_constants:
-    auto                       = _constants.CPX_WRITELEVEL_AUTO
-    all_variables              = _constants.CPX_WRITELEVEL_ALLVARS
-    discrete_variables         = _constants.CPX_WRITELEVEL_DISCRETEVARS
-    nonzero_variables          = _constants.CPX_WRITELEVEL_NONZEROVARS
+
+class writelevel_constants(object):
+    auto = _constants.CPX_WRITELEVEL_AUTO
+    all_variables = _constants.CPX_WRITELEVEL_ALLVARS
+    discrete_variables = _constants.CPX_WRITELEVEL_DISCRETEVARS
+    nonzero_variables = _constants.CPX_WRITELEVEL_NONZEROVARS
     nonzero_discrete_variables = _constants.CPX_WRITELEVEL_NONZERODISCRETEVARS
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -532,10 +556,12 @@ class writelevel_constants:
         if item == _constants.CPX_WRITELEVEL_NONZERODISCRETEVARS:
             return 'nonzero_discrete_variables'
 
-class scale_constants:
+
+class scale_constants(object):
     none = -1
     equilibration = 0
     aggressive = 1
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -555,12 +581,14 @@ class scale_constants:
         if item == 1:
             return 'aggressive'
 
-class mip_emph_constants:
-    balanced    = _constants.CPX_MIPEMPHASIS_BALANCED
-    optimality  = _constants.CPX_MIPEMPHASIS_OPTIMALITY
+
+class mip_emph_constants(object):
+    balanced = _constants.CPX_MIPEMPHASIS_BALANCED
+    optimality = _constants.CPX_MIPEMPHASIS_OPTIMALITY
     feasibility = _constants.CPX_MIPEMPHASIS_FEASIBILITY
-    best_bound   = _constants.CPX_MIPEMPHASIS_BESTBOUND
-    hidden_feasibility  = _constants.CPX_MIPEMPHASIS_HIDDENFEAS 
+    best_bound = _constants.CPX_MIPEMPHASIS_BESTBOUND
+    hidden_feasibility = _constants.CPX_MIPEMPHASIS_HIDDENFEAS
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -581,13 +609,15 @@ class mip_emph_constants:
             return 'feasibility'
         if item == _constants.CPX_MIPEMPHASIS_BESTBOUND:
             return 'best_bound'
-        if item == _constants.CPX_MIPEMPHASIS_HIDDENFEAS :
+        if item == _constants.CPX_MIPEMPHASIS_HIDDENFEAS:
             return 'hidden_feasibility'
 
-class brdir_constants:
+
+class brdir_constants(object):
     down = _constants.CPX_BRDIR_DOWN
     auto = _constants.CPX_BRDIR_AUTO
-    up   = _constants.CPX_BRDIR_UP
+    up = _constants.CPX_BRDIR_UP
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -607,10 +637,12 @@ class brdir_constants:
         if item == _constants.CPX_BRDIR_UP:
             return 'up'
 
-class search_constants:
-    auto        = _constants.CPX_MIPSEARCH_AUTO
+
+class search_constants(object):
+    auto = _constants.CPX_MIPSEARCH_AUTO
     traditional = _constants.CPX_MIPSEARCH_TRADITIONAL
-    dynamic     = _constants.CPX_MIPSEARCH_DYNAMIC      
+    dynamic = _constants.CPX_MIPSEARCH_DYNAMIC
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -627,16 +659,18 @@ class search_constants:
             return 'auto'
         if item == _constants.CPX_MIPSEARCH_TRADITIONAL:
             return 'traditional'
-        if item == _constants.CPX_MIPSEARCH_DYNAMIC      :
+        if item == _constants.CPX_MIPSEARCH_DYNAMIC:
             return 'dynamic'
 
-class subalg_constants:
-    auto       = _constants.CPX_ALG_AUTOMATIC
-    primal     = _constants.CPX_ALG_PRIMAL
-    dual       = _constants.CPX_ALG_DUAL
-    network    = _constants.CPX_ALG_NET
-    barrier    = _constants.CPX_ALG_BARRIER
-    sifting    = _constants.CPX_ALG_SIFTING
+
+class subalg_constants(object):
+    auto = _constants.CPX_ALG_AUTOMATIC
+    primal = _constants.CPX_ALG_PRIMAL
+    dual = _constants.CPX_ALG_DUAL
+    network = _constants.CPX_ALG_NET
+    barrier = _constants.CPX_ALG_BARRIER
+    sifting = _constants.CPX_ALG_SIFTING
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -662,11 +696,13 @@ class subalg_constants:
         if item == _constants.CPX_ALG_SIFTING:
             return 'sifting'
 
-class nodesel_constants:
-    depth_first       = _constants.CPX_NODESEL_DFS
-    best_bound        = _constants.CPX_NODESEL_BESTBOUND
-    best_estimate     = _constants.CPX_NODESEL_BESTEST
-    best_estimate_alt = _constants.CPX_NODESEL_BESTEST_ALT     
+
+class nodesel_constants(object):
+    depth_first = _constants.CPX_NODESEL_DFS
+    best_bound = _constants.CPX_NODESEL_BESTBOUND
+    best_estimate = _constants.CPX_NODESEL_BESTEST
+    best_estimate_alt = _constants.CPX_NODESEL_BESTEST_ALT
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -685,17 +721,19 @@ class nodesel_constants:
             return 'best_bound'
         if item == _constants.CPX_NODESEL_BESTEST:
             return 'best_estimate'
-        if item == _constants.CPX_NODESEL_BESTEST_ALT     :
+        if item == _constants.CPX_NODESEL_BESTEST_ALT:
             return 'best_estimate_alt'
 
-class alg_constants:
-    auto       = _constants.CPX_ALG_AUTOMATIC
-    primal     = _constants.CPX_ALG_PRIMAL
-    dual       = _constants.CPX_ALG_DUAL
-    barrier    = _constants.CPX_ALG_BARRIER
-    sifting    = _constants.CPX_ALG_SIFTING
-    network    = _constants.CPX_ALG_NET
+
+class alg_constants(object):
+    auto = _constants.CPX_ALG_AUTOMATIC
+    primal = _constants.CPX_ALG_PRIMAL
+    dual = _constants.CPX_ALG_DUAL
+    barrier = _constants.CPX_ALG_BARRIER
+    sifting = _constants.CPX_ALG_SIFTING
+    network = _constants.CPX_ALG_NET
     concurrent = _constants.CPX_ALG_CONCURRENT
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -723,13 +761,15 @@ class alg_constants:
         if item == _constants.CPX_ALG_CONCURRENT:
             return 'concurrent'
 
-class varsel_constants:
-    min_infeasibility    = _constants.CPX_VARSEL_MININFEAS
-    default              = _constants.CPX_VARSEL_DEFAULT
-    max_infeasibility    = _constants.CPX_VARSEL_MAXINFEAS
-    pseudo_costs         = _constants.CPX_VARSEL_PSEUDO
-    strong_branching     = _constants.CPX_VARSEL_STRONG
-    pseudo_reduced_costs = _constants.CPX_VARSEL_PSEUDOREDUCED 
+
+class varsel_constants(object):
+    min_infeasibility = _constants.CPX_VARSEL_MININFEAS
+    default = _constants.CPX_VARSEL_DEFAULT
+    max_infeasibility = _constants.CPX_VARSEL_MAXINFEAS
+    pseudo_costs = _constants.CPX_VARSEL_PSEUDO
+    strong_branching = _constants.CPX_VARSEL_STRONG
+    pseudo_reduced_costs = _constants.CPX_VARSEL_PSEUDOREDUCED
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -752,14 +792,16 @@ class varsel_constants:
             return 'pseudo_costs'
         if item == _constants.CPX_VARSEL_STRONG:
             return 'strong_branching'
-        if item == _constants.CPX_VARSEL_PSEUDOREDUCED :
+        if item == _constants.CPX_VARSEL_PSEUDOREDUCED:
             return 'pseudo_reduced_costs'
 
-class dive_constants:
+
+class dive_constants(object):
     auto = 0
     traditional = 1
     probing = 2
     guided = 3
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -781,11 +823,13 @@ class dive_constants:
         if item == 3:
             return 'guided'
 
-class file_constants:
+
+class file_constants(object):
     auto = 0
     memory = 1
     disk = 2
     disk_compressed = 3
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -807,11 +851,13 @@ class file_constants:
         if item == 3:
             return 'disk_compressed'
 
-class fpheur_constants:
+
+class fpheur_constants(object):
     none = -1
     auto = 0
     feas = 1
     obj_and_feas = 2
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -833,10 +879,12 @@ class fpheur_constants:
         if item == 2:
             return 'obj_and_feas'
 
-class miqcp_constants:
+
+class miqcp_constants(object):
     auto = 0
     QCP_at_node = 1
     LP_at_node = 2
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -856,11 +904,13 @@ class miqcp_constants:
         if item == 2:
             return 'LP_at_node'
 
-class presolve_constants:
+
+class presolve_constants(object):
     none = -1
     auto = 0
     force = 1
     probe = 2
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -882,12 +932,14 @@ class presolve_constants:
         if item == 2:
             return 'probe'
 
-class v_agg_constants:
-    none            = -1
-    auto            = 0
-    moderate        = 1
-    aggressive      = 2
+
+class v_agg_constants(object):
+    none = -1
+    auto = 0
+    moderate = 1
+    aggressive = 2
     very_aggressive = 3
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -911,11 +963,13 @@ class v_agg_constants:
         if item == 3:
             return 'very_aggressive'
 
-class kappastats_constants:
-    none   = -1
-    auto   = 0
+
+class kappastats_constants(object):
+    none = -1
+    auto = 0
     sample = 1
-    full   = 2
+    full = 2
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -937,11 +991,13 @@ class kappastats_constants:
         if item == 2:
             return 'full'
 
-class agg_constants:
-    none            = -1
-    auto            = 0
-    moderate        = 1
-    aggressive      = 2
+
+class agg_constants(object):
+    none = -1
+    auto = 0
+    moderate = 1
+    aggressive = 2
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -963,10 +1019,12 @@ class agg_constants:
         if item == 2:
             return 'aggressive'
 
-class replace_constants:
+
+class replace_constants(object):
     firstin_firstout = _constants.CPX_SOLNPOOL_FIFO
-    worst_objective  = _constants.CPX_SOLNPOOL_OBJ
-    diversity        = _constants.CPX_SOLNPOOL_DIV
+    worst_objective = _constants.CPX_SOLNPOOL_OBJ
+    diversity = _constants.CPX_SOLNPOOL_DIV
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -986,11 +1044,13 @@ class replace_constants:
         if item == _constants.CPX_SOLNPOOL_DIV:
             return 'diversity'
 
-class ordertype_constants:
-    default     = 0
-    cost        = _constants.CPX_MIPORDER_COST
-    bounds      = _constants.CPX_MIPORDER_BOUNDS
+
+class ordertype_constants(object):
+    default = 0
+    cost = _constants.CPX_MIPORDER_COST
+    bounds = _constants.CPX_MIPORDER_BOUNDS
     scaled_cost = _constants.CPX_MIPORDER_SCALEDCOST
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1011,14 +1071,16 @@ class ordertype_constants:
             return 'bounds'
         if item == _constants.CPX_MIPORDER_SCALEDCOST:
             return 'scaled_cost'
-        
-class mip_display_constants:
+
+
+class mip_display_constants(object):
     none = 0
     integer_feasible = 1
     mip_interval_nodes = 2
     node_cuts = 3
     LP_root = 4
     LP_all = 5
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1044,14 +1106,16 @@ class mip_display_constants:
         if item == 5:
             return 'LP_all'
 
-class conflict_algorithm_constants:
-    auto          = _constants.CPX_CONFLICTALG_AUTO
-    fast          = _constants.CPX_CONFLICTALG_FAST
-    propagate     = _constants.CPX_CONFLICTALG_PROPAGATE
-    presolve      = _constants.CPX_CONFLICTALG_PRESOLVE
-    iis           = _constants.CPX_CONFLICTALG_IIS
-    limitedsolve  = _constants.CPX_CONFLICTALG_LIMITSOLVE
-    solve         = _constants.CPX_CONFLICTALG_SOLVE
+
+class conflict_algorithm_constants(object):
+    auto = _constants.CPX_CONFLICTALG_AUTO
+    fast = _constants.CPX_CONFLICTALG_FAST
+    propagate = _constants.CPX_CONFLICTALG_PROPAGATE
+    presolve = _constants.CPX_CONFLICTALG_PRESOLVE
+    iis = _constants.CPX_CONFLICTALG_IIS
+    limitedsolve = _constants.CPX_CONFLICTALG_LIMITSOLVE
+    solve = _constants.CPX_CONFLICTALG_SOLVE
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1065,27 +1129,29 @@ class conflict_algorithm_constants:
         'fast'
         """
         if item == _constants.CPX_CONFLICTALG_AUTO:
-           return 'auto'
+            return 'auto'
         if item == _constants.CPX_CONFLICTALG_FAST:
-           return 'fast'
+            return 'fast'
         if item == _constants.CPX_CONFLICTALG_PROPAGATE:
-           return 'propagate'
+            return 'propagate'
         if item == _constants.CPX_CONFLICTALG_PRESOLVE:
-           return 'presolve'
+            return 'presolve'
         if item == _constants.CPX_CONFLICTALG_IIS:
-           return 'iis'
+            return 'iis'
         if item == _constants.CPX_CONFLICTALG_LIMITSOLVE:
-           return 'limitedsolve'
+            return 'limitedsolve'
         if item == _constants.CPX_CONFLICTALG_SOLVE:
-           return 'solve'
+            return 'solve'
 
-class dual_pricing_constants:
-    auto          = _constants.CPX_DPRIIND_AUTO
-    full          = _constants.CPX_DPRIIND_FULL
-    steep         = _constants.CPX_DPRIIND_STEEP
-    full_steep    = _constants.CPX_DPRIIND_FULLSTEEP
+
+class dual_pricing_constants(object):
+    auto = _constants.CPX_DPRIIND_AUTO
+    full = _constants.CPX_DPRIIND_FULL
+    steep = _constants.CPX_DPRIIND_STEEP
+    full_steep = _constants.CPX_DPRIIND_FULLSTEEP
     steep_Q_start = _constants.CPX_DPRIIND_STEEPQSTART
-    devex         = _constants.CPX_DPRIIND_DEVEX 
+    devex = _constants.CPX_DPRIIND_DEVEX
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1108,16 +1174,18 @@ class dual_pricing_constants:
             return 'full_steep'
         if item == _constants.CPX_DPRIIND_STEEPQSTART:
             return 'steep_Q_start'
-        if item == _constants.CPX_DPRIIND_DEVEX :
+        if item == _constants.CPX_DPRIIND_DEVEX:
             return 'devex'
 
-class primal_pricing_constants:
-    partial       = _constants.CPX_PPRIIND_PARTIAL
-    auto          = _constants.CPX_PPRIIND_AUTO
-    devex         = _constants.CPX_PPRIIND_DEVEX
-    steep         = _constants.CPX_PPRIIND_STEEP
+
+class primal_pricing_constants(object):
+    partial = _constants.CPX_PPRIIND_PARTIAL
+    auto = _constants.CPX_PPRIIND_AUTO
+    devex = _constants.CPX_PPRIIND_DEVEX
+    steep = _constants.CPX_PPRIIND_STEEP
     steep_Q_start = _constants.CPX_PPRIIND_STEEPQSTART
-    full          = _constants.CPX_PPRIIND_FULL
+    full = _constants.CPX_PPRIIND_FULL
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1143,10 +1211,12 @@ class primal_pricing_constants:
         if item == _constants.CPX_PPRIIND_FULL:
             return 'full'
 
-class display_constants:
+
+class display_constants(object):
     none = 0
     normal = 1
     detailed = 2
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1166,11 +1236,13 @@ class display_constants:
         if item == 2:
             return 'detailed'
 
-class prered_constants:
-    none            = _constants.CPX_PREREDUCE_NOPRIMALORDUAL
-    primal          = _constants.CPX_PREREDUCE_PRIMALONLY
-    dual            = _constants.CPX_PREREDUCE_DUALONLY
+
+class prered_constants(object):
+    none = _constants.CPX_PREREDUCE_NOPRIMALORDUAL
+    primal = _constants.CPX_PREREDUCE_PRIMALONLY
+    dual = _constants.CPX_PREREDUCE_DUALONLY
     primal_and_dual = _constants.CPX_PREREDUCE_PRIMALANDDUAL
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1192,10 +1264,12 @@ class prered_constants:
         if item == _constants.CPX_PREREDUCE_PRIMALANDDUAL:
             return 'primal_and_dual'
 
-class coeffreduce_constants:
+
+class coeffreduce_constants(object):
     none = 0
     integral = 1
     any = 2
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1215,12 +1289,14 @@ class coeffreduce_constants:
         if item == 2:
             return 'any'
 
-class dependency_constants:
+
+class dependency_constants(object):
     auto = -1
     off = 0
     begin = 1
     end = 2
     begin_and_end = 3
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1244,10 +1320,12 @@ class dependency_constants:
         if item == 3:
             return 'begin_and_end'
 
-class dual_constants:
+
+class dual_constants(object):
     no = -1
     auto = 0
     yes = 1
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1267,9 +1345,11 @@ class dual_constants:
         if item == 1:
             return 'yes'
 
-class linear_constants:
+
+class linear_constants(object):
     only_linear = 0
     full = 1
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1287,12 +1367,14 @@ class linear_constants:
         if item == 1:
             return 'full'
 
-class repeatpre_constants:
+
+class repeatpre_constants(object):
     auto = -1
     off = 0
     without_cuts = 1
     with_cuts = 2
     new_root_cuts = 3
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1316,14 +1398,16 @@ class repeatpre_constants:
         if item == 3:
             return 'new_root_cuts'
 
-class sym_constants:
+
+class sym_constants(object):
     auto = -1
-    off   = 0
+    off = 0
     mild = 1
     moderate = 2
     aggressive = 3
     more_aggressive = 4
     very_aggressive = 5
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1351,10 +1435,12 @@ class sym_constants:
         if item == 5:
             return 'very_aggressive'
 
-class qcpduals_constants:
+
+class qcpduals_constants(object):
     no = 0
     if_possible = 1
     force = 2
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1374,12 +1460,14 @@ class qcpduals_constants:
         if item == 2:
             return 'force'
 
-class sift_alg_constants:
-    auto       = _constants.CPX_ALG_AUTOMATIC
-    primal     = _constants.CPX_ALG_PRIMAL
-    dual       = _constants.CPX_ALG_DUAL
-    barrier    = _constants.CPX_ALG_BARRIER
-    network    = _constants.CPX_ALG_NET
+
+class sift_alg_constants(object):
+    auto = _constants.CPX_ALG_AUTOMATIC
+    primal = _constants.CPX_ALG_PRIMAL
+    dual = _constants.CPX_ALG_DUAL
+    barrier = _constants.CPX_ALG_BARRIER
+    network = _constants.CPX_ALG_NET
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1402,14 +1490,16 @@ class sift_alg_constants:
             return 'barrier'
         if item == _constants.CPX_ALG_NET:
             return 'network'
-    
-class feasopt_mode_constants:
-    min_sum  = _constants.CPX_FEASOPT_MIN_SUM
-    opt_sum  = _constants.CPX_FEASOPT_OPT_SUM
-    min_inf  = _constants.CPX_FEASOPT_MIN_INF
-    opt_inf  = _constants.CPX_FEASOPT_OPT_INF
+
+
+class feasopt_mode_constants(object):
+    min_sum = _constants.CPX_FEASOPT_MIN_SUM
+    opt_sum = _constants.CPX_FEASOPT_OPT_SUM
+    min_inf = _constants.CPX_FEASOPT_MIN_INF
+    opt_inf = _constants.CPX_FEASOPT_OPT_INF
     min_quad = _constants.CPX_FEASOPT_MIN_QUAD
-    opt_quad = _constants.CPX_FEASOPT_OPT_QUAD         
+    opt_quad = _constants.CPX_FEASOPT_OPT_QUAD
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1432,12 +1522,14 @@ class feasopt_mode_constants:
             return 'opt_inf'
         if item == _constants.CPX_FEASOPT_MIN_QUAD:
             return 'min_quad'
-        if item == _constants.CPX_FEASOPT_OPT_QUAD         :
+        if item == _constants.CPX_FEASOPT_OPT_QUAD:
             return 'opt_quad'
-    
-class measure_constants:
-    average  = _constants.CPX_TUNE_AVERAGE
-    minmax   = _constants.CPX_TUNE_MINMAX
+
+
+class measure_constants(object):
+    average = _constants.CPX_TUNE_AVERAGE
+    minmax = _constants.CPX_TUNE_MINMAX
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1455,11 +1547,13 @@ class measure_constants:
         if item == _constants.CPX_TUNE_MINMAX:
             return 'minmax'
 
-class tune_display_constants:
+
+class tune_display_constants(object):
     none = 0
     minimal = 1
     settings = 2
     settings_and_logs = 3
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1481,10 +1575,12 @@ class tune_display_constants:
         if item == 3:
             return 'settings_and_logs'
 
-class bar_order_constants:
+
+class bar_order_constants(object):
     approx_min_degree = _constants.CPX_BARORDER_AMD
-    approx_min_fill   = _constants.CPX_BARORDER_AMF
+    approx_min_fill = _constants.CPX_BARORDER_AMF
     nested_dissection = _constants.CPX_BARORDER_ND
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1503,12 +1599,14 @@ class bar_order_constants:
             return 'approx_min_fill'
         if item == _constants.CPX_BARORDER_ND:
             return 'nested_dissection'
-    
-class crossover_constants:
-    none   = _constants.CPX_ALG_NONE
-    auto   = _constants.CPX_ALG_AUTOMATIC
+
+
+class crossover_constants(object):
+    none = _constants.CPX_ALG_NONE
+    auto = _constants.CPX_ALG_AUTOMATIC
     primal = _constants.CPX_ALG_PRIMAL
-    dual   = _constants.CPX_ALG_DUAL
+    dual = _constants.CPX_ALG_DUAL
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1530,11 +1628,13 @@ class crossover_constants:
         if item == _constants.CPX_ALG_DUAL:
             return 'dual'
 
-class bar_alg_constants:
+
+class bar_alg_constants(object):
     default = 0
     infeas_estimate = 1
     infeas_constant = 2
     standard = 3
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1556,11 +1656,13 @@ class bar_alg_constants:
         if item == 3:
             return 'standard'
 
-class bar_start_alg_constants:
+
+class bar_start_alg_constants(object):
     zero_dual = 1
     estimated_dual = 2
     average_primal_zero_dual = 3
     average_primal_estimated_dual = 4
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1582,10 +1684,12 @@ class bar_start_alg_constants:
         if item == 4:
             return 'average_primal_estimated_dual'
 
-class par_constants:
-    opportunistic  = _constants.CPX_PARALLEL_OPPORTUNISTIC
-    auto   = _constants.CPX_PARALLEL_AUTO
-    deterministic  = _constants.CPX_PARALLEL_DETERMINISTIC      
+
+class par_constants(object):
+    opportunistic = _constants.CPX_PARALLEL_OPPORTUNISTIC
+    auto = _constants.CPX_PARALLEL_AUTO
+    deterministic = _constants.CPX_PARALLEL_DETERMINISTIC
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1605,12 +1709,14 @@ class par_constants:
         if item == _constants.CPX_PARALLEL_DETERMINISTIC:
             return 'deterministic'
 
-class qp_alg_constants:
-    auto       = _constants.CPX_ALG_AUTOMATIC
-    primal     = _constants.CPX_ALG_PRIMAL
-    dual       = _constants.CPX_ALG_DUAL
-    network    = _constants.CPX_ALG_NET
-    barrier    = _constants.CPX_ALG_BARRIER
+
+class qp_alg_constants(object):
+    auto = _constants.CPX_ALG_AUTOMATIC
+    primal = _constants.CPX_ALG_PRIMAL
+    dual = _constants.CPX_ALG_DUAL
+    network = _constants.CPX_ALG_NET
+    barrier = _constants.CPX_ALG_BARRIER
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1634,10 +1740,12 @@ class qp_alg_constants:
         if item == _constants.CPX_ALG_BARRIER:
             return 'barrier'
 
-class advance_constants:
+
+class advance_constants(object):
     none = 0
     standard = 1
     alternate = 2
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1657,10 +1765,12 @@ class advance_constants:
         if item == 2:
             return 'alternate'
 
-class clocktype_constants:
+
+class clocktype_constants(object):
     auto = 0
-    CPU  = 1
+    CPU = 1
     wall = 2
+
     def __getitem__(self, item):
         if item == 0:
             return 'auto'
@@ -1669,10 +1779,12 @@ class clocktype_constants:
         if item == 2:
             return 'wall'
 
-class solutiontype_constants:
-    auto      = 0
-    basic     = 1
+
+class solutiontype_constants(object):
+    auto = 0
+    basic = 1
     non_basic = 2
+
     def __getitem__(self, item):
         if item == 0:
             return 'auto'
@@ -1681,11 +1793,13 @@ class solutiontype_constants:
         if item == 2:
             return 'non_basic'
 
-class optimalitytarget_constants:
-    auto           = 0
+
+class optimalitytarget_constants(object):
+    auto = 0
     optimal_convex = 1
-    first_order    = 2
+    first_order = 2
     optimal_global = 3
+
     def __getitem__(self, item):
         if item == 0:
             return 'auto'
@@ -1697,11 +1811,12 @@ class optimalitytarget_constants:
             return 'optimal_global'
 
 
-class rampup_duration_constants:
-    disabled   = _constants.CPX_RAMPUP_DISABLED
-    auto       = _constants.CPX_RAMPUP_AUTO
-    dynamic    = _constants.CPX_RAMPUP_DYNAMIC
-    infinite   = _constants.CPX_RAMPUP_INFINITE
+class rampup_duration_constants(object):
+    disabled = _constants.CPX_RAMPUP_DISABLED
+    auto = _constants.CPX_RAMPUP_AUTO
+    dynamic = _constants.CPX_RAMPUP_DYNAMIC
+    infinite = _constants.CPX_RAMPUP_INFINITE
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1723,10 +1838,12 @@ class rampup_duration_constants:
         if item == _constants.CPX_RAMPUP_INFINITE:
             return 'infinite'
 
-class datacheck_constants:
+
+class datacheck_constants(object):
     off = _constants.CPX_DATACHECK_OFF
     warn = _constants.CPX_DATACHECK_WARN
     assist = _constants.CPX_DATACHECK_ASSIST
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1746,12 +1863,14 @@ class datacheck_constants:
         if item == _constants.CPX_DATACHECK_ASSIST:
             return 'assist'
 
-class benders_strategy_constants:
+
+class benders_strategy_constants(object):
     none = _constants.CPX_BENDERSSTRATEGY_OFF
     auto = _constants.CPX_BENDERSSTRATEGY_AUTO
     user = _constants.CPX_BENDERSSTRATEGY_USER
     workers = _constants.CPX_BENDERSSTRATEGY_WORKERS
     full = _constants.CPX_BENDERSSTRATEGY_FULL
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -1774,3 +1893,75 @@ class benders_strategy_constants:
             return 'workers'
         if item == _constants.CPX_BENDERSSTRATEGY_FULL:
             return 'full'
+
+class network_display_constants:
+    none = 0
+    true_objective_values = 1
+    penalized_objective_values = 2
+    def __getitem__(self, item):
+        """Converts a constant to a string.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> c.parameters.network.display.values.true_objective_values
+        1
+        >>> c.parameters.network.display.values[1]
+        'true_objective_values'
+        """
+        if item == _constants.CPXNET_NO_DISPLAY_OBJECTIVE:
+            return 'none'
+        if item == _constants.CPXNET_TRUE_OBJECTIVE:
+            return 'true_objective_values'
+        if item == _constants.CPXNET_PENALIZED_OBJECTIVE:
+            return 'penalized_objective_values'
+
+class network_netfind_constants:
+    pure = 1
+    reflection_scaling = 2
+    general_scaling = 3
+    def __getitem__(self, item):
+        """Converts a constant to a string.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> c.parameters.network.netfind.values.pure
+        1
+        >>> c.parameters.network.netfind.values[1]
+        'pure'
+        """
+        if item == _constants.CPX_NETFIND_PURE:
+            return 'pure'
+        if item == _constants.CPX_NETFIND_REFLECT:
+            return 'reflection_scaling'
+        if item == _constants.CPX_NETFIND_SCALE:
+            return 'general_scaling'
+
+class network_pricing_constants:
+    auto = 0
+    partial = 1
+    multiple_partial = 2
+    multiple_partial_with_sorting = 3
+    def __getitem__(self, item):
+        """Converts a constant to a string.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> c.parameters.network.pricing.values.partial
+        1
+        >>> c.parameters.network.pricing.values[1]
+        'partial'
+        """
+        if item == _constants.CPXNET_PRICE_AUTO:
+            return 'auto'
+        if item == _constants.CPXNET_PRICE_PARTIAL:
+            return 'partial'
+        if item == _constants.CPXNET_PRICE_MULT_PART:
+            return 'multiple_partial'
+        if item == _constants.CPXNET_PRICE_SORT_MULT_PART:
+            return 'multiple_partial_with_sorting'

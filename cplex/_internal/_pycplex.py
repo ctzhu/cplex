@@ -136,12 +136,8 @@ CPX_VERSION_VERSION = _pycplex_platform.CPX_VERSION_VERSION
 CPX_VERSION_RELEASE = _pycplex_platform.CPX_VERSION_RELEASE
 CPX_VERSION_MODIFICATION = _pycplex_platform.CPX_VERSION_MODIFICATION
 CPX_VERSION_FIX = _pycplex_platform.CPX_VERSION_FIX
-CPX_VERSIONSTRING = _pycplex_platform.CPX_VERSIONSTRING
 CPX_INFBOUND = _pycplex_platform.CPX_INFBOUND
 CPX_MINBOUND = _pycplex_platform.CPX_MINBOUND
-CPX_OPT_TOL = _pycplex_platform.CPX_OPT_TOL
-CPX_FEAS_TOL = _pycplex_platform.CPX_FEAS_TOL
-CPX_CANCEL_TOL = _pycplex_platform.CPX_CANCEL_TOL
 CPX_PARAMTYPE_NONE = _pycplex_platform.CPX_PARAMTYPE_NONE
 CPX_PARAMTYPE_INT = _pycplex_platform.CPX_PARAMTYPE_INT
 CPX_PARAMTYPE_DOUBLE = _pycplex_platform.CPX_PARAMTYPE_DOUBLE
@@ -301,8 +297,6 @@ CPX_FEASOPT_MIN_INF = _pycplex_platform.CPX_FEASOPT_MIN_INF
 CPX_FEASOPT_OPT_INF = _pycplex_platform.CPX_FEASOPT_OPT_INF
 CPX_FEASOPT_MIN_QUAD = _pycplex_platform.CPX_FEASOPT_MIN_QUAD
 CPX_FEASOPT_OPT_QUAD = _pycplex_platform.CPX_FEASOPT_OPT_QUAD
-CPX_BENDERS_ANNOTATION = _pycplex_platform.CPX_BENDERS_ANNOTATION
-CPX_BENDERS_MASTERVALUE = _pycplex_platform.CPX_BENDERS_MASTERVALUE
 CPX_BENDERSSTRATEGY_OFF = _pycplex_platform.CPX_BENDERSSTRATEGY_OFF
 CPX_BENDERSSTRATEGY_AUTO = _pycplex_platform.CPX_BENDERSSTRATEGY_AUTO
 CPX_BENDERSSTRATEGY_USER = _pycplex_platform.CPX_BENDERSSTRATEGY_USER
@@ -530,12 +524,23 @@ CPXNET_PRICE_AUTO = _pycplex_platform.CPXNET_PRICE_AUTO
 CPXNET_PRICE_PARTIAL = _pycplex_platform.CPXNET_PRICE_PARTIAL
 CPXNET_PRICE_MULT_PART = _pycplex_platform.CPXNET_PRICE_MULT_PART
 CPXNET_PRICE_SORT_MULT_PART = _pycplex_platform.CPXNET_PRICE_SORT_MULT_PART
+CPX_NETFIND_PURE = _pycplex_platform.CPX_NETFIND_PURE
+CPX_NETFIND_REFLECT = _pycplex_platform.CPX_NETFIND_REFLECT
+CPX_NETFIND_SCALE = _pycplex_platform.CPX_NETFIND_SCALE
 CPX_QCPDUALS_NO = _pycplex_platform.CPX_QCPDUALS_NO
 CPX_QCPDUALS_IFPOSSIBLE = _pycplex_platform.CPX_QCPDUALS_IFPOSSIBLE
 CPX_QCPDUALS_FORCE = _pycplex_platform.CPX_QCPDUALS_FORCE
 CPX_CPXAUTOCONSTANTS_H_H = _pycplex_platform.CPX_CPXAUTOCONSTANTS_H_H
+CPX_BENDERS_ANNOTATION = _pycplex_platform.CPX_BENDERS_ANNOTATION
+CPX_BENDERS_MASTERVALUE = _pycplex_platform.CPX_BENDERS_MASTERVALUE
 CPX_BIGINT = _pycplex_platform.CPX_BIGINT
 CPX_BIGLONG = _pycplex_platform.CPX_BIGLONG
+CPX_CALLBACKCONTEXT_CANDIDATE = _pycplex_platform.CPX_CALLBACKCONTEXT_CANDIDATE
+CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS = _pycplex_platform.CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS
+CPX_CALLBACKCONTEXT_LOCAL_PROGRESS = _pycplex_platform.CPX_CALLBACKCONTEXT_LOCAL_PROGRESS
+CPX_CALLBACKCONTEXT_RELAXATION = _pycplex_platform.CPX_CALLBACKCONTEXT_RELAXATION
+CPX_CALLBACKCONTEXT_THREAD_DOWN = _pycplex_platform.CPX_CALLBACKCONTEXT_THREAD_DOWN
+CPX_CALLBACKCONTEXT_THREAD_UP = _pycplex_platform.CPX_CALLBACKCONTEXT_THREAD_UP
 CPX_DUAL_OBJ = _pycplex_platform.CPX_DUAL_OBJ
 CPX_EXACT_KAPPA = _pycplex_platform.CPX_EXACT_KAPPA
 CPX_KAPPA = _pycplex_platform.CPX_KAPPA
@@ -655,6 +660,7 @@ CPXERR_BAD_FILETYPE = _pycplex_platform.CPXERR_BAD_FILETYPE
 CPXERR_BAD_ID = _pycplex_platform.CPXERR_BAD_ID
 CPXERR_BAD_INDCONSTR = _pycplex_platform.CPXERR_BAD_INDCONSTR
 CPXERR_BAD_INDICATOR = _pycplex_platform.CPXERR_BAD_INDICATOR
+CPXERR_BAD_INDTYPE = _pycplex_platform.CPXERR_BAD_INDTYPE
 CPXERR_BAD_LAZY_UCUT = _pycplex_platform.CPXERR_BAD_LAZY_UCUT
 CPXERR_BAD_LUB = _pycplex_platform.CPXERR_BAD_LUB
 CPXERR_BAD_METHOD = _pycplex_platform.CPXERR_BAD_METHOD
@@ -677,6 +683,9 @@ CPXERR_BAS_FILE_SHORT = _pycplex_platform.CPXERR_BAS_FILE_SHORT
 CPXERR_BAS_FILE_SIZE = _pycplex_platform.CPXERR_BAS_FILE_SIZE
 CPXERR_BENDERS_MASTER_SOLVE = _pycplex_platform.CPXERR_BENDERS_MASTER_SOLVE
 CPXERR_CALLBACK = _pycplex_platform.CPXERR_CALLBACK
+CPXERR_CALLBACK_INCONSISTENT = _pycplex_platform.CPXERR_CALLBACK_INCONSISTENT
+CPXERR_CAND_NOT_POINT = _pycplex_platform.CPXERR_CAND_NOT_POINT
+CPXERR_CAND_NOT_RAY = _pycplex_platform.CPXERR_CAND_NOT_RAY
 CPXERR_CANT_CLOSE_CHILD = _pycplex_platform.CPXERR_CANT_CLOSE_CHILD
 CPXERR_CHILD_OF_CHILD = _pycplex_platform.CPXERR_CHILD_OF_CHILD
 CPXERR_CNTRL_IN_NAME = _pycplex_platform.CPXERR_CNTRL_IN_NAME
@@ -800,7 +809,6 @@ CPXERR_NOT_ONE_PROBLEM = _pycplex_platform.CPXERR_NOT_ONE_PROBLEM
 CPXERR_NOT_QP = _pycplex_platform.CPXERR_NOT_QP
 CPXERR_NOT_SAV_FILE = _pycplex_platform.CPXERR_NOT_SAV_FILE
 CPXERR_NOT_UNBOUNDED = _pycplex_platform.CPXERR_NOT_UNBOUNDED
-CPXERR_NULL_NAME = _pycplex_platform.CPXERR_NULL_NAME
 CPXERR_NULL_POINTER = _pycplex_platform.CPXERR_NULL_POINTER
 CPXERR_ORDER_BAD_DIRECTION = _pycplex_platform.CPXERR_ORDER_BAD_DIRECTION
 CPXERR_OVERFLOW = _pycplex_platform.CPXERR_OVERFLOW
@@ -916,6 +924,15 @@ CPXMI_QOBJ_SMALL_NUM = _pycplex_platform.CPXMI_QOBJ_SMALL_NUM
 CPXMI_QOPT_TOL = _pycplex_platform.CPXMI_QOPT_TOL
 CPXMI_RHS_LARGE_NUM = _pycplex_platform.CPXMI_RHS_LARGE_NUM
 CPXMI_RHS_SMALL_NUM = _pycplex_platform.CPXMI_RHS_SMALL_NUM
+CPXMI_SAMECOEFF_COL = _pycplex_platform.CPXMI_SAMECOEFF_COL
+CPXMI_SAMECOEFF_IND = _pycplex_platform.CPXMI_SAMECOEFF_IND
+CPXMI_SAMECOEFF_LAZY = _pycplex_platform.CPXMI_SAMECOEFF_LAZY
+CPXMI_SAMECOEFF_OBJ = _pycplex_platform.CPXMI_SAMECOEFF_OBJ
+CPXMI_SAMECOEFF_QLIN = _pycplex_platform.CPXMI_SAMECOEFF_QLIN
+CPXMI_SAMECOEFF_QUAD = _pycplex_platform.CPXMI_SAMECOEFF_QUAD
+CPXMI_SAMECOEFF_RHS = _pycplex_platform.CPXMI_SAMECOEFF_RHS
+CPXMI_SAMECOEFF_ROW = _pycplex_platform.CPXMI_SAMECOEFF_ROW
+CPXMI_SAMECOEFF_UCUT = _pycplex_platform.CPXMI_SAMECOEFF_UCUT
 CPXMI_SINGLE_PRECISION = _pycplex_platform.CPXMI_SINGLE_PRECISION
 CPXMI_SYMMETRY_BREAKING_INEQ = _pycplex_platform.CPXMI_SYMMETRY_BREAKING_INEQ
 CPXMI_UB_LARGE_NUM = _pycplex_platform.CPXMI_UB_LARGE_NUM
@@ -960,6 +977,17 @@ CPXMIP_TIME_LIM_FEAS = _pycplex_platform.CPXMIP_TIME_LIM_FEAS
 CPXMIP_TIME_LIM_INFEAS = _pycplex_platform.CPXMIP_TIME_LIM_INFEAS
 CPXMIP_UNBOUNDED = _pycplex_platform.CPXMIP_UNBOUNDED
 CPX_CPXAUTOENUMS_H_H = _pycplex_platform.CPX_CPXAUTOENUMS_H_H
+CPXCALLBACKINFO_THREADID = _pycplex_platform.CPXCALLBACKINFO_THREADID
+CPXCALLBACKINFO_NODECOUNT = _pycplex_platform.CPXCALLBACKINFO_NODECOUNT
+CPXCALLBACKINFO_ITCOUNT = _pycplex_platform.CPXCALLBACKINFO_ITCOUNT
+CPXCALLBACKINFO_BEST_SOL = _pycplex_platform.CPXCALLBACKINFO_BEST_SOL
+CPXCALLBACKINFO_BEST_BND = _pycplex_platform.CPXCALLBACKINFO_BEST_BND
+CPXCALLBACKINFO_THREADS = _pycplex_platform.CPXCALLBACKINFO_THREADS
+CPXCALLBACKINFO_FEASIBLE = _pycplex_platform.CPXCALLBACKINFO_FEASIBLE
+CPXCALLBACKINFO_TIME = _pycplex_platform.CPXCALLBACKINFO_TIME
+CPXCALLBACKINFO_DETTIME = _pycplex_platform.CPXCALLBACKINFO_DETTIME
+CPXCALLBACKSOLUTION_CHECKFEAS = _pycplex_platform.CPXCALLBACKSOLUTION_CHECKFEAS
+CPXCALLBACKSOLUTION_PROPAGATE = _pycplex_platform.CPXCALLBACKSOLUTION_PROPAGATE
 CPXINFO_BYTE = _pycplex_platform.CPXINFO_BYTE
 CPXINFO_SHORT = _pycplex_platform.CPXINFO_SHORT
 CPXINFO_INT = _pycplex_platform.CPXINFO_INT
@@ -1029,6 +1057,10 @@ CPX_PARAM_CLONELOG = _pycplex_platform.CPX_PARAM_CLONELOG
 CPX_PARAM_TUNINGDETTILIM = _pycplex_platform.CPX_PARAM_TUNINGDETTILIM
 CPX_PARAM_CPUMASK = _pycplex_platform.CPX_PARAM_CPUMASK
 CPX_PARAM_SOLUTIONTYPE = _pycplex_platform.CPX_PARAM_SOLUTIONTYPE
+CPX_PARAM_SIFTSIM = _pycplex_platform.CPX_PARAM_SIFTSIM
+CPX_PARAM_DYNAMICROWS = _pycplex_platform.CPX_PARAM_DYNAMICROWS
+CPX_PARAM_RECORD = _pycplex_platform.CPX_PARAM_RECORD
+CPX_PARAM_PARAMDISPLAY = _pycplex_platform.CPX_PARAM_PARAMDISPLAY
 CPX_PARAM_WORKERALG = _pycplex_platform.CPX_PARAM_WORKERALG
 CPX_PARAM_BENDERSSTRATEGY = _pycplex_platform.CPX_PARAM_BENDERSSTRATEGY
 CPX_PARAM_BENDERSFEASCUTTOL = _pycplex_platform.CPX_PARAM_BENDERSFEASCUTTOL
@@ -1119,6 +1151,10 @@ CPX_PARAM_RAMPUPTILIM = _pycplex_platform.CPX_PARAM_RAMPUPTILIM
 CPX_PARAM_LOCALIMPLBD = _pycplex_platform.CPX_PARAM_LOCALIMPLBD
 CPX_PARAM_BQPCUTS = _pycplex_platform.CPX_PARAM_BQPCUTS
 CPX_PARAM_RLTCUTS = _pycplex_platform.CPX_PARAM_RLTCUTS
+CPX_PARAM_SUBMIPSTARTALG = _pycplex_platform.CPX_PARAM_SUBMIPSTARTALG
+CPX_PARAM_SUBMIPSUBALG = _pycplex_platform.CPX_PARAM_SUBMIPSUBALG
+CPX_PARAM_SUBMIPSCAIND = _pycplex_platform.CPX_PARAM_SUBMIPSCAIND
+CPX_PARAM_SUBMIPNODELIMIT = _pycplex_platform.CPX_PARAM_SUBMIPNODELIMIT
 CPX_PARAM_BAREPCOMP = _pycplex_platform.CPX_PARAM_BAREPCOMP
 CPX_PARAM_BARGROWTH = _pycplex_platform.CPX_PARAM_BARGROWTH
 CPX_PARAM_BAROBJRNG = _pycplex_platform.CPX_PARAM_BAROBJRNG
@@ -1305,6 +1341,10 @@ def setpydel(*args):
   return _pycplex_platform.setpydel(*args)
 setpydel = _pycplex_platform.setpydel
 
+def cpxpygenericcallbackfuncwrap(*args):
+  return _pycplex_platform.cpxpygenericcallbackfuncwrap(*args)
+cpxpygenericcallbackfuncwrap = _pycplex_platform.cpxpygenericcallbackfuncwrap
+
 def messagewrap(*args):
   return _pycplex_platform.messagewrap(*args)
 messagewrap = _pycplex_platform.messagewrap
@@ -1321,29 +1361,29 @@ def set_py_terminator():
   return _pycplex_platform.set_py_terminator()
 set_py_terminator = _pycplex_platform.set_py_terminator
 
-def sigint_swap():
-  return _pycplex_platform.sigint_swap()
-sigint_swap = _pycplex_platform.sigint_swap
+def new_native_int():
+  return _pycplex_platform.new_native_int()
+new_native_int = _pycplex_platform.new_native_int
+
+def delete_native_int(*args):
+  return _pycplex_platform.delete_native_int(*args)
+delete_native_int = _pycplex_platform.delete_native_int
+
+def set_native_int(*args):
+  return _pycplex_platform.set_native_int(*args)
+set_native_int = _pycplex_platform.set_native_int
+
+def get_native_int(*args):
+  return _pycplex_platform.get_native_int(*args)
+get_native_int = _pycplex_platform.get_native_int
+
+def setterminate(*args):
+  return _pycplex_platform.setterminate(*args)
+setterminate = _pycplex_platform.setterminate
 
 def set_status_checker(*args):
   return _pycplex_platform.set_status_checker(*args)
 set_status_checker = _pycplex_platform.set_status_checker
-
-def py_sigint_handler(*args):
-  return _pycplex_platform.py_sigint_handler(*args)
-py_sigint_handler = _pycplex_platform.py_sigint_handler
-
-def intArraytoList(*args):
-  return _pycplex_platform.intArraytoList(*args)
-intArraytoList = _pycplex_platform.intArraytoList
-
-def doubleArraytoList(*args):
-  return _pycplex_platform.doubleArraytoList(*args)
-doubleArraytoList = _pycplex_platform.doubleArraytoList
-
-def safe_GetAttr(*args):
-  return _pycplex_platform.safe_GetAttr(*args)
-safe_GetAttr = _pycplex_platform.safe_GetAttr
 
 def fast_getcallbackinfo(*args):
   return _pycplex_platform.fast_getcallbackinfo(*args)
@@ -1448,14 +1488,6 @@ cb_getobj = _pycplex_platform.cb_getobj
 def cb_getprestat_c(*args):
   return _pycplex_platform.cb_getprestat_c(*args)
 cb_getprestat_c = _pycplex_platform.cb_getprestat_c
-
-def init_callback_lock():
-  return _pycplex_platform.init_callback_lock()
-init_callback_lock = _pycplex_platform.init_callback_lock
-
-def finit_callback_lock(*args):
-  return _pycplex_platform.finit_callback_lock(*args)
-finit_callback_lock = _pycplex_platform.finit_callback_lock
 class cb_struct(_object):
     __swig_setmethods__ = {}
     __setattr__ = lambda self, name, value: _swig_setattr(self, cb_struct, name, value)
@@ -1485,13 +1517,209 @@ def get_wherefrom(*args):
   return _pycplex_platform.get_wherefrom(*args)
 get_wherefrom = _pycplex_platform.get_wherefrom
 
-def convert_to_cpxsize(*args):
-  return _pycplex_platform.convert_to_cpxsize(*args)
-convert_to_cpxsize = _pycplex_platform.convert_to_cpxsize
-
 def delpydel(*args):
   return _pycplex_platform.delpydel(*args)
 delpydel = _pycplex_platform.delpydel
+CPX_CPLEXE_H = _pycplex_platform.CPX_CPLEXE_H
+CPXE_H = _pycplex_platform.CPXE_H
+BARE_H = _pycplex_platform.BARE_H
+MIPE_H = _pycplex_platform.MIPE_H
+CPXAUTOE_H = _pycplex_platform.CPXAUTOE_H
+CPX_AUTOES_H = _pycplex_platform.CPX_AUTOES_H
+CPX_AUTOEL_H = _pycplex_platform.CPX_AUTOEL_H
+CPX_AUTOEX_H = _pycplex_platform.CPX_AUTOEX_H
+
+def CPXXdualopt(*args):
+  return _pycplex_platform.CPXXdualopt(*args)
+CPXXdualopt = _pycplex_platform.CPXXdualopt
+
+def CPXXembwrite(*args):
+  return _pycplex_platform.CPXXembwrite(*args)
+CPXXembwrite = _pycplex_platform.CPXXembwrite
+
+def CPXXfeasoptext(*args):
+  return _pycplex_platform.CPXXfeasoptext(*args)
+CPXXfeasoptext = _pycplex_platform.CPXXfeasoptext
+
+def CPXXhybnetopt(*args):
+  return _pycplex_platform.CPXXhybnetopt(*args)
+CPXXhybnetopt = _pycplex_platform.CPXXhybnetopt
+
+def CPXXlpopt(*args):
+  return _pycplex_platform.CPXXlpopt(*args)
+CPXXlpopt = _pycplex_platform.CPXXlpopt
+
+def CPXXpivotin(*args):
+  return _pycplex_platform.CPXXpivotin(*args)
+CPXXpivotin = _pycplex_platform.CPXXpivotin
+
+def CPXXpivotout(*args):
+  return _pycplex_platform.CPXXpivotout(*args)
+CPXXpivotout = _pycplex_platform.CPXXpivotout
+
+def CPXXpreslvwrite(*args):
+  return _pycplex_platform.CPXXpreslvwrite(*args)
+CPXXpreslvwrite = _pycplex_platform.CPXXpreslvwrite
+
+def CPXXpresolve(*args):
+  return _pycplex_platform.CPXXpresolve(*args)
+CPXXpresolve = _pycplex_platform.CPXXpresolve
+
+def CPXXprimopt(*args):
+  return _pycplex_platform.CPXXprimopt(*args)
+CPXXprimopt = _pycplex_platform.CPXXprimopt
+
+def CPXXrefineconflictext(*args):
+  return _pycplex_platform.CPXXrefineconflictext(*args)
+CPXXrefineconflictext = _pycplex_platform.CPXXrefineconflictext
+
+def CPXXsiftopt(*args):
+  return _pycplex_platform.CPXXsiftopt(*args)
+CPXXsiftopt = _pycplex_platform.CPXXsiftopt
+
+def CPXXstrongbranch(*args):
+  return _pycplex_platform.CPXXstrongbranch(*args)
+CPXXstrongbranch = _pycplex_platform.CPXXstrongbranch
+
+def CPXXbaropt(*args):
+  return _pycplex_platform.CPXXbaropt(*args)
+CPXXbaropt = _pycplex_platform.CPXXbaropt
+
+def CPXXhybbaropt(*args):
+  return _pycplex_platform.CPXXhybbaropt(*args)
+CPXXhybbaropt = _pycplex_platform.CPXXhybbaropt
+
+def CPXXqpindefcertificate(*args):
+  return _pycplex_platform.CPXXqpindefcertificate(*args)
+CPXXqpindefcertificate = _pycplex_platform.CPXXqpindefcertificate
+
+def CPXXqpopt(*args):
+  return _pycplex_platform.CPXXqpopt(*args)
+CPXXqpopt = _pycplex_platform.CPXXqpopt
+
+def CPXXmipopt(*args):
+  return _pycplex_platform.CPXXmipopt(*args)
+CPXXmipopt = _pycplex_platform.CPXXmipopt
+
+def CPXXpopulate(*args):
+  return _pycplex_platform.CPXXpopulate(*args)
+CPXXpopulate = _pycplex_platform.CPXXpopulate
+
+def CPXXrefinemipstartconflictext(*args):
+  return _pycplex_platform.CPXXrefinemipstartconflictext(*args)
+CPXXrefinemipstartconflictext = _pycplex_platform.CPXXrefinemipstartconflictext
+
+def CPXXtuneparam(*args):
+  return _pycplex_platform.CPXXtuneparam(*args)
+CPXXtuneparam = _pycplex_platform.CPXXtuneparam
+
+def CPXXtuneparamprobset(*args):
+  return _pycplex_platform.CPXXtuneparamprobset(*args)
+CPXXtuneparamprobset = _pycplex_platform.CPXXtuneparamprobset
+
+def CPXErunseeds(*args):
+  return _pycplex_platform.CPXErunseeds(*args)
+CPXErunseeds = _pycplex_platform.CPXErunseeds
+
+def CPXXwriteannotations(*args):
+  return _pycplex_platform.CPXXwriteannotations(*args)
+CPXXwriteannotations = _pycplex_platform.CPXXwriteannotations
+
+def CPXXwritebendersannotation(*args):
+  return _pycplex_platform.CPXXwritebendersannotation(*args)
+CPXXwritebendersannotation = _pycplex_platform.CPXXwritebendersannotation
+
+def CPXXclpwrite(*args):
+  return _pycplex_platform.CPXXclpwrite(*args)
+CPXXclpwrite = _pycplex_platform.CPXXclpwrite
+
+def CPXXwriteprob(*args):
+  return _pycplex_platform.CPXXwriteprob(*args)
+CPXXwriteprob = _pycplex_platform.CPXXwriteprob
+
+def CPXXmbasewrite(*args):
+  return _pycplex_platform.CPXXmbasewrite(*args)
+CPXXmbasewrite = _pycplex_platform.CPXXmbasewrite
+
+def CPXXsolwrite(*args):
+  return _pycplex_platform.CPXXsolwrite(*args)
+CPXXsolwrite = _pycplex_platform.CPXXsolwrite
+
+def CPXXsolwritesolnpool(*args):
+  return _pycplex_platform.CPXXsolwritesolnpool(*args)
+CPXXsolwritesolnpool = _pycplex_platform.CPXXsolwritesolnpool
+
+def CPXXsolwritesolnpoolall(*args):
+  return _pycplex_platform.CPXXsolwritesolnpoolall(*args)
+CPXXsolwritesolnpoolall = _pycplex_platform.CPXXsolwritesolnpoolall
+
+def CPXXdperwrite(*args):
+  return _pycplex_platform.CPXXdperwrite(*args)
+CPXXdperwrite = _pycplex_platform.CPXXdperwrite
+
+def CPXXpperwrite(*args):
+  return _pycplex_platform.CPXXpperwrite(*args)
+CPXXpperwrite = _pycplex_platform.CPXXpperwrite
+
+def CPXXdualwrite(*args):
+  return _pycplex_platform.CPXXdualwrite(*args)
+CPXXdualwrite = _pycplex_platform.CPXXdualwrite
+
+def CPXXwriteparam(*args):
+  return _pycplex_platform.CPXXwriteparam(*args)
+CPXXwriteparam = _pycplex_platform.CPXXwriteparam
+
+def CPXXordwrite(*args):
+  return _pycplex_platform.CPXXordwrite(*args)
+CPXXordwrite = _pycplex_platform.CPXXordwrite
+
+def CPXXwritemipstarts(*args):
+  return _pycplex_platform.CPXXwritemipstarts(*args)
+CPXXwritemipstarts = _pycplex_platform.CPXXwritemipstarts
+
+def CPXXfltwrite(*args):
+  return _pycplex_platform.CPXXfltwrite(*args)
+CPXXfltwrite = _pycplex_platform.CPXXfltwrite
+
+def CPXXreadcopyannotations(*args):
+  return _pycplex_platform.CPXXreadcopyannotations(*args)
+CPXXreadcopyannotations = _pycplex_platform.CPXXreadcopyannotations
+
+def CPXXreadcopyprob(*args):
+  return _pycplex_platform.CPXXreadcopyprob(*args)
+CPXXreadcopyprob = _pycplex_platform.CPXXreadcopyprob
+
+def CPXXreadcopybase(*args):
+  return _pycplex_platform.CPXXreadcopybase(*args)
+CPXXreadcopybase = _pycplex_platform.CPXXreadcopybase
+
+def CPXXreadcopysol(*args):
+  return _pycplex_platform.CPXXreadcopysol(*args)
+CPXXreadcopysol = _pycplex_platform.CPXXreadcopysol
+
+def CPXXreadcopyparam(*args):
+  return _pycplex_platform.CPXXreadcopyparam(*args)
+CPXXreadcopyparam = _pycplex_platform.CPXXreadcopyparam
+
+def CPXXreadcopyorder(*args):
+  return _pycplex_platform.CPXXreadcopyorder(*args)
+CPXXreadcopyorder = _pycplex_platform.CPXXreadcopyorder
+
+def CPXXreadcopysolnpoolfilters(*args):
+  return _pycplex_platform.CPXXreadcopysolnpoolfilters(*args)
+CPXXreadcopysolnpoolfilters = _pycplex_platform.CPXXreadcopysolnpoolfilters
+
+def CPXXreadcopymipstarts(*args):
+  return _pycplex_platform.CPXXreadcopymipstarts(*args)
+CPXXreadcopymipstarts = _pycplex_platform.CPXXreadcopymipstarts
+
+def init_callback_lock():
+  return _pycplex_platform.init_callback_lock()
+init_callback_lock = _pycplex_platform.init_callback_lock
+
+def finit_callback_lock(*args):
+  return _pycplex_platform.finit_callback_lock(*args)
+finit_callback_lock = _pycplex_platform.finit_callback_lock
 
 def pack_env_lp_ptr(*args):
   return _pycplex_platform.pack_env_lp_ptr(*args)
@@ -1520,14 +1748,1258 @@ free_int_C_array = _pycplex_platform.free_int_C_array
 def free_double_C_array(*args):
   return _pycplex_platform.free_double_C_array(*args)
 free_double_C_array = _pycplex_platform.free_double_C_array
-CPX_CPLEXE_H = _pycplex_platform.CPX_CPLEXE_H
-CPXE_H = _pycplex_platform.CPXE_H
-BARE_H = _pycplex_platform.BARE_H
-MIPE_H = _pycplex_platform.MIPE_H
-CPXAUTOE_H = _pycplex_platform.CPXAUTOE_H
-CPX_AUTOES_H = _pycplex_platform.CPX_AUTOES_H
-CPX_AUTOEL_H = _pycplex_platform.CPX_AUTOEL_H
-CPX_AUTOEX_H = _pycplex_platform.CPX_AUTOEX_H
+
+def CPXXcreateprob(*args):
+  return _pycplex_platform.CPXXcreateprob(*args)
+CPXXcreateprob = _pycplex_platform.CPXXcreateprob
+
+def CPXXcloneprob(*args):
+  return _pycplex_platform.CPXXcloneprob(*args)
+CPXXcloneprob = _pycplex_platform.CPXXcloneprob
+
+def CPXXcopylpwnames(*args):
+  return _pycplex_platform.CPXXcopylpwnames(*args)
+CPXXcopylpwnames = _pycplex_platform.CPXXcopylpwnames
+
+def CPXXcopyobjname(*args):
+  return _pycplex_platform.CPXXcopyobjname(*args)
+CPXXcopyobjname = _pycplex_platform.CPXXcopyobjname
+
+def CPXXcopybase(*args):
+  return _pycplex_platform.CPXXcopybase(*args)
+CPXXcopybase = _pycplex_platform.CPXXcopybase
+
+def CPXXcleanup(*args):
+  return _pycplex_platform.CPXXcleanup(*args)
+CPXXcleanup = _pycplex_platform.CPXXcleanup
+
+def CPXXcopystart(*args):
+  return _pycplex_platform.CPXXcopystart(*args)
+CPXXcopystart = _pycplex_platform.CPXXcopystart
+
+def CPXXfreeprob(*args):
+  return _pycplex_platform.CPXXfreeprob(*args)
+CPXXfreeprob = _pycplex_platform.CPXXfreeprob
+
+def CPXXcopynettolp(*args):
+  return _pycplex_platform.CPXXcopynettolp(*args)
+CPXXcopynettolp = _pycplex_platform.CPXXcopynettolp
+
+def CPXNETextract(*args):
+  return _pycplex_platform.CPXNETextract(*args)
+CPXNETextract = _pycplex_platform.CPXNETextract
+
+def CPXXpivot(*args):
+  return _pycplex_platform.CPXXpivot(*args)
+CPXXpivot = _pycplex_platform.CPXXpivot
+
+def CPXXsolninfo(*args):
+  return _pycplex_platform.CPXXsolninfo(*args)
+CPXXsolninfo = _pycplex_platform.CPXXsolninfo
+
+def CPXXgetstat(*args):
+  return _pycplex_platform.CPXXgetstat(*args)
+CPXXgetstat = _pycplex_platform.CPXXgetstat
+
+def CPXXgetstatstring(*args):
+  return _pycplex_platform.CPXXgetstatstring(*args)
+CPXXgetstatstring = _pycplex_platform.CPXXgetstatstring
+
+def CPXXgetmethod(*args):
+  return _pycplex_platform.CPXXgetmethod(*args)
+CPXXgetmethod = _pycplex_platform.CPXXgetmethod
+
+def CPXXgetobjval(*args):
+  return _pycplex_platform.CPXXgetobjval(*args)
+CPXXgetobjval = _pycplex_platform.CPXXgetobjval
+
+def CPXXgetx(*args):
+  return _pycplex_platform.CPXXgetx(*args)
+CPXXgetx = _pycplex_platform.CPXXgetx
+
+def CPXXgetax(*args):
+  return _pycplex_platform.CPXXgetax(*args)
+CPXXgetax = _pycplex_platform.CPXXgetax
+
+def CPXXgetpi(*args):
+  return _pycplex_platform.CPXXgetpi(*args)
+CPXXgetpi = _pycplex_platform.CPXXgetpi
+
+def CPXXgetslack(*args):
+  return _pycplex_platform.CPXXgetslack(*args)
+CPXXgetslack = _pycplex_platform.CPXXgetslack
+
+def CPXXgetrowinfeas(*args):
+  return _pycplex_platform.CPXXgetrowinfeas(*args)
+CPXXgetrowinfeas = _pycplex_platform.CPXXgetrowinfeas
+
+def CPXXgetcolinfeas(*args):
+  return _pycplex_platform.CPXXgetcolinfeas(*args)
+CPXXgetcolinfeas = _pycplex_platform.CPXXgetcolinfeas
+
+def CPXXgetdj(*args):
+  return _pycplex_platform.CPXXgetdj(*args)
+CPXXgetdj = _pycplex_platform.CPXXgetdj
+
+def CPXXgetgrad(*args):
+  return _pycplex_platform.CPXXgetgrad(*args)
+CPXXgetgrad = _pycplex_platform.CPXXgetgrad
+
+def CPXXgetijdiv(*args):
+  return _pycplex_platform.CPXXgetijdiv(*args)
+CPXXgetijdiv = _pycplex_platform.CPXXgetijdiv
+
+def CPXXgetbase(*args):
+  return _pycplex_platform.CPXXgetbase(*args)
+CPXXgetbase = _pycplex_platform.CPXXgetbase
+
+def CPXXgetitcnt(*args):
+  return _pycplex_platform.CPXXgetitcnt(*args)
+CPXXgetitcnt = _pycplex_platform.CPXXgetitcnt
+
+def CPXXgetphase1cnt(*args):
+  return _pycplex_platform.CPXXgetphase1cnt(*args)
+CPXXgetphase1cnt = _pycplex_platform.CPXXgetphase1cnt
+
+def CPXXgetsiftitcnt(*args):
+  return _pycplex_platform.CPXXgetsiftitcnt(*args)
+CPXXgetsiftitcnt = _pycplex_platform.CPXXgetsiftitcnt
+
+def CPXXgetsiftphase1cnt(*args):
+  return _pycplex_platform.CPXXgetsiftphase1cnt(*args)
+CPXXgetsiftphase1cnt = _pycplex_platform.CPXXgetsiftphase1cnt
+
+def CPXXgetbaritcnt(*args):
+  return _pycplex_platform.CPXXgetbaritcnt(*args)
+CPXXgetbaritcnt = _pycplex_platform.CPXXgetbaritcnt
+
+def CPXXgetcrossppushcnt(*args):
+  return _pycplex_platform.CPXXgetcrossppushcnt(*args)
+CPXXgetcrossppushcnt = _pycplex_platform.CPXXgetcrossppushcnt
+
+def CPXXgetcrosspexchcnt(*args):
+  return _pycplex_platform.CPXXgetcrosspexchcnt(*args)
+CPXXgetcrosspexchcnt = _pycplex_platform.CPXXgetcrosspexchcnt
+
+def CPXXgetcrossdpushcnt(*args):
+  return _pycplex_platform.CPXXgetcrossdpushcnt(*args)
+CPXXgetcrossdpushcnt = _pycplex_platform.CPXXgetcrossdpushcnt
+
+def CPXXgetcrossdexchcnt(*args):
+  return _pycplex_platform.CPXXgetcrossdexchcnt(*args)
+CPXXgetcrossdexchcnt = _pycplex_platform.CPXXgetcrossdexchcnt
+
+def CPXXgetpsbcnt(*args):
+  return _pycplex_platform.CPXXgetpsbcnt(*args)
+CPXXgetpsbcnt = _pycplex_platform.CPXXgetpsbcnt
+
+def CPXXgetdsbcnt(*args):
+  return _pycplex_platform.CPXXgetdsbcnt(*args)
+CPXXgetdsbcnt = _pycplex_platform.CPXXgetdsbcnt
+
+def CPXXgetdblquality(*args):
+  return _pycplex_platform.CPXXgetdblquality(*args)
+CPXXgetdblquality = _pycplex_platform.CPXXgetdblquality
+
+def CPXXgetsolnpooldblquality(*args):
+  return _pycplex_platform.CPXXgetsolnpooldblquality(*args)
+CPXXgetsolnpooldblquality = _pycplex_platform.CPXXgetsolnpooldblquality
+
+def CPXXgetintquality(*args):
+  return _pycplex_platform.CPXXgetintquality(*args)
+CPXXgetintquality = _pycplex_platform.CPXXgetintquality
+
+def CPXXgetsolnpoolintquality(*args):
+  return _pycplex_platform.CPXXgetsolnpoolintquality(*args)
+CPXXgetsolnpoolintquality = _pycplex_platform.CPXXgetsolnpoolintquality
+
+def CPXXrhssa(*args):
+  return _pycplex_platform.CPXXrhssa(*args)
+CPXXrhssa = _pycplex_platform.CPXXrhssa
+
+def CPXXboundsa(*args):
+  return _pycplex_platform.CPXXboundsa(*args)
+CPXXboundsa = _pycplex_platform.CPXXboundsa
+
+def CPXXobjsa(*args):
+  return _pycplex_platform.CPXXobjsa(*args)
+CPXXobjsa = _pycplex_platform.CPXXobjsa
+
+def CPXXgetconflictext(*args):
+  return _pycplex_platform.CPXXgetconflictext(*args)
+CPXXgetconflictext = _pycplex_platform.CPXXgetconflictext
+
+def CPXXnewrows(*args):
+  return _pycplex_platform.CPXXnewrows(*args)
+CPXXnewrows = _pycplex_platform.CPXXnewrows
+
+def CPXXaddrows(*args):
+  return _pycplex_platform.CPXXaddrows(*args)
+CPXXaddrows = _pycplex_platform.CPXXaddrows
+
+def CPXXnewcols(*args):
+  return _pycplex_platform.CPXXnewcols(*args)
+CPXXnewcols = _pycplex_platform.CPXXnewcols
+
+def CPXXaddcols(*args):
+  return _pycplex_platform.CPXXaddcols(*args)
+CPXXaddcols = _pycplex_platform.CPXXaddcols
+
+def CPXXdelrows(*args):
+  return _pycplex_platform.CPXXdelrows(*args)
+CPXXdelrows = _pycplex_platform.CPXXdelrows
+
+def CPXXdelcols(*args):
+  return _pycplex_platform.CPXXdelcols(*args)
+CPXXdelcols = _pycplex_platform.CPXXdelcols
+
+def CPXXchgrowname(*args):
+  return _pycplex_platform.CPXXchgrowname(*args)
+CPXXchgrowname = _pycplex_platform.CPXXchgrowname
+
+def CPXXchgcolname(*args):
+  return _pycplex_platform.CPXXchgcolname(*args)
+CPXXchgcolname = _pycplex_platform.CPXXchgcolname
+
+def CPXXdelnames(*args):
+  return _pycplex_platform.CPXXdelnames(*args)
+CPXXdelnames = _pycplex_platform.CPXXdelnames
+
+def CPXXchgprobname(*args):
+  return _pycplex_platform.CPXXchgprobname(*args)
+CPXXchgprobname = _pycplex_platform.CPXXchgprobname
+
+def CPXXchgcoeflist(*args):
+  return _pycplex_platform.CPXXchgcoeflist(*args)
+CPXXchgcoeflist = _pycplex_platform.CPXXchgcoeflist
+
+def CPXXchgbds(*args):
+  return _pycplex_platform.CPXXchgbds(*args)
+CPXXchgbds = _pycplex_platform.CPXXchgbds
+
+def CPXXchgobj(*args):
+  return _pycplex_platform.CPXXchgobj(*args)
+CPXXchgobj = _pycplex_platform.CPXXchgobj
+
+def CPXXchgrhs(*args):
+  return _pycplex_platform.CPXXchgrhs(*args)
+CPXXchgrhs = _pycplex_platform.CPXXchgrhs
+
+def CPXXchgrngval(*args):
+  return _pycplex_platform.CPXXchgrngval(*args)
+CPXXchgrngval = _pycplex_platform.CPXXchgrngval
+
+def CPXXchgsense(*args):
+  return _pycplex_platform.CPXXchgsense(*args)
+CPXXchgsense = _pycplex_platform.CPXXchgsense
+
+def CPXXchgobjsen(*args):
+  return _pycplex_platform.CPXXchgobjsen(*args)
+CPXXchgobjsen = _pycplex_platform.CPXXchgobjsen
+
+def CPXXchgprobtype(*args):
+  return _pycplex_platform.CPXXchgprobtype(*args)
+CPXXchgprobtype = _pycplex_platform.CPXXchgprobtype
+
+def CPXXchgprobtypesolnpool(*args):
+  return _pycplex_platform.CPXXchgprobtypesolnpool(*args)
+CPXXchgprobtypesolnpool = _pycplex_platform.CPXXchgprobtypesolnpool
+
+def CPXXcompletelp(*args):
+  return _pycplex_platform.CPXXcompletelp(*args)
+CPXXcompletelp = _pycplex_platform.CPXXcompletelp
+
+def CPXXpreaddrows(*args):
+  return _pycplex_platform.CPXXpreaddrows(*args)
+CPXXpreaddrows = _pycplex_platform.CPXXpreaddrows
+
+def CPXXprechgobj(*args):
+  return _pycplex_platform.CPXXprechgobj(*args)
+CPXXprechgobj = _pycplex_platform.CPXXprechgobj
+
+def CPXXgetnumcols(*args):
+  return _pycplex_platform.CPXXgetnumcols(*args)
+CPXXgetnumcols = _pycplex_platform.CPXXgetnumcols
+
+def CPXXgetnumrows(*args):
+  return _pycplex_platform.CPXXgetnumrows(*args)
+CPXXgetnumrows = _pycplex_platform.CPXXgetnumrows
+
+def CPXXgetnumnz(*args):
+  return _pycplex_platform.CPXXgetnumnz(*args)
+CPXXgetnumnz = _pycplex_platform.CPXXgetnumnz
+
+def CPXXgetobjsen(*args):
+  return _pycplex_platform.CPXXgetobjsen(*args)
+CPXXgetobjsen = _pycplex_platform.CPXXgetobjsen
+
+def CPXXgetobj(*args):
+  return _pycplex_platform.CPXXgetobj(*args)
+CPXXgetobj = _pycplex_platform.CPXXgetobj
+
+def CPXXgetrhs(*args):
+  return _pycplex_platform.CPXXgetrhs(*args)
+CPXXgetrhs = _pycplex_platform.CPXXgetrhs
+
+def CPXXgetsense(*args):
+  return _pycplex_platform.CPXXgetsense(*args)
+CPXXgetsense = _pycplex_platform.CPXXgetsense
+
+def CPXXgetcols(*args):
+  return _pycplex_platform.CPXXgetcols(*args)
+CPXXgetcols = _pycplex_platform.CPXXgetcols
+
+def CPXXgetrows(*args):
+  return _pycplex_platform.CPXXgetrows(*args)
+CPXXgetrows = _pycplex_platform.CPXXgetrows
+
+def CPXXgetlb(*args):
+  return _pycplex_platform.CPXXgetlb(*args)
+CPXXgetlb = _pycplex_platform.CPXXgetlb
+
+def CPXXgetub(*args):
+  return _pycplex_platform.CPXXgetub(*args)
+CPXXgetub = _pycplex_platform.CPXXgetub
+
+def CPXXgetrngval(*args):
+  return _pycplex_platform.CPXXgetrngval(*args)
+CPXXgetrngval = _pycplex_platform.CPXXgetrngval
+
+def CPXXgetprobname(*args):
+  return _pycplex_platform.CPXXgetprobname(*args)
+CPXXgetprobname = _pycplex_platform.CPXXgetprobname
+
+def CPXXgetobjname(*args):
+  return _pycplex_platform.CPXXgetobjname(*args)
+CPXXgetobjname = _pycplex_platform.CPXXgetobjname
+
+def CPXXgetcolname(*args):
+  return _pycplex_platform.CPXXgetcolname(*args)
+CPXXgetcolname = _pycplex_platform.CPXXgetcolname
+
+def CPXXgetrowname(*args):
+  return _pycplex_platform.CPXXgetrowname(*args)
+CPXXgetrowname = _pycplex_platform.CPXXgetrowname
+
+def CPXXgetcoef(*args):
+  return _pycplex_platform.CPXXgetcoef(*args)
+CPXXgetcoef = _pycplex_platform.CPXXgetcoef
+
+def CPXXgetrowindex(*args):
+  return _pycplex_platform.CPXXgetrowindex(*args)
+CPXXgetrowindex = _pycplex_platform.CPXXgetrowindex
+
+def CPXXgetcolindex(*args):
+  return _pycplex_platform.CPXXgetcolindex(*args)
+CPXXgetcolindex = _pycplex_platform.CPXXgetcolindex
+
+def CPXXgetprobtype(*args):
+  return _pycplex_platform.CPXXgetprobtype(*args)
+CPXXgetprobtype = _pycplex_platform.CPXXgetprobtype
+
+def CPXXsetintparam(*args):
+  return _pycplex_platform.CPXXsetintparam(*args)
+CPXXsetintparam = _pycplex_platform.CPXXsetintparam
+
+def CPXXsetlongparam(*args):
+  return _pycplex_platform.CPXXsetlongparam(*args)
+CPXXsetlongparam = _pycplex_platform.CPXXsetlongparam
+
+def CPXXsetdblparam(*args):
+  return _pycplex_platform.CPXXsetdblparam(*args)
+CPXXsetdblparam = _pycplex_platform.CPXXsetdblparam
+
+def CPXXsetstrparam(*args):
+  return _pycplex_platform.CPXXsetstrparam(*args)
+CPXXsetstrparam = _pycplex_platform.CPXXsetstrparam
+
+def CPXXgetintparam(*args):
+  return _pycplex_platform.CPXXgetintparam(*args)
+CPXXgetintparam = _pycplex_platform.CPXXgetintparam
+
+def CPXXgetlongparam(*args):
+  return _pycplex_platform.CPXXgetlongparam(*args)
+CPXXgetlongparam = _pycplex_platform.CPXXgetlongparam
+
+def CPXXgetdblparam(*args):
+  return _pycplex_platform.CPXXgetdblparam(*args)
+CPXXgetdblparam = _pycplex_platform.CPXXgetdblparam
+
+def CPXXgetstrparam(*args):
+  return _pycplex_platform.CPXXgetstrparam(*args)
+CPXXgetstrparam = _pycplex_platform.CPXXgetstrparam
+
+def CPXXinfointparam(*args):
+  return _pycplex_platform.CPXXinfointparam(*args)
+CPXXinfointparam = _pycplex_platform.CPXXinfointparam
+
+def CPXXinfolongparam(*args):
+  return _pycplex_platform.CPXXinfolongparam(*args)
+CPXXinfolongparam = _pycplex_platform.CPXXinfolongparam
+
+def CPXXinfodblparam(*args):
+  return _pycplex_platform.CPXXinfodblparam(*args)
+CPXXinfodblparam = _pycplex_platform.CPXXinfodblparam
+
+def CPXXinfostrparam(*args):
+  return _pycplex_platform.CPXXinfostrparam(*args)
+CPXXinfostrparam = _pycplex_platform.CPXXinfostrparam
+
+def CPXXgetparamtype(*args):
+  return _pycplex_platform.CPXXgetparamtype(*args)
+CPXXgetparamtype = _pycplex_platform.CPXXgetparamtype
+
+def CPXXEfixparam(*args):
+  return _pycplex_platform.CPXXEfixparam(*args)
+CPXXEfixparam = _pycplex_platform.CPXXEfixparam
+
+def CPXXversion(*args):
+  return _pycplex_platform.CPXXversion(*args)
+CPXXversion = _pycplex_platform.CPXXversion
+
+def CPXXversionnumber(*args):
+  return _pycplex_platform.CPXXversionnumber(*args)
+CPXXversionnumber = _pycplex_platform.CPXXversionnumber
+
+def CPXXopenCPLEX(*args):
+  return _pycplex_platform.CPXXopenCPLEX(*args)
+CPXXopenCPLEX = _pycplex_platform.CPXXopenCPLEX
+
+def CPXXcloseCPLEX(*args):
+  return _pycplex_platform.CPXXcloseCPLEX(*args)
+CPXXcloseCPLEX = _pycplex_platform.CPXXcloseCPLEX
+
+def CPXXgetchannels(*args):
+  return _pycplex_platform.CPXXgetchannels(*args)
+CPXXgetchannels = _pycplex_platform.CPXXgetchannels
+
+def CPXXaddfuncdest(*args):
+  return _pycplex_platform.CPXXaddfuncdest(*args)
+CPXXaddfuncdest = _pycplex_platform.CPXXaddfuncdest
+
+def CPXXdelfuncdest(*args):
+  return _pycplex_platform.CPXXdelfuncdest(*args)
+CPXXdelfuncdest = _pycplex_platform.CPXXdelfuncdest
+
+def CPXXgeterrorstring(*args):
+  return _pycplex_platform.CPXXgeterrorstring(*args)
+CPXXgeterrorstring = _pycplex_platform.CPXXgeterrorstring
+
+def CPXXsetlpcallbackfunc(*args):
+  return _pycplex_platform.CPXXsetlpcallbackfunc(*args)
+CPXXsetlpcallbackfunc = _pycplex_platform.CPXXsetlpcallbackfunc
+
+def CPXXsetnetcallbackfunc(*args):
+  return _pycplex_platform.CPXXsetnetcallbackfunc(*args)
+CPXXsetnetcallbackfunc = _pycplex_platform.CPXXsetnetcallbackfunc
+
+def CPXXsettuningcallbackfunc(*args):
+  return _pycplex_platform.CPXXsettuningcallbackfunc(*args)
+CPXXsettuningcallbackfunc = _pycplex_platform.CPXXsettuningcallbackfunc
+
+def CPXXsetterminate(*args):
+  return _pycplex_platform.CPXXsetterminate(*args)
+CPXXsetterminate = _pycplex_platform.CPXXsetterminate
+
+def CPXXgetbhead(*args):
+  return _pycplex_platform.CPXXgetbhead(*args)
+CPXXgetbhead = _pycplex_platform.CPXXgetbhead
+
+def CPXXbinvcol(*args):
+  return _pycplex_platform.CPXXbinvcol(*args)
+CPXXbinvcol = _pycplex_platform.CPXXbinvcol
+
+def CPXXbinvrow(*args):
+  return _pycplex_platform.CPXXbinvrow(*args)
+CPXXbinvrow = _pycplex_platform.CPXXbinvrow
+
+def CPXXbinvacol(*args):
+  return _pycplex_platform.CPXXbinvacol(*args)
+CPXXbinvacol = _pycplex_platform.CPXXbinvacol
+
+def CPXXbinvarow(*args):
+  return _pycplex_platform.CPXXbinvarow(*args)
+CPXXbinvarow = _pycplex_platform.CPXXbinvarow
+
+def CPXXftran(*args):
+  return _pycplex_platform.CPXXftran(*args)
+CPXXftran = _pycplex_platform.CPXXftran
+
+def CPXXbtran(*args):
+  return _pycplex_platform.CPXXbtran(*args)
+CPXXbtran = _pycplex_platform.CPXXbtran
+
+def CPXXgetijrow(*args):
+  return _pycplex_platform.CPXXgetijrow(*args)
+CPXXgetijrow = _pycplex_platform.CPXXgetijrow
+
+def CPXXgetray(*args):
+  return _pycplex_platform.CPXXgetray(*args)
+CPXXgetray = _pycplex_platform.CPXXgetray
+
+def CPXXmdleave(*args):
+  return _pycplex_platform.CPXXmdleave(*args)
+CPXXmdleave = _pycplex_platform.CPXXmdleave
+
+def CPXXdualfarkas(*args):
+  return _pycplex_platform.CPXXdualfarkas(*args)
+CPXXdualfarkas = _pycplex_platform.CPXXdualfarkas
+
+def CPXXchgobjoffset(*args):
+  return _pycplex_platform.CPXXchgobjoffset(*args)
+CPXXchgobjoffset = _pycplex_platform.CPXXchgobjoffset
+
+def CPXXgetobjoffset(*args):
+  return _pycplex_platform.CPXXgetobjoffset(*args)
+CPXXgetobjoffset = _pycplex_platform.CPXXgetobjoffset
+
+def CPXXgetbasednorms(*args):
+  return _pycplex_platform.CPXXgetbasednorms(*args)
+CPXXgetbasednorms = _pycplex_platform.CPXXgetbasednorms
+
+def CPXXgetdnorms(*args):
+  return _pycplex_platform.CPXXgetdnorms(*args)
+CPXXgetdnorms = _pycplex_platform.CPXXgetdnorms
+
+def CPXXgetpnorms(*args):
+  return _pycplex_platform.CPXXgetpnorms(*args)
+CPXXgetpnorms = _pycplex_platform.CPXXgetpnorms
+
+def CPXXtightenbds(*args):
+  return _pycplex_platform.CPXXtightenbds(*args)
+CPXXtightenbds = _pycplex_platform.CPXXtightenbds
+
+def CPXXbasicpresolve(*args):
+  return _pycplex_platform.CPXXbasicpresolve(*args)
+CPXXbasicpresolve = _pycplex_platform.CPXXbasicpresolve
+
+def CPXXslackfromx(*args):
+  return _pycplex_platform.CPXXslackfromx(*args)
+CPXXslackfromx = _pycplex_platform.CPXXslackfromx
+
+def CPXXdjfrompi(*args):
+  return _pycplex_platform.CPXXdjfrompi(*args)
+CPXXdjfrompi = _pycplex_platform.CPXXdjfrompi
+
+def CPXXqpdjfrompi(*args):
+  return _pycplex_platform.CPXXqpdjfrompi(*args)
+CPXXqpdjfrompi = _pycplex_platform.CPXXqpdjfrompi
+
+def CPXXfreepresolve(*args):
+  return _pycplex_platform.CPXXfreepresolve(*args)
+CPXXfreepresolve = _pycplex_platform.CPXXfreepresolve
+
+def CPXXgetredlp(*args):
+  return _pycplex_platform.CPXXgetredlp(*args)
+CPXXgetredlp = _pycplex_platform.CPXXgetredlp
+
+def CPXXcrushx(*args):
+  return _pycplex_platform.CPXXcrushx(*args)
+CPXXcrushx = _pycplex_platform.CPXXcrushx
+
+def CPXXuncrushx(*args):
+  return _pycplex_platform.CPXXuncrushx(*args)
+CPXXuncrushx = _pycplex_platform.CPXXuncrushx
+
+def CPXXcrushpi(*args):
+  return _pycplex_platform.CPXXcrushpi(*args)
+CPXXcrushpi = _pycplex_platform.CPXXcrushpi
+
+def CPXXuncrushpi(*args):
+  return _pycplex_platform.CPXXuncrushpi(*args)
+CPXXuncrushpi = _pycplex_platform.CPXXuncrushpi
+
+def CPXXcrushform(*args):
+  return _pycplex_platform.CPXXcrushform(*args)
+CPXXcrushform = _pycplex_platform.CPXXcrushform
+
+def CPXXuncrushform(*args):
+  return _pycplex_platform.CPXXuncrushform(*args)
+CPXXuncrushform = _pycplex_platform.CPXXuncrushform
+
+def CPXXgetprestat(*args):
+  return _pycplex_platform.CPXXgetprestat(*args)
+CPXXgetprestat = _pycplex_platform.CPXXgetprestat
+
+def CPXXcopyprotected(*args):
+  return _pycplex_platform.CPXXcopyprotected(*args)
+CPXXcopyprotected = _pycplex_platform.CPXXcopyprotected
+
+def CPXXgetprotected(*args):
+  return _pycplex_platform.CPXXgetprotected(*args)
+CPXXgetprotected = _pycplex_platform.CPXXgetprotected
+
+def CPXXgettime(*args):
+  return _pycplex_platform.CPXXgettime(*args)
+CPXXgettime = _pycplex_platform.CPXXgettime
+
+def CPXXgetdettime(*args):
+  return _pycplex_platform.CPXXgetdettime(*args)
+CPXXgetdettime = _pycplex_platform.CPXXgetdettime
+
+def CPXXcopyorder(*args):
+  return _pycplex_platform.CPXXcopyorder(*args)
+CPXXcopyorder = _pycplex_platform.CPXXcopyorder
+
+def CPXXchgmipstarts(*args):
+  return _pycplex_platform.CPXXchgmipstarts(*args)
+CPXXchgmipstarts = _pycplex_platform.CPXXchgmipstarts
+
+def CPXXaddmipstarts(*args):
+  return _pycplex_platform.CPXXaddmipstarts(*args)
+CPXXaddmipstarts = _pycplex_platform.CPXXaddmipstarts
+
+def CPXXdelmipstarts(*args):
+  return _pycplex_platform.CPXXdelmipstarts(*args)
+CPXXdelmipstarts = _pycplex_platform.CPXXdelmipstarts
+
+def CPXXdistmipopt(*args):
+  return _pycplex_platform.CPXXdistmipopt(*args)
+CPXXdistmipopt = _pycplex_platform.CPXXdistmipopt
+
+def CPXXcopyvmconfig(*args):
+  return _pycplex_platform.CPXXcopyvmconfig(*args)
+CPXXcopyvmconfig = _pycplex_platform.CPXXcopyvmconfig
+
+def CPXXreadcopyvmconfig(*args):
+  return _pycplex_platform.CPXXreadcopyvmconfig(*args)
+CPXXreadcopyvmconfig = _pycplex_platform.CPXXreadcopyvmconfig
+
+def CPXXdelvmconfig(*args):
+  return _pycplex_platform.CPXXdelvmconfig(*args)
+CPXXdelvmconfig = _pycplex_platform.CPXXdelvmconfig
+
+def CPXEhasvmconfig(*args):
+  return _pycplex_platform.CPXEhasvmconfig(*args)
+CPXEhasvmconfig = _pycplex_platform.CPXEhasvmconfig
+
+def CPXXgetmipitcnt(*args):
+  return _pycplex_platform.CPXXgetmipitcnt(*args)
+CPXXgetmipitcnt = _pycplex_platform.CPXXgetmipitcnt
+
+def CPXXgetbestobjval(*args):
+  return _pycplex_platform.CPXXgetbestobjval(*args)
+CPXXgetbestobjval = _pycplex_platform.CPXXgetbestobjval
+
+def CPXXgetmiprelgap(*args):
+  return _pycplex_platform.CPXXgetmiprelgap(*args)
+CPXXgetmiprelgap = _pycplex_platform.CPXXgetmiprelgap
+
+def CPXXgetcutoff(*args):
+  return _pycplex_platform.CPXXgetcutoff(*args)
+CPXXgetcutoff = _pycplex_platform.CPXXgetcutoff
+
+def CPXXgetnodecnt(*args):
+  return _pycplex_platform.CPXXgetnodecnt(*args)
+CPXXgetnodecnt = _pycplex_platform.CPXXgetnodecnt
+
+def CPXXgetnodeleftcnt(*args):
+  return _pycplex_platform.CPXXgetnodeleftcnt(*args)
+CPXXgetnodeleftcnt = _pycplex_platform.CPXXgetnodeleftcnt
+
+def CPXXgetnodeint(*args):
+  return _pycplex_platform.CPXXgetnodeint(*args)
+CPXXgetnodeint = _pycplex_platform.CPXXgetnodeint
+
+def CPXXgetnumcuts(*args):
+  return _pycplex_platform.CPXXgetnumcuts(*args)
+CPXXgetnumcuts = _pycplex_platform.CPXXgetnumcuts
+
+def CPXXgetnummipstarts(*args):
+  return _pycplex_platform.CPXXgetnummipstarts(*args)
+CPXXgetnummipstarts = _pycplex_platform.CPXXgetnummipstarts
+
+def CPXXgetmipstarts(*args):
+  return _pycplex_platform.CPXXgetmipstarts(*args)
+CPXXgetmipstarts = _pycplex_platform.CPXXgetmipstarts
+
+def CPXXgetmipstartname(*args):
+  return _pycplex_platform.CPXXgetmipstartname(*args)
+CPXXgetmipstartname = _pycplex_platform.CPXXgetmipstartname
+
+def CPXXgetmipstartindex(*args):
+  return _pycplex_platform.CPXXgetmipstartindex(*args)
+CPXXgetmipstartindex = _pycplex_platform.CPXXgetmipstartindex
+
+def CPXXgetsubstat(*args):
+  return _pycplex_platform.CPXXgetsubstat(*args)
+CPXXgetsubstat = _pycplex_platform.CPXXgetsubstat
+
+def CPXXchgctype(*args):
+  return _pycplex_platform.CPXXchgctype(*args)
+CPXXchgctype = _pycplex_platform.CPXXchgctype
+
+def CPXXaddsos(*args):
+  return _pycplex_platform.CPXXaddsos(*args)
+CPXXaddsos = _pycplex_platform.CPXXaddsos
+
+def CPXXdelsos(*args):
+  return _pycplex_platform.CPXXdelsos(*args)
+CPXXdelsos = _pycplex_platform.CPXXdelsos
+
+def CPXXgetctype(*args):
+  return _pycplex_platform.CPXXgetctype(*args)
+CPXXgetctype = _pycplex_platform.CPXXgetctype
+
+def CPXXgetnumsos(*args):
+  return _pycplex_platform.CPXXgetnumsos(*args)
+CPXXgetnumsos = _pycplex_platform.CPXXgetnumsos
+
+def CPXXgetsos(*args):
+  return _pycplex_platform.CPXXgetsos(*args)
+CPXXgetsos = _pycplex_platform.CPXXgetsos
+
+def CPXXgetsosname(*args):
+  return _pycplex_platform.CPXXgetsosname(*args)
+CPXXgetsosname = _pycplex_platform.CPXXgetsosname
+
+def CPXXgetsosindex(*args):
+  return _pycplex_platform.CPXXgetsosindex(*args)
+CPXXgetsosindex = _pycplex_platform.CPXXgetsosindex
+
+def CPXXgetsosinfeas(*args):
+  return _pycplex_platform.CPXXgetsosinfeas(*args)
+CPXXgetsosinfeas = _pycplex_platform.CPXXgetsosinfeas
+
+def CPXXaddindconstraints(*args):
+  return _pycplex_platform.CPXXaddindconstraints(*args)
+CPXXaddindconstraints = _pycplex_platform.CPXXaddindconstraints
+
+def CPXXgetindconstraints(*args):
+  return _pycplex_platform.CPXXgetindconstraints(*args)
+CPXXgetindconstraints = _pycplex_platform.CPXXgetindconstraints
+
+def CPXXgetnumindconstrs(*args):
+  return _pycplex_platform.CPXXgetnumindconstrs(*args)
+CPXXgetnumindconstrs = _pycplex_platform.CPXXgetnumindconstrs
+
+def CPXXgetindconstrindex(*args):
+  return _pycplex_platform.CPXXgetindconstrindex(*args)
+CPXXgetindconstrindex = _pycplex_platform.CPXXgetindconstrindex
+
+def CPXXgetindconstrname(*args):
+  return _pycplex_platform.CPXXgetindconstrname(*args)
+CPXXgetindconstrname = _pycplex_platform.CPXXgetindconstrname
+
+def CPXXgetindconstrslack(*args):
+  return _pycplex_platform.CPXXgetindconstrslack(*args)
+CPXXgetindconstrslack = _pycplex_platform.CPXXgetindconstrslack
+
+def CPXXindconstrslackfromx(*args):
+  return _pycplex_platform.CPXXindconstrslackfromx(*args)
+CPXXindconstrslackfromx = _pycplex_platform.CPXXindconstrslackfromx
+
+def CPXXgetindconstrinfeas(*args):
+  return _pycplex_platform.CPXXgetindconstrinfeas(*args)
+CPXXgetindconstrinfeas = _pycplex_platform.CPXXgetindconstrinfeas
+
+def CPXXdelindconstrs(*args):
+  return _pycplex_platform.CPXXdelindconstrs(*args)
+CPXXdelindconstrs = _pycplex_platform.CPXXdelindconstrs
+
+def CPXXgetnumint(*args):
+  return _pycplex_platform.CPXXgetnumint(*args)
+CPXXgetnumint = _pycplex_platform.CPXXgetnumint
+
+def CPXXgetnumbin(*args):
+  return _pycplex_platform.CPXXgetnumbin(*args)
+CPXXgetnumbin = _pycplex_platform.CPXXgetnumbin
+
+def CPXXgetnumsemicont(*args):
+  return _pycplex_platform.CPXXgetnumsemicont(*args)
+CPXXgetnumsemicont = _pycplex_platform.CPXXgetnumsemicont
+
+def CPXXgetnumsemiint(*args):
+  return _pycplex_platform.CPXXgetnumsemiint(*args)
+CPXXgetnumsemiint = _pycplex_platform.CPXXgetnumsemiint
+
+def CPXXgetorder(*args):
+  return _pycplex_platform.CPXXgetorder(*args)
+CPXXgetorder = _pycplex_platform.CPXXgetorder
+
+def CPXXgetsolnpoolnumfilters(*args):
+  return _pycplex_platform.CPXXgetsolnpoolnumfilters(*args)
+CPXXgetsolnpoolnumfilters = _pycplex_platform.CPXXgetsolnpoolnumfilters
+
+def CPXXaddsolnpooldivfilter(*args):
+  return _pycplex_platform.CPXXaddsolnpooldivfilter(*args)
+CPXXaddsolnpooldivfilter = _pycplex_platform.CPXXaddsolnpooldivfilter
+
+def CPXXaddsolnpoolrngfilter(*args):
+  return _pycplex_platform.CPXXaddsolnpoolrngfilter(*args)
+CPXXaddsolnpoolrngfilter = _pycplex_platform.CPXXaddsolnpoolrngfilter
+
+def CPXXgetsolnpoolfiltertype(*args):
+  return _pycplex_platform.CPXXgetsolnpoolfiltertype(*args)
+CPXXgetsolnpoolfiltertype = _pycplex_platform.CPXXgetsolnpoolfiltertype
+
+def CPXXgetsolnpooldivfilter(*args):
+  return _pycplex_platform.CPXXgetsolnpooldivfilter(*args)
+CPXXgetsolnpooldivfilter = _pycplex_platform.CPXXgetsolnpooldivfilter
+
+def CPXXgetsolnpoolrngfilter(*args):
+  return _pycplex_platform.CPXXgetsolnpoolrngfilter(*args)
+CPXXgetsolnpoolrngfilter = _pycplex_platform.CPXXgetsolnpoolrngfilter
+
+def CPXXgetsolnpoolfiltername(*args):
+  return _pycplex_platform.CPXXgetsolnpoolfiltername(*args)
+CPXXgetsolnpoolfiltername = _pycplex_platform.CPXXgetsolnpoolfiltername
+
+def CPXXgetsolnpoolfilterindex(*args):
+  return _pycplex_platform.CPXXgetsolnpoolfilterindex(*args)
+CPXXgetsolnpoolfilterindex = _pycplex_platform.CPXXgetsolnpoolfilterindex
+
+def CPXXdelsolnpoolfilters(*args):
+  return _pycplex_platform.CPXXdelsolnpoolfilters(*args)
+CPXXdelsolnpoolfilters = _pycplex_platform.CPXXdelsolnpoolfilters
+
+def CPXXgetsolnpoolnumsolns(*args):
+  return _pycplex_platform.CPXXgetsolnpoolnumsolns(*args)
+CPXXgetsolnpoolnumsolns = _pycplex_platform.CPXXgetsolnpoolnumsolns
+
+def CPXXgetsolnpoolnumreplaced(*args):
+  return _pycplex_platform.CPXXgetsolnpoolnumreplaced(*args)
+CPXXgetsolnpoolnumreplaced = _pycplex_platform.CPXXgetsolnpoolnumreplaced
+
+def CPXXgetsolnpoolmeanobjval(*args):
+  return _pycplex_platform.CPXXgetsolnpoolmeanobjval(*args)
+CPXXgetsolnpoolmeanobjval = _pycplex_platform.CPXXgetsolnpoolmeanobjval
+
+def CPXXgetsolnpoolobjval(*args):
+  return _pycplex_platform.CPXXgetsolnpoolobjval(*args)
+CPXXgetsolnpoolobjval = _pycplex_platform.CPXXgetsolnpoolobjval
+
+def CPXXgetsolnpoolx(*args):
+  return _pycplex_platform.CPXXgetsolnpoolx(*args)
+CPXXgetsolnpoolx = _pycplex_platform.CPXXgetsolnpoolx
+
+def CPXXgetsolnpoolslack(*args):
+  return _pycplex_platform.CPXXgetsolnpoolslack(*args)
+CPXXgetsolnpoolslack = _pycplex_platform.CPXXgetsolnpoolslack
+
+def CPXXgetsolnpoolqconstrslack(*args):
+  return _pycplex_platform.CPXXgetsolnpoolqconstrslack(*args)
+CPXXgetsolnpoolqconstrslack = _pycplex_platform.CPXXgetsolnpoolqconstrslack
+
+def CPXXgetsolnpoolsolnname(*args):
+  return _pycplex_platform.CPXXgetsolnpoolsolnname(*args)
+CPXXgetsolnpoolsolnname = _pycplex_platform.CPXXgetsolnpoolsolnname
+
+def CPXXgetsolnpoolsolnindex(*args):
+  return _pycplex_platform.CPXXgetsolnpoolsolnindex(*args)
+CPXXgetsolnpoolsolnindex = _pycplex_platform.CPXXgetsolnpoolsolnindex
+
+def CPXXdelsolnpoolsolns(*args):
+  return _pycplex_platform.CPXXdelsolnpoolsolns(*args)
+CPXXdelsolnpoolsolns = _pycplex_platform.CPXXdelsolnpoolsolns
+
+def CPXXsetinfocallbackfunc(*args):
+  return _pycplex_platform.CPXXsetinfocallbackfunc(*args)
+CPXXsetinfocallbackfunc = _pycplex_platform.CPXXsetinfocallbackfunc
+
+def CPXXsetmipcallbackfunc(*args):
+  return _pycplex_platform.CPXXsetmipcallbackfunc(*args)
+CPXXsetmipcallbackfunc = _pycplex_platform.CPXXsetmipcallbackfunc
+
+def CPXXsetbranchcallbackfunc(*args):
+  return _pycplex_platform.CPXXsetbranchcallbackfunc(*args)
+CPXXsetbranchcallbackfunc = _pycplex_platform.CPXXsetbranchcallbackfunc
+
+def CPXXsetbranchnosolncallbackfunc(*args):
+  return _pycplex_platform.CPXXsetbranchnosolncallbackfunc(*args)
+CPXXsetbranchnosolncallbackfunc = _pycplex_platform.CPXXsetbranchnosolncallbackfunc
+
+def CPXXsetlazyconstraintcallbackfunc(*args):
+  return _pycplex_platform.CPXXsetlazyconstraintcallbackfunc(*args)
+CPXXsetlazyconstraintcallbackfunc = _pycplex_platform.CPXXsetlazyconstraintcallbackfunc
+
+def CPXXsetusercutcallbackfunc(*args):
+  return _pycplex_platform.CPXXsetusercutcallbackfunc(*args)
+CPXXsetusercutcallbackfunc = _pycplex_platform.CPXXsetusercutcallbackfunc
+
+def CPXXsetnodecallbackfunc(*args):
+  return _pycplex_platform.CPXXsetnodecallbackfunc(*args)
+CPXXsetnodecallbackfunc = _pycplex_platform.CPXXsetnodecallbackfunc
+
+def CPXXsetheuristiccallbackfunc(*args):
+  return _pycplex_platform.CPXXsetheuristiccallbackfunc(*args)
+CPXXsetheuristiccallbackfunc = _pycplex_platform.CPXXsetheuristiccallbackfunc
+
+def CPXXsetincumbentcallbackfunc(*args):
+  return _pycplex_platform.CPXXsetincumbentcallbackfunc(*args)
+CPXXsetincumbentcallbackfunc = _pycplex_platform.CPXXsetincumbentcallbackfunc
+
+def CPXXsetsolvecallbackfunc(*args):
+  return _pycplex_platform.CPXXsetsolvecallbackfunc(*args)
+CPXXsetsolvecallbackfunc = _pycplex_platform.CPXXsetsolvecallbackfunc
+
+def CPXXgetcallbacknodeinfo(*args):
+  return _pycplex_platform.CPXXgetcallbacknodeinfo(*args)
+CPXXgetcallbacknodeinfo = _pycplex_platform.CPXXgetcallbacknodeinfo
+
+def CPXXcallbacksetuserhandle(*args):
+  return _pycplex_platform.CPXXcallbacksetuserhandle(*args)
+CPXXcallbacksetuserhandle = _pycplex_platform.CPXXcallbacksetuserhandle
+
+def CPXXcallbacksetnodeuserhandle(*args):
+  return _pycplex_platform.CPXXcallbacksetnodeuserhandle(*args)
+CPXXcallbacksetnodeuserhandle = _pycplex_platform.CPXXcallbacksetnodeuserhandle
+
+def CPXXgetcallbackseqinfo(*args):
+  return _pycplex_platform.CPXXgetcallbackseqinfo(*args)
+CPXXgetcallbackseqinfo = _pycplex_platform.CPXXgetcallbackseqinfo
+
+def CPXXgetcallbacksosinfo(*args):
+  return _pycplex_platform.CPXXgetcallbacksosinfo(*args)
+CPXXgetcallbacksosinfo = _pycplex_platform.CPXXgetcallbacksosinfo
+
+def CPXXgetcallbackindicatorinfo(*args):
+  return _pycplex_platform.CPXXgetcallbackindicatorinfo(*args)
+CPXXgetcallbackindicatorinfo = _pycplex_platform.CPXXgetcallbackindicatorinfo
+
+def CPXXcutcallbackadd(*args):
+  return _pycplex_platform.CPXXcutcallbackadd(*args)
+CPXXcutcallbackadd = _pycplex_platform.CPXXcutcallbackadd
+
+def CPXXcutcallbackaddlocal(*args):
+  return _pycplex_platform.CPXXcutcallbackaddlocal(*args)
+CPXXcutcallbackaddlocal = _pycplex_platform.CPXXcutcallbackaddlocal
+
+def CPXXbranchcallbackbranchgeneral(*args):
+  return _pycplex_platform.CPXXbranchcallbackbranchgeneral(*args)
+CPXXbranchcallbackbranchgeneral = _pycplex_platform.CPXXbranchcallbackbranchgeneral
+
+def CPXXbranchcallbackbranchasCPLEX(*args):
+  return _pycplex_platform.CPXXbranchcallbackbranchasCPLEX(*args)
+CPXXbranchcallbackbranchasCPLEX = _pycplex_platform.CPXXbranchcallbackbranchasCPLEX
+
+def CPXXgetcallbacknodex(*args):
+  return _pycplex_platform.CPXXgetcallbacknodex(*args)
+CPXXgetcallbacknodex = _pycplex_platform.CPXXgetcallbacknodex
+
+def CPXXgetcallbacknodeobjval(*args):
+  return _pycplex_platform.CPXXgetcallbacknodeobjval(*args)
+CPXXgetcallbacknodeobjval = _pycplex_platform.CPXXgetcallbacknodeobjval
+
+def CPXXgetcallbackorder(*args):
+  return _pycplex_platform.CPXXgetcallbackorder(*args)
+CPXXgetcallbackorder = _pycplex_platform.CPXXgetcallbackorder
+
+def CPXXgetcallbackpseudocosts(*args):
+  return _pycplex_platform.CPXXgetcallbackpseudocosts(*args)
+CPXXgetcallbackpseudocosts = _pycplex_platform.CPXXgetcallbackpseudocosts
+
+def CPXXgetcallbackincumbent(*args):
+  return _pycplex_platform.CPXXgetcallbackincumbent(*args)
+CPXXgetcallbackincumbent = _pycplex_platform.CPXXgetcallbackincumbent
+
+def CPXXgetcallbacknodeintfeas(*args):
+  return _pycplex_platform.CPXXgetcallbacknodeintfeas(*args)
+CPXXgetcallbacknodeintfeas = _pycplex_platform.CPXXgetcallbacknodeintfeas
+
+def CPXXgetcallbackgloballb(*args):
+  return _pycplex_platform.CPXXgetcallbackgloballb(*args)
+CPXXgetcallbackgloballb = _pycplex_platform.CPXXgetcallbackgloballb
+
+def CPXXgetcallbackglobalub(*args):
+  return _pycplex_platform.CPXXgetcallbackglobalub(*args)
+CPXXgetcallbackglobalub = _pycplex_platform.CPXXgetcallbackglobalub
+
+def CPXXgetcallbacknodelb(*args):
+  return _pycplex_platform.CPXXgetcallbacknodelb(*args)
+CPXXgetcallbacknodelb = _pycplex_platform.CPXXgetcallbacknodelb
+
+def CPXXgetcallbacknodeub(*args):
+  return _pycplex_platform.CPXXgetcallbacknodeub(*args)
+CPXXgetcallbacknodeub = _pycplex_platform.CPXXgetcallbacknodeub
+
+def CPXXgetcallbacknodestat(*args):
+  return _pycplex_platform.CPXXgetcallbacknodestat(*args)
+CPXXgetcallbacknodestat = _pycplex_platform.CPXXgetcallbacknodestat
+
+def CPXXgetcallbackbranchconstraints(*args):
+  return _pycplex_platform.CPXXgetcallbackbranchconstraints(*args)
+CPXXgetcallbackbranchconstraints = _pycplex_platform.CPXXgetcallbackbranchconstraints
+
+def CPXXaddusercuts(*args):
+  return _pycplex_platform.CPXXaddusercuts(*args)
+CPXXaddusercuts = _pycplex_platform.CPXXaddusercuts
+
+def CPXXaddlazyconstraints(*args):
+  return _pycplex_platform.CPXXaddlazyconstraints(*args)
+CPXXaddlazyconstraints = _pycplex_platform.CPXXaddlazyconstraints
+
+def CPXXfreeusercuts(*args):
+  return _pycplex_platform.CPXXfreeusercuts(*args)
+CPXXfreeusercuts = _pycplex_platform.CPXXfreeusercuts
+
+def CPXXfreelazyconstraints(*args):
+  return _pycplex_platform.CPXXfreelazyconstraints(*args)
+CPXXfreelazyconstraints = _pycplex_platform.CPXXfreelazyconstraints
+
+def CPXXcopyquad(*args):
+  return _pycplex_platform.CPXXcopyquad(*args)
+CPXXcopyquad = _pycplex_platform.CPXXcopyquad
+
+def CPXXcopyqpsep(*args):
+  return _pycplex_platform.CPXXcopyqpsep(*args)
+CPXXcopyqpsep = _pycplex_platform.CPXXcopyqpsep
+
+def CPXXchgqpcoef(*args):
+  return _pycplex_platform.CPXXchgqpcoef(*args)
+CPXXchgqpcoef = _pycplex_platform.CPXXchgqpcoef
+
+def CPXXgetnumqpnz(*args):
+  return _pycplex_platform.CPXXgetnumqpnz(*args)
+CPXXgetnumqpnz = _pycplex_platform.CPXXgetnumqpnz
+
+def CPXXgetnumquad(*args):
+  return _pycplex_platform.CPXXgetnumquad(*args)
+CPXXgetnumquad = _pycplex_platform.CPXXgetnumquad
+
+def CPXXgetqpcoef(*args):
+  return _pycplex_platform.CPXXgetqpcoef(*args)
+CPXXgetqpcoef = _pycplex_platform.CPXXgetqpcoef
+
+def CPXXgetquad(*args):
+  return _pycplex_platform.CPXXgetquad(*args)
+CPXXgetquad = _pycplex_platform.CPXXgetquad
+
+def CPXXaddqconstr(*args):
+  return _pycplex_platform.CPXXaddqconstr(*args)
+CPXXaddqconstr = _pycplex_platform.CPXXaddqconstr
+
+def CPXXdelqconstrs(*args):
+  return _pycplex_platform.CPXXdelqconstrs(*args)
+CPXXdelqconstrs = _pycplex_platform.CPXXdelqconstrs
+
+def CPXXgetnumqconstrs(*args):
+  return _pycplex_platform.CPXXgetnumqconstrs(*args)
+CPXXgetnumqconstrs = _pycplex_platform.CPXXgetnumqconstrs
+
+def CPXXgetqconstrindex(*args):
+  return _pycplex_platform.CPXXgetqconstrindex(*args)
+CPXXgetqconstrindex = _pycplex_platform.CPXXgetqconstrindex
+
+def CPXXgetqconstr(*args):
+  return _pycplex_platform.CPXXgetqconstr(*args)
+CPXXgetqconstr = _pycplex_platform.CPXXgetqconstr
+
+def CPXXgetqconstrname(*args):
+  return _pycplex_platform.CPXXgetqconstrname(*args)
+CPXXgetqconstrname = _pycplex_platform.CPXXgetqconstrname
+
+def CPXXgetqconstrslack(*args):
+  return _pycplex_platform.CPXXgetqconstrslack(*args)
+CPXXgetqconstrslack = _pycplex_platform.CPXXgetqconstrslack
+
+def CPXXqconstrslackfromx(*args):
+  return _pycplex_platform.CPXXqconstrslackfromx(*args)
+CPXXqconstrslackfromx = _pycplex_platform.CPXXqconstrslackfromx
+
+def CPXXgetqconstrinfeas(*args):
+  return _pycplex_platform.CPXXgetqconstrinfeas(*args)
+CPXXgetqconstrinfeas = _pycplex_platform.CPXXgetqconstrinfeas
+
+def CPXXgetxqxax(*args):
+  return _pycplex_platform.CPXXgetxqxax(*args)
+CPXXgetxqxax = _pycplex_platform.CPXXgetxqxax
+
+def CPXXgetqconstrdslack(*args):
+  return _pycplex_platform.CPXXgetqconstrdslack(*args)
+CPXXgetqconstrdslack = _pycplex_platform.CPXXgetqconstrdslack
+
+def CPXXnewlongannotation(*args):
+  return _pycplex_platform.CPXXnewlongannotation(*args)
+CPXXnewlongannotation = _pycplex_platform.CPXXnewlongannotation
+
+def CPXXnewdblannotation(*args):
+  return _pycplex_platform.CPXXnewdblannotation(*args)
+CPXXnewdblannotation = _pycplex_platform.CPXXnewdblannotation
+
+def CPXXdellongannotations(*args):
+  return _pycplex_platform.CPXXdellongannotations(*args)
+CPXXdellongannotations = _pycplex_platform.CPXXdellongannotations
+
+def CPXXdeldblannotations(*args):
+  return _pycplex_platform.CPXXdeldblannotations(*args)
+CPXXdeldblannotations = _pycplex_platform.CPXXdeldblannotations
+
+def CPXXgetlongannotationindex(*args):
+  return _pycplex_platform.CPXXgetlongannotationindex(*args)
+CPXXgetlongannotationindex = _pycplex_platform.CPXXgetlongannotationindex
+
+def CPXXgetdblannotationindex(*args):
+  return _pycplex_platform.CPXXgetdblannotationindex(*args)
+CPXXgetdblannotationindex = _pycplex_platform.CPXXgetdblannotationindex
+
+def CPXXgetlongannotationname(*args):
+  return _pycplex_platform.CPXXgetlongannotationname(*args)
+CPXXgetlongannotationname = _pycplex_platform.CPXXgetlongannotationname
+
+def CPXXgetdblannotationname(*args):
+  return _pycplex_platform.CPXXgetdblannotationname(*args)
+CPXXgetdblannotationname = _pycplex_platform.CPXXgetdblannotationname
+
+def CPXXgetnumlongannotations(*args):
+  return _pycplex_platform.CPXXgetnumlongannotations(*args)
+CPXXgetnumlongannotations = _pycplex_platform.CPXXgetnumlongannotations
+
+def CPXXgetnumdblannotations(*args):
+  return _pycplex_platform.CPXXgetnumdblannotations(*args)
+CPXXgetnumdblannotations = _pycplex_platform.CPXXgetnumdblannotations
+
+def CPXXgetlongannotationdefval(*args):
+  return _pycplex_platform.CPXXgetlongannotationdefval(*args)
+CPXXgetlongannotationdefval = _pycplex_platform.CPXXgetlongannotationdefval
+
+def CPXXgetdblannotationdefval(*args):
+  return _pycplex_platform.CPXXgetdblannotationdefval(*args)
+CPXXgetdblannotationdefval = _pycplex_platform.CPXXgetdblannotationdefval
+
+def CPXXsetdblannotations(*args):
+  return _pycplex_platform.CPXXsetdblannotations(*args)
+CPXXsetdblannotations = _pycplex_platform.CPXXsetdblannotations
+
+def CPXXsetlongannotations(*args):
+  return _pycplex_platform.CPXXsetlongannotations(*args)
+CPXXsetlongannotations = _pycplex_platform.CPXXsetlongannotations
+
+def CPXXgetlongannotations(*args):
+  return _pycplex_platform.CPXXgetlongannotations(*args)
+CPXXgetlongannotations = _pycplex_platform.CPXXgetlongannotations
+
+def CPXXgetdblannotations(*args):
+  return _pycplex_platform.CPXXgetdblannotations(*args)
+CPXXgetdblannotations = _pycplex_platform.CPXXgetdblannotations
+
+def CPXXaddpwl(*args):
+  return _pycplex_platform.CPXXaddpwl(*args)
+CPXXaddpwl = _pycplex_platform.CPXXaddpwl
+
+def CPXXdelpwl(*args):
+  return _pycplex_platform.CPXXdelpwl(*args)
+CPXXdelpwl = _pycplex_platform.CPXXdelpwl
+
+def CPXXgetnumpwl(*args):
+  return _pycplex_platform.CPXXgetnumpwl(*args)
+CPXXgetnumpwl = _pycplex_platform.CPXXgetnumpwl
+
+def CPXXgetpwl(*args):
+  return _pycplex_platform.CPXXgetpwl(*args)
+CPXXgetpwl = _pycplex_platform.CPXXgetpwl
+
+def CPXXgetpwlindex(*args):
+  return _pycplex_platform.CPXXgetpwlindex(*args)
+CPXXgetpwlindex = _pycplex_platform.CPXXgetpwlindex
+
+def CPXXgetpwlname(*args):
+  return _pycplex_platform.CPXXgetpwlname(*args)
+CPXXgetpwlname = _pycplex_platform.CPXXgetpwlname
+
+def CPXXgetnumlazyconstraints(*args):
+  return _pycplex_platform.CPXXgetnumlazyconstraints(*args)
+CPXXgetnumlazyconstraints = _pycplex_platform.CPXXgetnumlazyconstraints
+
+def CPXXgetnumusercuts(*args):
+  return _pycplex_platform.CPXXgetnumusercuts(*args)
+CPXXgetnumusercuts = _pycplex_platform.CPXXgetnumusercuts
+
+def CPXEgetnumgconstrs(*args):
+  return _pycplex_platform.CPXEgetnumgconstrs(*args)
+CPXEgetnumgconstrs = _pycplex_platform.CPXEgetnumgconstrs
+
+def CPXEgetprobstats(*args):
+  return _pycplex_platform.CPXEgetprobstats(*args)
+CPXEgetprobstats = _pycplex_platform.CPXEgetprobstats
+
+def CPXEgethist(*args):
+  return _pycplex_platform.CPXEgethist(*args)
+CPXEgethist = _pycplex_platform.CPXEgethist
+
+def CPXEgetqualitymetrics(*args):
+  return _pycplex_platform.CPXEgetqualitymetrics(*args)
+CPXEgetqualitymetrics = _pycplex_platform.CPXEgetqualitymetrics
+
+def CPXEshowquality(*args):
+  return _pycplex_platform.CPXEshowquality(*args)
+CPXEshowquality = _pycplex_platform.CPXEshowquality
+
+def CPXXgetnumcores(*args):
+  return _pycplex_platform.CPXXgetnumcores(*args)
+CPXXgetnumcores = _pycplex_platform.CPXXgetnumcores
+
+def CPXXcallbacksetfunc(*args):
+  return _pycplex_platform.CPXXcallbacksetfunc(*args)
+CPXXcallbacksetfunc = _pycplex_platform.CPXXcallbacksetfunc
+
+def CPXXcallbackgetinfoint(*args):
+  return _pycplex_platform.CPXXcallbackgetinfoint(*args)
+CPXXcallbackgetinfoint = _pycplex_platform.CPXXcallbackgetinfoint
+
+def CPXXcallbackgetinfolong(*args):
+  return _pycplex_platform.CPXXcallbackgetinfolong(*args)
+CPXXcallbackgetinfolong = _pycplex_platform.CPXXcallbackgetinfolong
+
+def CPXXcallbackgetinfodbl(*args):
+  return _pycplex_platform.CPXXcallbackgetinfodbl(*args)
+CPXXcallbackgetinfodbl = _pycplex_platform.CPXXcallbackgetinfodbl
+
+def CPXXcallbackabort(*args):
+  return _pycplex_platform.CPXXcallbackabort(*args)
+CPXXcallbackabort = _pycplex_platform.CPXXcallbackabort
+
+def CPXXcallbackcandidateispoint(*args):
+  return _pycplex_platform.CPXXcallbackcandidateispoint(*args)
+CPXXcallbackcandidateispoint = _pycplex_platform.CPXXcallbackcandidateispoint
+
+def CPXXcallbackcandidateisray(*args):
+  return _pycplex_platform.CPXXcallbackcandidateisray(*args)
+CPXXcallbackcandidateisray = _pycplex_platform.CPXXcallbackcandidateisray
+
+def CPXXcallbackgetcandidatepoint(*args):
+  return _pycplex_platform.CPXXcallbackgetcandidatepoint(*args)
+CPXXcallbackgetcandidatepoint = _pycplex_platform.CPXXcallbackgetcandidatepoint
+
+def CPXXcallbackgetcandidateray(*args):
+  return _pycplex_platform.CPXXcallbackgetcandidateray(*args)
+CPXXcallbackgetcandidateray = _pycplex_platform.CPXXcallbackgetcandidateray
+
+def CPXXcallbackgetrelaxationpoint(*args):
+  return _pycplex_platform.CPXXcallbackgetrelaxationpoint(*args)
+CPXXcallbackgetrelaxationpoint = _pycplex_platform.CPXXcallbackgetrelaxationpoint
+
+def CPXXcallbackgetincumbent(*args):
+  return _pycplex_platform.CPXXcallbackgetincumbent(*args)
+CPXXcallbackgetincumbent = _pycplex_platform.CPXXcallbackgetincumbent
+
+def CPXXcallbackgetlocallb(*args):
+  return _pycplex_platform.CPXXcallbackgetlocallb(*args)
+CPXXcallbackgetlocallb = _pycplex_platform.CPXXcallbackgetlocallb
+
+def CPXXcallbackgetlocalub(*args):
+  return _pycplex_platform.CPXXcallbackgetlocalub(*args)
+CPXXcallbackgetlocalub = _pycplex_platform.CPXXcallbackgetlocalub
+
+def CPXXcallbackgetgloballb(*args):
+  return _pycplex_platform.CPXXcallbackgetgloballb(*args)
+CPXXcallbackgetgloballb = _pycplex_platform.CPXXcallbackgetgloballb
+
+def CPXXcallbackgetglobalub(*args):
+  return _pycplex_platform.CPXXcallbackgetglobalub(*args)
+CPXXcallbackgetglobalub = _pycplex_platform.CPXXcallbackgetglobalub
+
+def CPXXcallbackpostheursoln(*args):
+  return _pycplex_platform.CPXXcallbackpostheursoln(*args)
+CPXXcallbackpostheursoln = _pycplex_platform.CPXXcallbackpostheursoln
+
+def CPXXcallbackaddusercuts(*args):
+  return _pycplex_platform.CPXXcallbackaddusercuts(*args)
+CPXXcallbackaddusercuts = _pycplex_platform.CPXXcallbackaddusercuts
+
+def CPXXcallbackrejectcandidate(*args):
+  return _pycplex_platform.CPXXcallbackrejectcandidate(*args)
+CPXXcallbackrejectcandidate = _pycplex_platform.CPXXcallbackrejectcandidate
 class intPtr(_object):
     __swig_setmethods__ = {}
     __setattr__ = lambda self, name, value: _swig_setattr(self, intPtr, name, value)
@@ -1744,1362 +3216,6 @@ def longArray_frompointer(*args):
   return _pycplex_platform.longArray_frompointer(*args)
 longArray_frompointer = _pycplex_platform.longArray_frompointer
 
-
-def CPXXcreateprob(*args):
-  return _pycplex_platform.CPXXcreateprob(*args)
-CPXXcreateprob = _pycplex_platform.CPXXcreateprob
-
-def CPXXcloneprob(*args):
-  return _pycplex_platform.CPXXcloneprob(*args)
-CPXXcloneprob = _pycplex_platform.CPXXcloneprob
-
-def CPXXcopylpwnames(*args):
-  return _pycplex_platform.CPXXcopylpwnames(*args)
-CPXXcopylpwnames = _pycplex_platform.CPXXcopylpwnames
-
-def CPXXcopyobjname(*args):
-  return _pycplex_platform.CPXXcopyobjname(*args)
-CPXXcopyobjname = _pycplex_platform.CPXXcopyobjname
-
-def CPXXcopybase(*args):
-  return _pycplex_platform.CPXXcopybase(*args)
-CPXXcopybase = _pycplex_platform.CPXXcopybase
-
-def CPXXcleanup(*args):
-  return _pycplex_platform.CPXXcleanup(*args)
-CPXXcleanup = _pycplex_platform.CPXXcleanup
-
-def CPXXcopystart(*args):
-  return _pycplex_platform.CPXXcopystart(*args)
-CPXXcopystart = _pycplex_platform.CPXXcopystart
-
-def CPXXfreeprob(*args):
-  return _pycplex_platform.CPXXfreeprob(*args)
-CPXXfreeprob = _pycplex_platform.CPXXfreeprob
-
-def CPXXcopynettolp(*args):
-  return _pycplex_platform.CPXXcopynettolp(*args)
-CPXXcopynettolp = _pycplex_platform.CPXXcopynettolp
-
-def CPXNETextract(*args):
-  return _pycplex_platform.CPXNETextract(*args)
-CPXNETextract = _pycplex_platform.CPXNETextract
-
-def CPXXlpopt(*args):
-  return _pycplex_platform.CPXXlpopt(*args)
-CPXXlpopt = _pycplex_platform.CPXXlpopt
-
-def CPXXprimopt(*args):
-  return _pycplex_platform.CPXXprimopt(*args)
-CPXXprimopt = _pycplex_platform.CPXXprimopt
-
-def CPXXdualopt(*args):
-  return _pycplex_platform.CPXXdualopt(*args)
-CPXXdualopt = _pycplex_platform.CPXXdualopt
-
-def CPXXhybnetopt(*args):
-  return _pycplex_platform.CPXXhybnetopt(*args)
-CPXXhybnetopt = _pycplex_platform.CPXXhybnetopt
-
-def CPXXsiftopt(*args):
-  return _pycplex_platform.CPXXsiftopt(*args)
-CPXXsiftopt = _pycplex_platform.CPXXsiftopt
-
-def CPXXpivot(*args):
-  return _pycplex_platform.CPXXpivot(*args)
-CPXXpivot = _pycplex_platform.CPXXpivot
-
-def CPXXsolninfo(*args):
-  return _pycplex_platform.CPXXsolninfo(*args)
-CPXXsolninfo = _pycplex_platform.CPXXsolninfo
-
-def CPXXgetstat(*args):
-  return _pycplex_platform.CPXXgetstat(*args)
-CPXXgetstat = _pycplex_platform.CPXXgetstat
-
-def CPXXgetstatstring(*args):
-  return _pycplex_platform.CPXXgetstatstring(*args)
-CPXXgetstatstring = _pycplex_platform.CPXXgetstatstring
-
-def CPXXgetmethod(*args):
-  return _pycplex_platform.CPXXgetmethod(*args)
-CPXXgetmethod = _pycplex_platform.CPXXgetmethod
-
-def CPXXgetobjval(*args):
-  return _pycplex_platform.CPXXgetobjval(*args)
-CPXXgetobjval = _pycplex_platform.CPXXgetobjval
-
-def CPXXgetx(*args):
-  return _pycplex_platform.CPXXgetx(*args)
-CPXXgetx = _pycplex_platform.CPXXgetx
-
-def CPXXgetax(*args):
-  return _pycplex_platform.CPXXgetax(*args)
-CPXXgetax = _pycplex_platform.CPXXgetax
-
-def CPXXgetpi(*args):
-  return _pycplex_platform.CPXXgetpi(*args)
-CPXXgetpi = _pycplex_platform.CPXXgetpi
-
-def CPXXgetslack(*args):
-  return _pycplex_platform.CPXXgetslack(*args)
-CPXXgetslack = _pycplex_platform.CPXXgetslack
-
-def CPXXgetrowinfeas(*args):
-  return _pycplex_platform.CPXXgetrowinfeas(*args)
-CPXXgetrowinfeas = _pycplex_platform.CPXXgetrowinfeas
-
-def CPXXgetcolinfeas(*args):
-  return _pycplex_platform.CPXXgetcolinfeas(*args)
-CPXXgetcolinfeas = _pycplex_platform.CPXXgetcolinfeas
-
-def CPXXgetdj(*args):
-  return _pycplex_platform.CPXXgetdj(*args)
-CPXXgetdj = _pycplex_platform.CPXXgetdj
-
-def CPXXgetgrad(*args):
-  return _pycplex_platform.CPXXgetgrad(*args)
-CPXXgetgrad = _pycplex_platform.CPXXgetgrad
-
-def CPXXgetijdiv(*args):
-  return _pycplex_platform.CPXXgetijdiv(*args)
-CPXXgetijdiv = _pycplex_platform.CPXXgetijdiv
-
-def CPXXgetbase(*args):
-  return _pycplex_platform.CPXXgetbase(*args)
-CPXXgetbase = _pycplex_platform.CPXXgetbase
-
-def CPXXgetitcnt(*args):
-  return _pycplex_platform.CPXXgetitcnt(*args)
-CPXXgetitcnt = _pycplex_platform.CPXXgetitcnt
-
-def CPXXgetphase1cnt(*args):
-  return _pycplex_platform.CPXXgetphase1cnt(*args)
-CPXXgetphase1cnt = _pycplex_platform.CPXXgetphase1cnt
-
-def CPXXgetsiftitcnt(*args):
-  return _pycplex_platform.CPXXgetsiftitcnt(*args)
-CPXXgetsiftitcnt = _pycplex_platform.CPXXgetsiftitcnt
-
-def CPXXgetsiftphase1cnt(*args):
-  return _pycplex_platform.CPXXgetsiftphase1cnt(*args)
-CPXXgetsiftphase1cnt = _pycplex_platform.CPXXgetsiftphase1cnt
-
-def CPXXgetbaritcnt(*args):
-  return _pycplex_platform.CPXXgetbaritcnt(*args)
-CPXXgetbaritcnt = _pycplex_platform.CPXXgetbaritcnt
-
-def CPXXgetcrossppushcnt(*args):
-  return _pycplex_platform.CPXXgetcrossppushcnt(*args)
-CPXXgetcrossppushcnt = _pycplex_platform.CPXXgetcrossppushcnt
-
-def CPXXgetcrosspexchcnt(*args):
-  return _pycplex_platform.CPXXgetcrosspexchcnt(*args)
-CPXXgetcrosspexchcnt = _pycplex_platform.CPXXgetcrosspexchcnt
-
-def CPXXgetcrossdpushcnt(*args):
-  return _pycplex_platform.CPXXgetcrossdpushcnt(*args)
-CPXXgetcrossdpushcnt = _pycplex_platform.CPXXgetcrossdpushcnt
-
-def CPXXgetcrossdexchcnt(*args):
-  return _pycplex_platform.CPXXgetcrossdexchcnt(*args)
-CPXXgetcrossdexchcnt = _pycplex_platform.CPXXgetcrossdexchcnt
-
-def CPXXgetpsbcnt(*args):
-  return _pycplex_platform.CPXXgetpsbcnt(*args)
-CPXXgetpsbcnt = _pycplex_platform.CPXXgetpsbcnt
-
-def CPXXgetdsbcnt(*args):
-  return _pycplex_platform.CPXXgetdsbcnt(*args)
-CPXXgetdsbcnt = _pycplex_platform.CPXXgetdsbcnt
-
-def CPXXgetdblquality(*args):
-  return _pycplex_platform.CPXXgetdblquality(*args)
-CPXXgetdblquality = _pycplex_platform.CPXXgetdblquality
-
-def CPXXgetsolnpooldblquality(*args):
-  return _pycplex_platform.CPXXgetsolnpooldblquality(*args)
-CPXXgetsolnpooldblquality = _pycplex_platform.CPXXgetsolnpooldblquality
-
-def CPXXgetintquality(*args):
-  return _pycplex_platform.CPXXgetintquality(*args)
-CPXXgetintquality = _pycplex_platform.CPXXgetintquality
-
-def CPXXgetsolnpoolintquality(*args):
-  return _pycplex_platform.CPXXgetsolnpoolintquality(*args)
-CPXXgetsolnpoolintquality = _pycplex_platform.CPXXgetsolnpoolintquality
-
-def CPXXrhssa(*args):
-  return _pycplex_platform.CPXXrhssa(*args)
-CPXXrhssa = _pycplex_platform.CPXXrhssa
-
-def CPXXboundsa(*args):
-  return _pycplex_platform.CPXXboundsa(*args)
-CPXXboundsa = _pycplex_platform.CPXXboundsa
-
-def CPXXobjsa(*args):
-  return _pycplex_platform.CPXXobjsa(*args)
-CPXXobjsa = _pycplex_platform.CPXXobjsa
-
-def CPXXrefineconflictext(*args):
-  return _pycplex_platform.CPXXrefineconflictext(*args)
-CPXXrefineconflictext = _pycplex_platform.CPXXrefineconflictext
-
-def CPXXgetconflictext(*args):
-  return _pycplex_platform.CPXXgetconflictext(*args)
-CPXXgetconflictext = _pycplex_platform.CPXXgetconflictext
-
-def CPXXclpwrite(*args):
-  return _pycplex_platform.CPXXclpwrite(*args)
-CPXXclpwrite = _pycplex_platform.CPXXclpwrite
-
-def CPXXfeasopt(*args):
-  return _pycplex_platform.CPXXfeasopt(*args)
-CPXXfeasopt = _pycplex_platform.CPXXfeasopt
-
-def CPXXfeasoptext(*args):
-  return _pycplex_platform.CPXXfeasoptext(*args)
-CPXXfeasoptext = _pycplex_platform.CPXXfeasoptext
-
-def CPXXnewrows(*args):
-  return _pycplex_platform.CPXXnewrows(*args)
-CPXXnewrows = _pycplex_platform.CPXXnewrows
-
-def CPXXaddrows(*args):
-  return _pycplex_platform.CPXXaddrows(*args)
-CPXXaddrows = _pycplex_platform.CPXXaddrows
-
-def CPXXnewcols(*args):
-  return _pycplex_platform.CPXXnewcols(*args)
-CPXXnewcols = _pycplex_platform.CPXXnewcols
-
-def CPXXaddcols(*args):
-  return _pycplex_platform.CPXXaddcols(*args)
-CPXXaddcols = _pycplex_platform.CPXXaddcols
-
-def CPXXdelrows(*args):
-  return _pycplex_platform.CPXXdelrows(*args)
-CPXXdelrows = _pycplex_platform.CPXXdelrows
-
-def CPXXdelcols(*args):
-  return _pycplex_platform.CPXXdelcols(*args)
-CPXXdelcols = _pycplex_platform.CPXXdelcols
-
-def CPXXchgrowname(*args):
-  return _pycplex_platform.CPXXchgrowname(*args)
-CPXXchgrowname = _pycplex_platform.CPXXchgrowname
-
-def CPXXchgcolname(*args):
-  return _pycplex_platform.CPXXchgcolname(*args)
-CPXXchgcolname = _pycplex_platform.CPXXchgcolname
-
-def CPXXdelnames(*args):
-  return _pycplex_platform.CPXXdelnames(*args)
-CPXXdelnames = _pycplex_platform.CPXXdelnames
-
-def CPXXchgprobname(*args):
-  return _pycplex_platform.CPXXchgprobname(*args)
-CPXXchgprobname = _pycplex_platform.CPXXchgprobname
-
-def CPXXchgcoeflist(*args):
-  return _pycplex_platform.CPXXchgcoeflist(*args)
-CPXXchgcoeflist = _pycplex_platform.CPXXchgcoeflist
-
-def CPXXchgbds(*args):
-  return _pycplex_platform.CPXXchgbds(*args)
-CPXXchgbds = _pycplex_platform.CPXXchgbds
-
-def CPXXchgobj(*args):
-  return _pycplex_platform.CPXXchgobj(*args)
-CPXXchgobj = _pycplex_platform.CPXXchgobj
-
-def CPXXchgrhs(*args):
-  return _pycplex_platform.CPXXchgrhs(*args)
-CPXXchgrhs = _pycplex_platform.CPXXchgrhs
-
-def CPXXchgrngval(*args):
-  return _pycplex_platform.CPXXchgrngval(*args)
-CPXXchgrngval = _pycplex_platform.CPXXchgrngval
-
-def CPXXchgsense(*args):
-  return _pycplex_platform.CPXXchgsense(*args)
-CPXXchgsense = _pycplex_platform.CPXXchgsense
-
-def CPXXchgobjsen(*args):
-  return _pycplex_platform.CPXXchgobjsen(*args)
-CPXXchgobjsen = _pycplex_platform.CPXXchgobjsen
-
-def CPXXchgprobtype(*args):
-  return _pycplex_platform.CPXXchgprobtype(*args)
-CPXXchgprobtype = _pycplex_platform.CPXXchgprobtype
-
-def CPXXchgprobtypesolnpool(*args):
-  return _pycplex_platform.CPXXchgprobtypesolnpool(*args)
-CPXXchgprobtypesolnpool = _pycplex_platform.CPXXchgprobtypesolnpool
-
-def CPXXcompletelp(*args):
-  return _pycplex_platform.CPXXcompletelp(*args)
-CPXXcompletelp = _pycplex_platform.CPXXcompletelp
-
-def CPXXpreaddrows(*args):
-  return _pycplex_platform.CPXXpreaddrows(*args)
-CPXXpreaddrows = _pycplex_platform.CPXXpreaddrows
-
-def CPXXprechgobj(*args):
-  return _pycplex_platform.CPXXprechgobj(*args)
-CPXXprechgobj = _pycplex_platform.CPXXprechgobj
-
-def CPXXgetnumcols(*args):
-  return _pycplex_platform.CPXXgetnumcols(*args)
-CPXXgetnumcols = _pycplex_platform.CPXXgetnumcols
-
-def CPXXgetnumrows(*args):
-  return _pycplex_platform.CPXXgetnumrows(*args)
-CPXXgetnumrows = _pycplex_platform.CPXXgetnumrows
-
-def CPXXgetnumnz(*args):
-  return _pycplex_platform.CPXXgetnumnz(*args)
-CPXXgetnumnz = _pycplex_platform.CPXXgetnumnz
-
-def CPXXgetobjsen(*args):
-  return _pycplex_platform.CPXXgetobjsen(*args)
-CPXXgetobjsen = _pycplex_platform.CPXXgetobjsen
-
-def CPXXgetobj(*args):
-  return _pycplex_platform.CPXXgetobj(*args)
-CPXXgetobj = _pycplex_platform.CPXXgetobj
-
-def CPXXgetrhs(*args):
-  return _pycplex_platform.CPXXgetrhs(*args)
-CPXXgetrhs = _pycplex_platform.CPXXgetrhs
-
-def CPXXgetsense(*args):
-  return _pycplex_platform.CPXXgetsense(*args)
-CPXXgetsense = _pycplex_platform.CPXXgetsense
-
-def CPXXgetcols(*args):
-  return _pycplex_platform.CPXXgetcols(*args)
-CPXXgetcols = _pycplex_platform.CPXXgetcols
-
-def CPXXgetrows(*args):
-  return _pycplex_platform.CPXXgetrows(*args)
-CPXXgetrows = _pycplex_platform.CPXXgetrows
-
-def CPXXgetlb(*args):
-  return _pycplex_platform.CPXXgetlb(*args)
-CPXXgetlb = _pycplex_platform.CPXXgetlb
-
-def CPXXgetub(*args):
-  return _pycplex_platform.CPXXgetub(*args)
-CPXXgetub = _pycplex_platform.CPXXgetub
-
-def CPXXgetrngval(*args):
-  return _pycplex_platform.CPXXgetrngval(*args)
-CPXXgetrngval = _pycplex_platform.CPXXgetrngval
-
-def CPXXgetprobname(*args):
-  return _pycplex_platform.CPXXgetprobname(*args)
-CPXXgetprobname = _pycplex_platform.CPXXgetprobname
-
-def CPXXgetobjname(*args):
-  return _pycplex_platform.CPXXgetobjname(*args)
-CPXXgetobjname = _pycplex_platform.CPXXgetobjname
-
-def CPXXgetcolname(*args):
-  return _pycplex_platform.CPXXgetcolname(*args)
-CPXXgetcolname = _pycplex_platform.CPXXgetcolname
-
-def CPXXgetrowname(*args):
-  return _pycplex_platform.CPXXgetrowname(*args)
-CPXXgetrowname = _pycplex_platform.CPXXgetrowname
-
-def CPXXgetcoef(*args):
-  return _pycplex_platform.CPXXgetcoef(*args)
-CPXXgetcoef = _pycplex_platform.CPXXgetcoef
-
-def CPXXgetrowindex(*args):
-  return _pycplex_platform.CPXXgetrowindex(*args)
-CPXXgetrowindex = _pycplex_platform.CPXXgetrowindex
-
-def CPXXgetcolindex(*args):
-  return _pycplex_platform.CPXXgetcolindex(*args)
-CPXXgetcolindex = _pycplex_platform.CPXXgetcolindex
-
-def CPXXgetprobtype(*args):
-  return _pycplex_platform.CPXXgetprobtype(*args)
-CPXXgetprobtype = _pycplex_platform.CPXXgetprobtype
-
-def CPXXreadcopyprob(*args):
-  return _pycplex_platform.CPXXreadcopyprob(*args)
-CPXXreadcopyprob = _pycplex_platform.CPXXreadcopyprob
-
-def CPXXreadcopybase(*args):
-  return _pycplex_platform.CPXXreadcopybase(*args)
-CPXXreadcopybase = _pycplex_platform.CPXXreadcopybase
-
-def CPXXreadcopysol(*args):
-  return _pycplex_platform.CPXXreadcopysol(*args)
-CPXXreadcopysol = _pycplex_platform.CPXXreadcopysol
-
-def CPXXwriteprob(*args):
-  return _pycplex_platform.CPXXwriteprob(*args)
-CPXXwriteprob = _pycplex_platform.CPXXwriteprob
-
-def CPXXmbasewrite(*args):
-  return _pycplex_platform.CPXXmbasewrite(*args)
-CPXXmbasewrite = _pycplex_platform.CPXXmbasewrite
-
-def CPXXsolwrite(*args):
-  return _pycplex_platform.CPXXsolwrite(*args)
-CPXXsolwrite = _pycplex_platform.CPXXsolwrite
-
-def CPXXsolwritesolnpool(*args):
-  return _pycplex_platform.CPXXsolwritesolnpool(*args)
-CPXXsolwritesolnpool = _pycplex_platform.CPXXsolwritesolnpool
-
-def CPXXsolwritesolnpoolall(*args):
-  return _pycplex_platform.CPXXsolwritesolnpoolall(*args)
-CPXXsolwritesolnpoolall = _pycplex_platform.CPXXsolwritesolnpoolall
-
-def CPXXembwrite(*args):
-  return _pycplex_platform.CPXXembwrite(*args)
-CPXXembwrite = _pycplex_platform.CPXXembwrite
-
-def CPXXdperwrite(*args):
-  return _pycplex_platform.CPXXdperwrite(*args)
-CPXXdperwrite = _pycplex_platform.CPXXdperwrite
-
-def CPXXpperwrite(*args):
-  return _pycplex_platform.CPXXpperwrite(*args)
-CPXXpperwrite = _pycplex_platform.CPXXpperwrite
-
-def CPXXpreslvwrite(*args):
-  return _pycplex_platform.CPXXpreslvwrite(*args)
-CPXXpreslvwrite = _pycplex_platform.CPXXpreslvwrite
-
-def CPXXdualwrite(*args):
-  return _pycplex_platform.CPXXdualwrite(*args)
-CPXXdualwrite = _pycplex_platform.CPXXdualwrite
-
-def CPXXsetintparam(*args):
-  return _pycplex_platform.CPXXsetintparam(*args)
-CPXXsetintparam = _pycplex_platform.CPXXsetintparam
-
-def CPXXsetlongparam(*args):
-  return _pycplex_platform.CPXXsetlongparam(*args)
-CPXXsetlongparam = _pycplex_platform.CPXXsetlongparam
-
-def CPXXsetdblparam(*args):
-  return _pycplex_platform.CPXXsetdblparam(*args)
-CPXXsetdblparam = _pycplex_platform.CPXXsetdblparam
-
-def CPXXsetstrparam(*args):
-  return _pycplex_platform.CPXXsetstrparam(*args)
-CPXXsetstrparam = _pycplex_platform.CPXXsetstrparam
-
-def CPXXgetintparam(*args):
-  return _pycplex_platform.CPXXgetintparam(*args)
-CPXXgetintparam = _pycplex_platform.CPXXgetintparam
-
-def CPXXgetlongparam(*args):
-  return _pycplex_platform.CPXXgetlongparam(*args)
-CPXXgetlongparam = _pycplex_platform.CPXXgetlongparam
-
-def CPXXgetdblparam(*args):
-  return _pycplex_platform.CPXXgetdblparam(*args)
-CPXXgetdblparam = _pycplex_platform.CPXXgetdblparam
-
-def CPXXgetstrparam(*args):
-  return _pycplex_platform.CPXXgetstrparam(*args)
-CPXXgetstrparam = _pycplex_platform.CPXXgetstrparam
-
-def CPXXinfointparam(*args):
-  return _pycplex_platform.CPXXinfointparam(*args)
-CPXXinfointparam = _pycplex_platform.CPXXinfointparam
-
-def CPXXinfolongparam(*args):
-  return _pycplex_platform.CPXXinfolongparam(*args)
-CPXXinfolongparam = _pycplex_platform.CPXXinfolongparam
-
-def CPXXinfodblparam(*args):
-  return _pycplex_platform.CPXXinfodblparam(*args)
-CPXXinfodblparam = _pycplex_platform.CPXXinfodblparam
-
-def CPXXinfostrparam(*args):
-  return _pycplex_platform.CPXXinfostrparam(*args)
-CPXXinfostrparam = _pycplex_platform.CPXXinfostrparam
-
-def CPXXgetparamtype(*args):
-  return _pycplex_platform.CPXXgetparamtype(*args)
-CPXXgetparamtype = _pycplex_platform.CPXXgetparamtype
-
-def CPXXreadcopyparam(*args):
-  return _pycplex_platform.CPXXreadcopyparam(*args)
-CPXXreadcopyparam = _pycplex_platform.CPXXreadcopyparam
-
-def CPXXwriteparam(*args):
-  return _pycplex_platform.CPXXwriteparam(*args)
-CPXXwriteparam = _pycplex_platform.CPXXwriteparam
-
-def CPXXtuneparam(*args):
-  return _pycplex_platform.CPXXtuneparam(*args)
-CPXXtuneparam = _pycplex_platform.CPXXtuneparam
-
-def CPXXtuneparamprobset(*args):
-  return _pycplex_platform.CPXXtuneparamprobset(*args)
-CPXXtuneparamprobset = _pycplex_platform.CPXXtuneparamprobset
-
-def CPXXversion(*args):
-  return _pycplex_platform.CPXXversion(*args)
-CPXXversion = _pycplex_platform.CPXXversion
-
-def CPXXversionnumber(*args):
-  return _pycplex_platform.CPXXversionnumber(*args)
-CPXXversionnumber = _pycplex_platform.CPXXversionnumber
-
-def CPXXopenCPLEX(*args):
-  return _pycplex_platform.CPXXopenCPLEX(*args)
-CPXXopenCPLEX = _pycplex_platform.CPXXopenCPLEX
-
-def CPXXcloseCPLEX(*args):
-  return _pycplex_platform.CPXXcloseCPLEX(*args)
-CPXXcloseCPLEX = _pycplex_platform.CPXXcloseCPLEX
-
-def CPXXgetchannels(*args):
-  return _pycplex_platform.CPXXgetchannels(*args)
-CPXXgetchannels = _pycplex_platform.CPXXgetchannels
-
-def CPXXaddfuncdest(*args):
-  return _pycplex_platform.CPXXaddfuncdest(*args)
-CPXXaddfuncdest = _pycplex_platform.CPXXaddfuncdest
-
-def CPXXdelfuncdest(*args):
-  return _pycplex_platform.CPXXdelfuncdest(*args)
-CPXXdelfuncdest = _pycplex_platform.CPXXdelfuncdest
-
-def CPXXgeterrorstring(*args):
-  return _pycplex_platform.CPXXgeterrorstring(*args)
-CPXXgeterrorstring = _pycplex_platform.CPXXgeterrorstring
-
-def CPXXsetlpcallbackfunc(*args):
-  return _pycplex_platform.CPXXsetlpcallbackfunc(*args)
-CPXXsetlpcallbackfunc = _pycplex_platform.CPXXsetlpcallbackfunc
-
-def CPXXsetnetcallbackfunc(*args):
-  return _pycplex_platform.CPXXsetnetcallbackfunc(*args)
-CPXXsetnetcallbackfunc = _pycplex_platform.CPXXsetnetcallbackfunc
-
-def CPXXsettuningcallbackfunc(*args):
-  return _pycplex_platform.CPXXsettuningcallbackfunc(*args)
-CPXXsettuningcallbackfunc = _pycplex_platform.CPXXsettuningcallbackfunc
-
-def CPXXsetterminate(*args):
-  return _pycplex_platform.CPXXsetterminate(*args)
-CPXXsetterminate = _pycplex_platform.CPXXsetterminate
-
-def CPXXgetbhead(*args):
-  return _pycplex_platform.CPXXgetbhead(*args)
-CPXXgetbhead = _pycplex_platform.CPXXgetbhead
-
-def CPXXbinvcol(*args):
-  return _pycplex_platform.CPXXbinvcol(*args)
-CPXXbinvcol = _pycplex_platform.CPXXbinvcol
-
-def CPXXbinvrow(*args):
-  return _pycplex_platform.CPXXbinvrow(*args)
-CPXXbinvrow = _pycplex_platform.CPXXbinvrow
-
-def CPXXbinvacol(*args):
-  return _pycplex_platform.CPXXbinvacol(*args)
-CPXXbinvacol = _pycplex_platform.CPXXbinvacol
-
-def CPXXbinvarow(*args):
-  return _pycplex_platform.CPXXbinvarow(*args)
-CPXXbinvarow = _pycplex_platform.CPXXbinvarow
-
-def CPXXftran(*args):
-  return _pycplex_platform.CPXXftran(*args)
-CPXXftran = _pycplex_platform.CPXXftran
-
-def CPXXbtran(*args):
-  return _pycplex_platform.CPXXbtran(*args)
-CPXXbtran = _pycplex_platform.CPXXbtran
-
-def CPXXgetijrow(*args):
-  return _pycplex_platform.CPXXgetijrow(*args)
-CPXXgetijrow = _pycplex_platform.CPXXgetijrow
-
-def CPXXgetray(*args):
-  return _pycplex_platform.CPXXgetray(*args)
-CPXXgetray = _pycplex_platform.CPXXgetray
-
-def CPXXmdleave(*args):
-  return _pycplex_platform.CPXXmdleave(*args)
-CPXXmdleave = _pycplex_platform.CPXXmdleave
-
-def CPXXstrongbranch(*args):
-  return _pycplex_platform.CPXXstrongbranch(*args)
-CPXXstrongbranch = _pycplex_platform.CPXXstrongbranch
-
-def CPXXdualfarkas(*args):
-  return _pycplex_platform.CPXXdualfarkas(*args)
-CPXXdualfarkas = _pycplex_platform.CPXXdualfarkas
-
-def CPXXchgobjoffset(*args):
-  return _pycplex_platform.CPXXchgobjoffset(*args)
-CPXXchgobjoffset = _pycplex_platform.CPXXchgobjoffset
-
-def CPXXgetobjoffset(*args):
-  return _pycplex_platform.CPXXgetobjoffset(*args)
-CPXXgetobjoffset = _pycplex_platform.CPXXgetobjoffset
-
-def CPXXgetbasednorms(*args):
-  return _pycplex_platform.CPXXgetbasednorms(*args)
-CPXXgetbasednorms = _pycplex_platform.CPXXgetbasednorms
-
-def CPXXgetdnorms(*args):
-  return _pycplex_platform.CPXXgetdnorms(*args)
-CPXXgetdnorms = _pycplex_platform.CPXXgetdnorms
-
-def CPXXgetpnorms(*args):
-  return _pycplex_platform.CPXXgetpnorms(*args)
-CPXXgetpnorms = _pycplex_platform.CPXXgetpnorms
-
-def CPXXpivotin(*args):
-  return _pycplex_platform.CPXXpivotin(*args)
-CPXXpivotin = _pycplex_platform.CPXXpivotin
-
-def CPXXpivotout(*args):
-  return _pycplex_platform.CPXXpivotout(*args)
-CPXXpivotout = _pycplex_platform.CPXXpivotout
-
-def CPXXtightenbds(*args):
-  return _pycplex_platform.CPXXtightenbds(*args)
-CPXXtightenbds = _pycplex_platform.CPXXtightenbds
-
-def CPXXpresolve(*args):
-  return _pycplex_platform.CPXXpresolve(*args)
-CPXXpresolve = _pycplex_platform.CPXXpresolve
-
-def CPXXbasicpresolve(*args):
-  return _pycplex_platform.CPXXbasicpresolve(*args)
-CPXXbasicpresolve = _pycplex_platform.CPXXbasicpresolve
-
-def CPXXslackfromx(*args):
-  return _pycplex_platform.CPXXslackfromx(*args)
-CPXXslackfromx = _pycplex_platform.CPXXslackfromx
-
-def CPXXdjfrompi(*args):
-  return _pycplex_platform.CPXXdjfrompi(*args)
-CPXXdjfrompi = _pycplex_platform.CPXXdjfrompi
-
-def CPXXqpdjfrompi(*args):
-  return _pycplex_platform.CPXXqpdjfrompi(*args)
-CPXXqpdjfrompi = _pycplex_platform.CPXXqpdjfrompi
-
-def CPXXfreepresolve(*args):
-  return _pycplex_platform.CPXXfreepresolve(*args)
-CPXXfreepresolve = _pycplex_platform.CPXXfreepresolve
-
-def CPXXgetredlp(*args):
-  return _pycplex_platform.CPXXgetredlp(*args)
-CPXXgetredlp = _pycplex_platform.CPXXgetredlp
-
-def CPXXcrushx(*args):
-  return _pycplex_platform.CPXXcrushx(*args)
-CPXXcrushx = _pycplex_platform.CPXXcrushx
-
-def CPXXuncrushx(*args):
-  return _pycplex_platform.CPXXuncrushx(*args)
-CPXXuncrushx = _pycplex_platform.CPXXuncrushx
-
-def CPXXcrushpi(*args):
-  return _pycplex_platform.CPXXcrushpi(*args)
-CPXXcrushpi = _pycplex_platform.CPXXcrushpi
-
-def CPXXuncrushpi(*args):
-  return _pycplex_platform.CPXXuncrushpi(*args)
-CPXXuncrushpi = _pycplex_platform.CPXXuncrushpi
-
-def CPXXcrushform(*args):
-  return _pycplex_platform.CPXXcrushform(*args)
-CPXXcrushform = _pycplex_platform.CPXXcrushform
-
-def CPXXuncrushform(*args):
-  return _pycplex_platform.CPXXuncrushform(*args)
-CPXXuncrushform = _pycplex_platform.CPXXuncrushform
-
-def CPXXgetprestat(*args):
-  return _pycplex_platform.CPXXgetprestat(*args)
-CPXXgetprestat = _pycplex_platform.CPXXgetprestat
-
-def CPXXcopyprotected(*args):
-  return _pycplex_platform.CPXXcopyprotected(*args)
-CPXXcopyprotected = _pycplex_platform.CPXXcopyprotected
-
-def CPXXgetprotected(*args):
-  return _pycplex_platform.CPXXgetprotected(*args)
-CPXXgetprotected = _pycplex_platform.CPXXgetprotected
-
-def CPXXgettime(*args):
-  return _pycplex_platform.CPXXgettime(*args)
-CPXXgettime = _pycplex_platform.CPXXgettime
-
-def CPXXgetdettime(*args):
-  return _pycplex_platform.CPXXgetdettime(*args)
-CPXXgetdettime = _pycplex_platform.CPXXgetdettime
-
-def CPXXhybbaropt(*args):
-  return _pycplex_platform.CPXXhybbaropt(*args)
-CPXXhybbaropt = _pycplex_platform.CPXXhybbaropt
-
-def CPXXbaropt(*args):
-  return _pycplex_platform.CPXXbaropt(*args)
-CPXXbaropt = _pycplex_platform.CPXXbaropt
-
-def CPXXcopyorder(*args):
-  return _pycplex_platform.CPXXcopyorder(*args)
-CPXXcopyorder = _pycplex_platform.CPXXcopyorder
-
-def CPXXchgmipstarts(*args):
-  return _pycplex_platform.CPXXchgmipstarts(*args)
-CPXXchgmipstarts = _pycplex_platform.CPXXchgmipstarts
-
-def CPXXaddmipstarts(*args):
-  return _pycplex_platform.CPXXaddmipstarts(*args)
-CPXXaddmipstarts = _pycplex_platform.CPXXaddmipstarts
-
-def CPXXdelmipstarts(*args):
-  return _pycplex_platform.CPXXdelmipstarts(*args)
-CPXXdelmipstarts = _pycplex_platform.CPXXdelmipstarts
-
-def CPXXrefinemipstartconflictext(*args):
-  return _pycplex_platform.CPXXrefinemipstartconflictext(*args)
-CPXXrefinemipstartconflictext = _pycplex_platform.CPXXrefinemipstartconflictext
-
-def CPXXmipopt(*args):
-  return _pycplex_platform.CPXXmipopt(*args)
-CPXXmipopt = _pycplex_platform.CPXXmipopt
-
-def CPXXdistmipopt(*args):
-  return _pycplex_platform.CPXXdistmipopt(*args)
-CPXXdistmipopt = _pycplex_platform.CPXXdistmipopt
-
-def CPXXcopyvmconfig(*args):
-  return _pycplex_platform.CPXXcopyvmconfig(*args)
-CPXXcopyvmconfig = _pycplex_platform.CPXXcopyvmconfig
-
-def CPXXreadcopyvmconfig(*args):
-  return _pycplex_platform.CPXXreadcopyvmconfig(*args)
-CPXXreadcopyvmconfig = _pycplex_platform.CPXXreadcopyvmconfig
-
-def CPXXdelvmconfig(*args):
-  return _pycplex_platform.CPXXdelvmconfig(*args)
-CPXXdelvmconfig = _pycplex_platform.CPXXdelvmconfig
-
-def CPXEhasvmconfig(*args):
-  return _pycplex_platform.CPXEhasvmconfig(*args)
-CPXEhasvmconfig = _pycplex_platform.CPXEhasvmconfig
-
-def CPXXgetmipitcnt(*args):
-  return _pycplex_platform.CPXXgetmipitcnt(*args)
-CPXXgetmipitcnt = _pycplex_platform.CPXXgetmipitcnt
-
-def CPXXgetbestobjval(*args):
-  return _pycplex_platform.CPXXgetbestobjval(*args)
-CPXXgetbestobjval = _pycplex_platform.CPXXgetbestobjval
-
-def CPXXgetmiprelgap(*args):
-  return _pycplex_platform.CPXXgetmiprelgap(*args)
-CPXXgetmiprelgap = _pycplex_platform.CPXXgetmiprelgap
-
-def CPXXgetcutoff(*args):
-  return _pycplex_platform.CPXXgetcutoff(*args)
-CPXXgetcutoff = _pycplex_platform.CPXXgetcutoff
-
-def CPXXgetnodecnt(*args):
-  return _pycplex_platform.CPXXgetnodecnt(*args)
-CPXXgetnodecnt = _pycplex_platform.CPXXgetnodecnt
-
-def CPXXgetnodeleftcnt(*args):
-  return _pycplex_platform.CPXXgetnodeleftcnt(*args)
-CPXXgetnodeleftcnt = _pycplex_platform.CPXXgetnodeleftcnt
-
-def CPXXgetnodeint(*args):
-  return _pycplex_platform.CPXXgetnodeint(*args)
-CPXXgetnodeint = _pycplex_platform.CPXXgetnodeint
-
-def CPXXgetnumcuts(*args):
-  return _pycplex_platform.CPXXgetnumcuts(*args)
-CPXXgetnumcuts = _pycplex_platform.CPXXgetnumcuts
-
-def CPXXgetnummipstarts(*args):
-  return _pycplex_platform.CPXXgetnummipstarts(*args)
-CPXXgetnummipstarts = _pycplex_platform.CPXXgetnummipstarts
-
-def CPXXgetmipstarts(*args):
-  return _pycplex_platform.CPXXgetmipstarts(*args)
-CPXXgetmipstarts = _pycplex_platform.CPXXgetmipstarts
-
-def CPXXgetmipstartname(*args):
-  return _pycplex_platform.CPXXgetmipstartname(*args)
-CPXXgetmipstartname = _pycplex_platform.CPXXgetmipstartname
-
-def CPXXgetmipstartindex(*args):
-  return _pycplex_platform.CPXXgetmipstartindex(*args)
-CPXXgetmipstartindex = _pycplex_platform.CPXXgetmipstartindex
-
-def CPXXgetsubstat(*args):
-  return _pycplex_platform.CPXXgetsubstat(*args)
-CPXXgetsubstat = _pycplex_platform.CPXXgetsubstat
-
-def CPXXchgctype(*args):
-  return _pycplex_platform.CPXXchgctype(*args)
-CPXXchgctype = _pycplex_platform.CPXXchgctype
-
-def CPXXaddsos(*args):
-  return _pycplex_platform.CPXXaddsos(*args)
-CPXXaddsos = _pycplex_platform.CPXXaddsos
-
-def CPXXdelsos(*args):
-  return _pycplex_platform.CPXXdelsos(*args)
-CPXXdelsos = _pycplex_platform.CPXXdelsos
-
-def CPXXgetctype(*args):
-  return _pycplex_platform.CPXXgetctype(*args)
-CPXXgetctype = _pycplex_platform.CPXXgetctype
-
-def CPXXgetnumsos(*args):
-  return _pycplex_platform.CPXXgetnumsos(*args)
-CPXXgetnumsos = _pycplex_platform.CPXXgetnumsos
-
-def CPXXgetsos(*args):
-  return _pycplex_platform.CPXXgetsos(*args)
-CPXXgetsos = _pycplex_platform.CPXXgetsos
-
-def CPXXgetsosname(*args):
-  return _pycplex_platform.CPXXgetsosname(*args)
-CPXXgetsosname = _pycplex_platform.CPXXgetsosname
-
-def CPXXgetsosindex(*args):
-  return _pycplex_platform.CPXXgetsosindex(*args)
-CPXXgetsosindex = _pycplex_platform.CPXXgetsosindex
-
-def CPXXgetsosinfeas(*args):
-  return _pycplex_platform.CPXXgetsosinfeas(*args)
-CPXXgetsosinfeas = _pycplex_platform.CPXXgetsosinfeas
-
-def CPXXgetnumindconstrs(*args):
-  return _pycplex_platform.CPXXgetnumindconstrs(*args)
-CPXXgetnumindconstrs = _pycplex_platform.CPXXgetnumindconstrs
-
-def CPXXgetindconstr(*args):
-  return _pycplex_platform.CPXXgetindconstr(*args)
-CPXXgetindconstr = _pycplex_platform.CPXXgetindconstr
-
-def CPXXgetindconstrindex(*args):
-  return _pycplex_platform.CPXXgetindconstrindex(*args)
-CPXXgetindconstrindex = _pycplex_platform.CPXXgetindconstrindex
-
-def CPXXgetindconstrname(*args):
-  return _pycplex_platform.CPXXgetindconstrname(*args)
-CPXXgetindconstrname = _pycplex_platform.CPXXgetindconstrname
-
-def CPXXgetindconstrslack(*args):
-  return _pycplex_platform.CPXXgetindconstrslack(*args)
-CPXXgetindconstrslack = _pycplex_platform.CPXXgetindconstrslack
-
-def CPXXindconstrslackfromx(*args):
-  return _pycplex_platform.CPXXindconstrslackfromx(*args)
-CPXXindconstrslackfromx = _pycplex_platform.CPXXindconstrslackfromx
-
-def CPXXgetindconstrinfeas(*args):
-  return _pycplex_platform.CPXXgetindconstrinfeas(*args)
-CPXXgetindconstrinfeas = _pycplex_platform.CPXXgetindconstrinfeas
-
-def CPXXdelindconstrs(*args):
-  return _pycplex_platform.CPXXdelindconstrs(*args)
-CPXXdelindconstrs = _pycplex_platform.CPXXdelindconstrs
-
-def CPXXgetnumint(*args):
-  return _pycplex_platform.CPXXgetnumint(*args)
-CPXXgetnumint = _pycplex_platform.CPXXgetnumint
-
-def CPXXgetnumbin(*args):
-  return _pycplex_platform.CPXXgetnumbin(*args)
-CPXXgetnumbin = _pycplex_platform.CPXXgetnumbin
-
-def CPXXgetnumsemicont(*args):
-  return _pycplex_platform.CPXXgetnumsemicont(*args)
-CPXXgetnumsemicont = _pycplex_platform.CPXXgetnumsemicont
-
-def CPXXgetnumsemiint(*args):
-  return _pycplex_platform.CPXXgetnumsemiint(*args)
-CPXXgetnumsemiint = _pycplex_platform.CPXXgetnumsemiint
-
-def CPXXgetorder(*args):
-  return _pycplex_platform.CPXXgetorder(*args)
-CPXXgetorder = _pycplex_platform.CPXXgetorder
-
-def CPXXpopulate(*args):
-  return _pycplex_platform.CPXXpopulate(*args)
-CPXXpopulate = _pycplex_platform.CPXXpopulate
-
-def CPXXgetsolnpoolnumfilters(*args):
-  return _pycplex_platform.CPXXgetsolnpoolnumfilters(*args)
-CPXXgetsolnpoolnumfilters = _pycplex_platform.CPXXgetsolnpoolnumfilters
-
-def CPXXaddsolnpooldivfilter(*args):
-  return _pycplex_platform.CPXXaddsolnpooldivfilter(*args)
-CPXXaddsolnpooldivfilter = _pycplex_platform.CPXXaddsolnpooldivfilter
-
-def CPXXaddsolnpoolrngfilter(*args):
-  return _pycplex_platform.CPXXaddsolnpoolrngfilter(*args)
-CPXXaddsolnpoolrngfilter = _pycplex_platform.CPXXaddsolnpoolrngfilter
-
-def CPXXgetsolnpoolfiltertype(*args):
-  return _pycplex_platform.CPXXgetsolnpoolfiltertype(*args)
-CPXXgetsolnpoolfiltertype = _pycplex_platform.CPXXgetsolnpoolfiltertype
-
-def CPXXgetsolnpooldivfilter(*args):
-  return _pycplex_platform.CPXXgetsolnpooldivfilter(*args)
-CPXXgetsolnpooldivfilter = _pycplex_platform.CPXXgetsolnpooldivfilter
-
-def CPXXgetsolnpoolrngfilter(*args):
-  return _pycplex_platform.CPXXgetsolnpoolrngfilter(*args)
-CPXXgetsolnpoolrngfilter = _pycplex_platform.CPXXgetsolnpoolrngfilter
-
-def CPXXgetsolnpoolfiltername(*args):
-  return _pycplex_platform.CPXXgetsolnpoolfiltername(*args)
-CPXXgetsolnpoolfiltername = _pycplex_platform.CPXXgetsolnpoolfiltername
-
-def CPXXgetsolnpoolfilterindex(*args):
-  return _pycplex_platform.CPXXgetsolnpoolfilterindex(*args)
-CPXXgetsolnpoolfilterindex = _pycplex_platform.CPXXgetsolnpoolfilterindex
-
-def CPXXdelsolnpoolfilters(*args):
-  return _pycplex_platform.CPXXdelsolnpoolfilters(*args)
-CPXXdelsolnpoolfilters = _pycplex_platform.CPXXdelsolnpoolfilters
-
-def CPXXgetsolnpoolnumsolns(*args):
-  return _pycplex_platform.CPXXgetsolnpoolnumsolns(*args)
-CPXXgetsolnpoolnumsolns = _pycplex_platform.CPXXgetsolnpoolnumsolns
-
-def CPXXgetsolnpoolnumreplaced(*args):
-  return _pycplex_platform.CPXXgetsolnpoolnumreplaced(*args)
-CPXXgetsolnpoolnumreplaced = _pycplex_platform.CPXXgetsolnpoolnumreplaced
-
-def CPXXgetsolnpoolmeanobjval(*args):
-  return _pycplex_platform.CPXXgetsolnpoolmeanobjval(*args)
-CPXXgetsolnpoolmeanobjval = _pycplex_platform.CPXXgetsolnpoolmeanobjval
-
-def CPXXgetsolnpoolobjval(*args):
-  return _pycplex_platform.CPXXgetsolnpoolobjval(*args)
-CPXXgetsolnpoolobjval = _pycplex_platform.CPXXgetsolnpoolobjval
-
-def CPXXgetsolnpoolx(*args):
-  return _pycplex_platform.CPXXgetsolnpoolx(*args)
-CPXXgetsolnpoolx = _pycplex_platform.CPXXgetsolnpoolx
-
-def CPXXgetsolnpoolslack(*args):
-  return _pycplex_platform.CPXXgetsolnpoolslack(*args)
-CPXXgetsolnpoolslack = _pycplex_platform.CPXXgetsolnpoolslack
-
-def CPXXgetsolnpoolqconstrslack(*args):
-  return _pycplex_platform.CPXXgetsolnpoolqconstrslack(*args)
-CPXXgetsolnpoolqconstrslack = _pycplex_platform.CPXXgetsolnpoolqconstrslack
-
-def CPXXgetsolnpoolsolnname(*args):
-  return _pycplex_platform.CPXXgetsolnpoolsolnname(*args)
-CPXXgetsolnpoolsolnname = _pycplex_platform.CPXXgetsolnpoolsolnname
-
-def CPXXgetsolnpoolsolnindex(*args):
-  return _pycplex_platform.CPXXgetsolnpoolsolnindex(*args)
-CPXXgetsolnpoolsolnindex = _pycplex_platform.CPXXgetsolnpoolsolnindex
-
-def CPXXdelsolnpoolsolns(*args):
-  return _pycplex_platform.CPXXdelsolnpoolsolns(*args)
-CPXXdelsolnpoolsolns = _pycplex_platform.CPXXdelsolnpoolsolns
-
-def CPXXreadcopyorder(*args):
-  return _pycplex_platform.CPXXreadcopyorder(*args)
-CPXXreadcopyorder = _pycplex_platform.CPXXreadcopyorder
-
-def CPXXreadcopysolnpoolfilters(*args):
-  return _pycplex_platform.CPXXreadcopysolnpoolfilters(*args)
-CPXXreadcopysolnpoolfilters = _pycplex_platform.CPXXreadcopysolnpoolfilters
-
-def CPXXreadcopymipstarts(*args):
-  return _pycplex_platform.CPXXreadcopymipstarts(*args)
-CPXXreadcopymipstarts = _pycplex_platform.CPXXreadcopymipstarts
-
-def CPXXordwrite(*args):
-  return _pycplex_platform.CPXXordwrite(*args)
-CPXXordwrite = _pycplex_platform.CPXXordwrite
-
-def CPXXwritemipstarts(*args):
-  return _pycplex_platform.CPXXwritemipstarts(*args)
-CPXXwritemipstarts = _pycplex_platform.CPXXwritemipstarts
-
-def CPXXfltwrite(*args):
-  return _pycplex_platform.CPXXfltwrite(*args)
-CPXXfltwrite = _pycplex_platform.CPXXfltwrite
-
-def CPXXsetinfocallbackfunc(*args):
-  return _pycplex_platform.CPXXsetinfocallbackfunc(*args)
-CPXXsetinfocallbackfunc = _pycplex_platform.CPXXsetinfocallbackfunc
-
-def CPXXsetmipcallbackfunc(*args):
-  return _pycplex_platform.CPXXsetmipcallbackfunc(*args)
-CPXXsetmipcallbackfunc = _pycplex_platform.CPXXsetmipcallbackfunc
-
-def CPXXsetbranchcallbackfunc(*args):
-  return _pycplex_platform.CPXXsetbranchcallbackfunc(*args)
-CPXXsetbranchcallbackfunc = _pycplex_platform.CPXXsetbranchcallbackfunc
-
-def CPXXsetbranchnosolncallbackfunc(*args):
-  return _pycplex_platform.CPXXsetbranchnosolncallbackfunc(*args)
-CPXXsetbranchnosolncallbackfunc = _pycplex_platform.CPXXsetbranchnosolncallbackfunc
-
-def CPXXsetlazyconstraintcallbackfunc(*args):
-  return _pycplex_platform.CPXXsetlazyconstraintcallbackfunc(*args)
-CPXXsetlazyconstraintcallbackfunc = _pycplex_platform.CPXXsetlazyconstraintcallbackfunc
-
-def CPXXsetusercutcallbackfunc(*args):
-  return _pycplex_platform.CPXXsetusercutcallbackfunc(*args)
-CPXXsetusercutcallbackfunc = _pycplex_platform.CPXXsetusercutcallbackfunc
-
-def CPXXsetnodecallbackfunc(*args):
-  return _pycplex_platform.CPXXsetnodecallbackfunc(*args)
-CPXXsetnodecallbackfunc = _pycplex_platform.CPXXsetnodecallbackfunc
-
-def CPXXsetheuristiccallbackfunc(*args):
-  return _pycplex_platform.CPXXsetheuristiccallbackfunc(*args)
-CPXXsetheuristiccallbackfunc = _pycplex_platform.CPXXsetheuristiccallbackfunc
-
-def CPXXsetincumbentcallbackfunc(*args):
-  return _pycplex_platform.CPXXsetincumbentcallbackfunc(*args)
-CPXXsetincumbentcallbackfunc = _pycplex_platform.CPXXsetincumbentcallbackfunc
-
-def CPXXsetsolvecallbackfunc(*args):
-  return _pycplex_platform.CPXXsetsolvecallbackfunc(*args)
-CPXXsetsolvecallbackfunc = _pycplex_platform.CPXXsetsolvecallbackfunc
-
-def CPXXgetcallbacknodeinfo(*args):
-  return _pycplex_platform.CPXXgetcallbacknodeinfo(*args)
-CPXXgetcallbacknodeinfo = _pycplex_platform.CPXXgetcallbacknodeinfo
-
-def CPXXcallbacksetuserhandle(*args):
-  return _pycplex_platform.CPXXcallbacksetuserhandle(*args)
-CPXXcallbacksetuserhandle = _pycplex_platform.CPXXcallbacksetuserhandle
-
-def CPXXcallbacksetnodeuserhandle(*args):
-  return _pycplex_platform.CPXXcallbacksetnodeuserhandle(*args)
-CPXXcallbacksetnodeuserhandle = _pycplex_platform.CPXXcallbacksetnodeuserhandle
-
-def CPXXgetcallbackseqinfo(*args):
-  return _pycplex_platform.CPXXgetcallbackseqinfo(*args)
-CPXXgetcallbackseqinfo = _pycplex_platform.CPXXgetcallbackseqinfo
-
-def CPXXgetcallbacksosinfo(*args):
-  return _pycplex_platform.CPXXgetcallbacksosinfo(*args)
-CPXXgetcallbacksosinfo = _pycplex_platform.CPXXgetcallbacksosinfo
-
-def CPXXgetcallbackindicatorinfo(*args):
-  return _pycplex_platform.CPXXgetcallbackindicatorinfo(*args)
-CPXXgetcallbackindicatorinfo = _pycplex_platform.CPXXgetcallbackindicatorinfo
-
-def CPXXcutcallbackadd(*args):
-  return _pycplex_platform.CPXXcutcallbackadd(*args)
-CPXXcutcallbackadd = _pycplex_platform.CPXXcutcallbackadd
-
-def CPXXcutcallbackaddlocal(*args):
-  return _pycplex_platform.CPXXcutcallbackaddlocal(*args)
-CPXXcutcallbackaddlocal = _pycplex_platform.CPXXcutcallbackaddlocal
-
-def CPXXbranchcallbackbranchgeneral(*args):
-  return _pycplex_platform.CPXXbranchcallbackbranchgeneral(*args)
-CPXXbranchcallbackbranchgeneral = _pycplex_platform.CPXXbranchcallbackbranchgeneral
-
-def CPXXbranchcallbackbranchasCPLEX(*args):
-  return _pycplex_platform.CPXXbranchcallbackbranchasCPLEX(*args)
-CPXXbranchcallbackbranchasCPLEX = _pycplex_platform.CPXXbranchcallbackbranchasCPLEX
-
-def CPXXgetcallbacknodex(*args):
-  return _pycplex_platform.CPXXgetcallbacknodex(*args)
-CPXXgetcallbacknodex = _pycplex_platform.CPXXgetcallbacknodex
-
-def CPXXgetcallbacknodeobjval(*args):
-  return _pycplex_platform.CPXXgetcallbacknodeobjval(*args)
-CPXXgetcallbacknodeobjval = _pycplex_platform.CPXXgetcallbacknodeobjval
-
-def CPXXgetcallbackorder(*args):
-  return _pycplex_platform.CPXXgetcallbackorder(*args)
-CPXXgetcallbackorder = _pycplex_platform.CPXXgetcallbackorder
-
-def CPXXgetcallbackpseudocosts(*args):
-  return _pycplex_platform.CPXXgetcallbackpseudocosts(*args)
-CPXXgetcallbackpseudocosts = _pycplex_platform.CPXXgetcallbackpseudocosts
-
-def CPXXgetcallbackincumbent(*args):
-  return _pycplex_platform.CPXXgetcallbackincumbent(*args)
-CPXXgetcallbackincumbent = _pycplex_platform.CPXXgetcallbackincumbent
-
-def CPXXgetcallbacknodeintfeas(*args):
-  return _pycplex_platform.CPXXgetcallbacknodeintfeas(*args)
-CPXXgetcallbacknodeintfeas = _pycplex_platform.CPXXgetcallbacknodeintfeas
-
-def CPXXgetcallbackgloballb(*args):
-  return _pycplex_platform.CPXXgetcallbackgloballb(*args)
-CPXXgetcallbackgloballb = _pycplex_platform.CPXXgetcallbackgloballb
-
-def CPXXgetcallbackglobalub(*args):
-  return _pycplex_platform.CPXXgetcallbackglobalub(*args)
-CPXXgetcallbackglobalub = _pycplex_platform.CPXXgetcallbackglobalub
-
-def CPXXgetcallbacknodelb(*args):
-  return _pycplex_platform.CPXXgetcallbacknodelb(*args)
-CPXXgetcallbacknodelb = _pycplex_platform.CPXXgetcallbacknodelb
-
-def CPXXgetcallbacknodeub(*args):
-  return _pycplex_platform.CPXXgetcallbacknodeub(*args)
-CPXXgetcallbacknodeub = _pycplex_platform.CPXXgetcallbacknodeub
-
-def CPXXgetcallbacknodestat(*args):
-  return _pycplex_platform.CPXXgetcallbacknodestat(*args)
-CPXXgetcallbacknodestat = _pycplex_platform.CPXXgetcallbacknodestat
-
-def CPXXgetcallbackbranchconstraints(*args):
-  return _pycplex_platform.CPXXgetcallbackbranchconstraints(*args)
-CPXXgetcallbackbranchconstraints = _pycplex_platform.CPXXgetcallbackbranchconstraints
-
-def CPXXaddusercuts(*args):
-  return _pycplex_platform.CPXXaddusercuts(*args)
-CPXXaddusercuts = _pycplex_platform.CPXXaddusercuts
-
-def CPXXaddlazyconstraints(*args):
-  return _pycplex_platform.CPXXaddlazyconstraints(*args)
-CPXXaddlazyconstraints = _pycplex_platform.CPXXaddlazyconstraints
-
-def CPXXfreeusercuts(*args):
-  return _pycplex_platform.CPXXfreeusercuts(*args)
-CPXXfreeusercuts = _pycplex_platform.CPXXfreeusercuts
-
-def CPXXfreelazyconstraints(*args):
-  return _pycplex_platform.CPXXfreelazyconstraints(*args)
-CPXXfreelazyconstraints = _pycplex_platform.CPXXfreelazyconstraints
-
-def CPXXaddindconstr(*args):
-  return _pycplex_platform.CPXXaddindconstr(*args)
-CPXXaddindconstr = _pycplex_platform.CPXXaddindconstr
-
-def CPXXcopyquad(*args):
-  return _pycplex_platform.CPXXcopyquad(*args)
-CPXXcopyquad = _pycplex_platform.CPXXcopyquad
-
-def CPXXcopyqpsep(*args):
-  return _pycplex_platform.CPXXcopyqpsep(*args)
-CPXXcopyqpsep = _pycplex_platform.CPXXcopyqpsep
-
-def CPXXchgqpcoef(*args):
-  return _pycplex_platform.CPXXchgqpcoef(*args)
-CPXXchgqpcoef = _pycplex_platform.CPXXchgqpcoef
-
-def CPXXgetnumqpnz(*args):
-  return _pycplex_platform.CPXXgetnumqpnz(*args)
-CPXXgetnumqpnz = _pycplex_platform.CPXXgetnumqpnz
-
-def CPXXgetnumquad(*args):
-  return _pycplex_platform.CPXXgetnumquad(*args)
-CPXXgetnumquad = _pycplex_platform.CPXXgetnumquad
-
-def CPXXgetqpcoef(*args):
-  return _pycplex_platform.CPXXgetqpcoef(*args)
-CPXXgetqpcoef = _pycplex_platform.CPXXgetqpcoef
-
-def CPXXgetquad(*args):
-  return _pycplex_platform.CPXXgetquad(*args)
-CPXXgetquad = _pycplex_platform.CPXXgetquad
-
-def CPXXqpindefcertificate(*args):
-  return _pycplex_platform.CPXXqpindefcertificate(*args)
-CPXXqpindefcertificate = _pycplex_platform.CPXXqpindefcertificate
-
-def CPXXqpopt(*args):
-  return _pycplex_platform.CPXXqpopt(*args)
-CPXXqpopt = _pycplex_platform.CPXXqpopt
-
-def CPXXaddqconstr(*args):
-  return _pycplex_platform.CPXXaddqconstr(*args)
-CPXXaddqconstr = _pycplex_platform.CPXXaddqconstr
-
-def CPXXdelqconstrs(*args):
-  return _pycplex_platform.CPXXdelqconstrs(*args)
-CPXXdelqconstrs = _pycplex_platform.CPXXdelqconstrs
-
-def CPXXgetnumqconstrs(*args):
-  return _pycplex_platform.CPXXgetnumqconstrs(*args)
-CPXXgetnumqconstrs = _pycplex_platform.CPXXgetnumqconstrs
-
-def CPXXgetqconstrindex(*args):
-  return _pycplex_platform.CPXXgetqconstrindex(*args)
-CPXXgetqconstrindex = _pycplex_platform.CPXXgetqconstrindex
-
-def CPXXgetqconstr(*args):
-  return _pycplex_platform.CPXXgetqconstr(*args)
-CPXXgetqconstr = _pycplex_platform.CPXXgetqconstr
-
-def CPXXgetqconstrname(*args):
-  return _pycplex_platform.CPXXgetqconstrname(*args)
-CPXXgetqconstrname = _pycplex_platform.CPXXgetqconstrname
-
-def CPXXgetqconstrslack(*args):
-  return _pycplex_platform.CPXXgetqconstrslack(*args)
-CPXXgetqconstrslack = _pycplex_platform.CPXXgetqconstrslack
-
-def CPXXqconstrslackfromx(*args):
-  return _pycplex_platform.CPXXqconstrslackfromx(*args)
-CPXXqconstrslackfromx = _pycplex_platform.CPXXqconstrslackfromx
-
-def CPXXgetqconstrinfeas(*args):
-  return _pycplex_platform.CPXXgetqconstrinfeas(*args)
-CPXXgetqconstrinfeas = _pycplex_platform.CPXXgetqconstrinfeas
-
-def CPXXgetxqxax(*args):
-  return _pycplex_platform.CPXXgetxqxax(*args)
-CPXXgetxqxax = _pycplex_platform.CPXXgetxqxax
-
-def CPXXgetqconstrdslack(*args):
-  return _pycplex_platform.CPXXgetqconstrdslack(*args)
-CPXXgetqconstrdslack = _pycplex_platform.CPXXgetqconstrdslack
-
-def CPXXnewlongannotation(*args):
-  return _pycplex_platform.CPXXnewlongannotation(*args)
-CPXXnewlongannotation = _pycplex_platform.CPXXnewlongannotation
-
-def CPXXnewdblannotation(*args):
-  return _pycplex_platform.CPXXnewdblannotation(*args)
-CPXXnewdblannotation = _pycplex_platform.CPXXnewdblannotation
-
-def CPXXdellongannotation(*args):
-  return _pycplex_platform.CPXXdellongannotation(*args)
-CPXXdellongannotation = _pycplex_platform.CPXXdellongannotation
-
-def CPXXdeldblannotation(*args):
-  return _pycplex_platform.CPXXdeldblannotation(*args)
-CPXXdeldblannotation = _pycplex_platform.CPXXdeldblannotation
-
-def CPXXgetlongannotationindex(*args):
-  return _pycplex_platform.CPXXgetlongannotationindex(*args)
-CPXXgetlongannotationindex = _pycplex_platform.CPXXgetlongannotationindex
-
-def CPXXgetdblannotationindex(*args):
-  return _pycplex_platform.CPXXgetdblannotationindex(*args)
-CPXXgetdblannotationindex = _pycplex_platform.CPXXgetdblannotationindex
-
-def CPXXgetlongannotationname(*args):
-  return _pycplex_platform.CPXXgetlongannotationname(*args)
-CPXXgetlongannotationname = _pycplex_platform.CPXXgetlongannotationname
-
-def CPXXgetdblannotationname(*args):
-  return _pycplex_platform.CPXXgetdblannotationname(*args)
-CPXXgetdblannotationname = _pycplex_platform.CPXXgetdblannotationname
-
-def CPXXgetnumlongannotations(*args):
-  return _pycplex_platform.CPXXgetnumlongannotations(*args)
-CPXXgetnumlongannotations = _pycplex_platform.CPXXgetnumlongannotations
-
-def CPXXgetnumdblannotations(*args):
-  return _pycplex_platform.CPXXgetnumdblannotations(*args)
-CPXXgetnumdblannotations = _pycplex_platform.CPXXgetnumdblannotations
-
-def CPXXgetlongannotationdefval(*args):
-  return _pycplex_platform.CPXXgetlongannotationdefval(*args)
-CPXXgetlongannotationdefval = _pycplex_platform.CPXXgetlongannotationdefval
-
-def CPXXgetdblannotationdefval(*args):
-  return _pycplex_platform.CPXXgetdblannotationdefval(*args)
-CPXXgetdblannotationdefval = _pycplex_platform.CPXXgetdblannotationdefval
-
-def CPXXsetdblannotations(*args):
-  return _pycplex_platform.CPXXsetdblannotations(*args)
-CPXXsetdblannotations = _pycplex_platform.CPXXsetdblannotations
-
-def CPXXsetlongannotations(*args):
-  return _pycplex_platform.CPXXsetlongannotations(*args)
-CPXXsetlongannotations = _pycplex_platform.CPXXsetlongannotations
-
-def CPXXgetlongannotations(*args):
-  return _pycplex_platform.CPXXgetlongannotations(*args)
-CPXXgetlongannotations = _pycplex_platform.CPXXgetlongannotations
-
-def CPXXgetdblannotations(*args):
-  return _pycplex_platform.CPXXgetdblannotations(*args)
-CPXXgetdblannotations = _pycplex_platform.CPXXgetdblannotations
-
-def CPXXreadcopyannotations(*args):
-  return _pycplex_platform.CPXXreadcopyannotations(*args)
-CPXXreadcopyannotations = _pycplex_platform.CPXXreadcopyannotations
-
-def CPXXwriteannotations(*args):
-  return _pycplex_platform.CPXXwriteannotations(*args)
-CPXXwriteannotations = _pycplex_platform.CPXXwriteannotations
-
-def CPXXwritebendersannotation(*args):
-  return _pycplex_platform.CPXXwritebendersannotation(*args)
-CPXXwritebendersannotation = _pycplex_platform.CPXXwritebendersannotation
-
-def CPXXaddpwl(*args):
-  return _pycplex_platform.CPXXaddpwl(*args)
-CPXXaddpwl = _pycplex_platform.CPXXaddpwl
-
-def CPXXdelpwl(*args):
-  return _pycplex_platform.CPXXdelpwl(*args)
-CPXXdelpwl = _pycplex_platform.CPXXdelpwl
-
-def CPXXgetnumpwl(*args):
-  return _pycplex_platform.CPXXgetnumpwl(*args)
-CPXXgetnumpwl = _pycplex_platform.CPXXgetnumpwl
-
-def CPXXgetpwl(*args):
-  return _pycplex_platform.CPXXgetpwl(*args)
-CPXXgetpwl = _pycplex_platform.CPXXgetpwl
-
-def CPXXgetpwlindex(*args):
-  return _pycplex_platform.CPXXgetpwlindex(*args)
-CPXXgetpwlindex = _pycplex_platform.CPXXgetpwlindex
-
-def CPXXgetpwlname(*args):
-  return _pycplex_platform.CPXXgetpwlname(*args)
-CPXXgetpwlname = _pycplex_platform.CPXXgetpwlname
-
-def CPXXgetnumlazyconstraints(*args):
-  return _pycplex_platform.CPXXgetnumlazyconstraints(*args)
-CPXXgetnumlazyconstraints = _pycplex_platform.CPXXgetnumlazyconstraints
-
-def CPXXgetnumusercuts(*args):
-  return _pycplex_platform.CPXXgetnumusercuts(*args)
-CPXXgetnumusercuts = _pycplex_platform.CPXXgetnumusercuts
-
-def CPXEgetnumgconstrs(*args):
-  return _pycplex_platform.CPXEgetnumgconstrs(*args)
-CPXEgetnumgconstrs = _pycplex_platform.CPXEgetnumgconstrs
-
-def CPXEgetprobstats(*args):
-  return _pycplex_platform.CPXEgetprobstats(*args)
-CPXEgetprobstats = _pycplex_platform.CPXEgetprobstats
-
-def CPXEgethist(*args):
-  return _pycplex_platform.CPXEgethist(*args)
-CPXEgethist = _pycplex_platform.CPXEgethist
-
-def CPXEgetqualitymetrics(*args):
-  return _pycplex_platform.CPXEgetqualitymetrics(*args)
-CPXEgetqualitymetrics = _pycplex_platform.CPXEgetqualitymetrics
-
-def CPXXgetnumcores(*args):
-  return _pycplex_platform.CPXXgetnumcores(*args)
-CPXXgetnumcores = _pycplex_platform.CPXXgetnumcores
 # This file is compatible with both classic and new-style classes.
 
 
