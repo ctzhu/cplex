@@ -13,7 +13,10 @@
 
 
 """
-import collections
+try:
+    import collections.abc as collections_abc # For Python >= 3.3
+except ImportError:
+    import collections as collections_abc
 import functools
 import inspect
 import warnings
@@ -313,7 +316,7 @@ def convert(name, getindexfunc, cache=None):
         cache = {}
     if isinstance(name, six.string_types):
         return _cachelookup(name, getindexfunc, cache)
-    elif isinstance(name, collections.Sequence):
+    elif isinstance(name, collections_abc.Sequence):
         # It's tempting to use a recursive solution here, but that kills
         # performance for the case where all indices are passed in (i.e.,
         # no names). This is due to the fact that we end up doing the

@@ -23,6 +23,8 @@ if platform.system() in ('Darwin', 'Linux', 'AIX', 'Windows', 'Microsoft'):
         from cplex._internal.py35_cplex1280 import *
     elif version_info < (3, 7, 0):
         from cplex._internal.py36_cplex1280 import *
+    elif version_info < (3, 8, 0):
+        from cplex._internal.py37_cplex1280 import *
     else:
         raise Exception(ERROR_STRING)
 else:

@@ -852,7 +852,7 @@ def cleanup(env, lp, eps):
 
 def basicpresolve(env, lp):
     numcols = CR.CPXXgetnumcols(env, lp)
-    numrows = CR.CPXXgetnumcols(env, lp)
+    numrows = CR.CPXXgetnumrows(env, lp)
     redlb = _safeDoubleArray(numcols)
     redub = _safeDoubleArray(numcols)
     rstat = _safeIntArray(numrows)

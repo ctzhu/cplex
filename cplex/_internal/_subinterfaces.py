@@ -2068,9 +2068,10 @@ class IndicatorConstraintInterface(BaseInterface):
         the variables that control whether the constraint is active or
         not.
 
-        complemented : a list of values (0 or 1) that determines whether
-        the constraint is active when the variable indvar is equal to 0
-        or 1: default is 0.
+        complemented : a list of values (0 or 1). Default value of 0
+        instructs CPLEX to interpret indicator constraint as active when
+        the indicator variable is 1. Set complemented to 1 to instruct
+        CPLEX that the indicator constraint is active when indvar = 0.
 
         name : a list of strings that determine the names of the
         individual constraints.
@@ -2134,8 +2135,10 @@ class IndicatorConstraintInterface(BaseInterface):
         indvar : the name or index of the variable that controls if
         the constraint is active
 
-        complemented : whether the constraint is active when the
-        variable indvar is equal to 0 or 1: default is 0
+        complemented : default value of 0 instructs CPLEX to interpret
+        indicator constraint as active when the indicator variable is 1.
+        Set complemented to 1 to instruct CPLEX that the indicator
+        constraint is active when indvar = 0.
 
         name : the name of the constraint.
 
@@ -9254,12 +9257,23 @@ class AdvancedCplexInterface(BaseInterface):
     def basic_presolve(self):
         """Performs bound strengthening and detects redundant rows.
 
+        Returns a tuple containing three lists: a list containing the
+        strengthened lower bounds, a list containing the strengthened
+        upper bounds, and a list containing the status of each row.
+
+        See CPXbasicpresolve in the Callable Library Reference Manual.
+
         Note
           This method does not create a presolved problem.
 
-        Note
-          This method cannot be used for quadratic programs.
+        Example usage:
 
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> out = c.set_results_stream(None)
+        >>> out = c.set_log_stream(None)
+        >>> c.read("lpex.mps")
+        >>> redlb, redub, rstat = c.advanced.basic_presolve()
         """
         return CPX_PROC.basicpresolve(self._env._e, self._cplex._lp)
 
