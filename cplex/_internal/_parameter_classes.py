@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2019. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -25,6 +25,7 @@ from ._parameters_auto import *
 from . import _constants
 from ..exceptions import CplexError, CplexSolverError, error_codes
 from .. import six
+from ..paramset import ParameterSet
 
 
 class Parameter(object):
@@ -280,6 +281,10 @@ class RootParameterGroup(ParameterGroup):
         self._set(_constants.CPX_PARAM_MIPCBREDLP, 0,
                   _constants.CPX_PARAMTYPE_INT)
         CPX_PROC.fixparam(self._env._e, _constants.CPX_PARAM_MIPCBREDLP)
+        # Fix CPX_PARAM_SCRIND to "off" (see RTC-36832).
+        self._set(_constants.CPX_PARAM_SCRIND, _constants.CPX_OFF,
+                  _constants.CPX_PARAMTYPE_INT)
+        CPX_PROC.fixparam(self._env._e, _constants.CPX_PARAM_SCRIND)
         # By default, the datacheck parameter is "on" in the Python API.
         self.read.datacheck.set(_constants.CPX_DATACHECK_WARN)
 
@@ -343,6 +348,12 @@ class RootParameterGroup(ParameterGroup):
             return CPX_PROC.infolongparam(self._env._e, which_parameter)
 
     def _validate_fixed_args(self, fixed_parameters_and_values):
+        if isinstance(fixed_parameters_and_values, ParameterSet):
+            if fixed_parameters_and_values not in self._cplex._pslst:
+                raise ValueError("parameter set must have been created"
+                                 " by this CPLEX problem object")
+            else:
+                return  # done checking
         valid = False  # guilty until proven innocent
         try:
             paramset = set()
@@ -361,6 +372,16 @@ class RootParameterGroup(ParameterGroup):
         if not valid:
             raise TypeError("invalid fixed_parameters_and_values arg detected")
 
+    def _get_fixed_args_iter(self, arg):
+        if isinstance(arg, ParameterSet):
+            for param_id in arg.get_ids():
+                param_type = CPX_PROC.getparamtype(self._env._e, param_id)
+                param_value = arg.get(param_id)
+                yield param_id, param_type, param_value
+        else:
+            for (param, value) in arg:
+                yield param._id, param._type, value
+
     def _process_fixed_args(self, fixed_parameters_and_values):
         """non-public"""
         if __debug__:
@@ -369,8 +390,8 @@ class RootParameterGroup(ParameterGroup):
         dbl_params_and_values = []
         str_params_and_values = []
         has_datacheck = False
-        for (param, value) in fixed_parameters_and_values:
-            param_id, param_type = param._id, param._type
+        for (param_id, param_type, value) in self._get_fixed_args_iter(
+                fixed_parameters_and_values):
             if param_id == _constants.CPX_PARAM_DATACHECK:
                 has_datacheck = True
             if (param_type == _constants.CPX_PARAMTYPE_INT or
@@ -406,10 +427,11 @@ class RootParameterGroup(ParameterGroup):
         length as filenames also consisting of strings that specify
         the types of the corresponding files.
 
-        fixed_parameters_and_values is a sequence of sequences of
-        length 2 containing instances of the Parameter class that are
-        to be fixed during the tuning process and the values at which
-        they are to be fixed.
+        If fixed_parameters_and_values is given, it may be either a
+        ParameterSet instance or a sequence of sequences of length 2
+        containing instances of the Parameter class that are to be fixed
+        during the tuning process and the values at which they are to be
+        fixed.
 
         tune_problem_set returns the status of the tuning procedure,
         which is an attribute of parameters.tuning_status.
@@ -418,9 +440,23 @@ class RootParameterGroup(ParameterGroup):
         >>> c = cplex.Cplex()
         >>> out = c.set_results_stream(None)
         >>> out = c.set_log_stream(None)
+        >>> ps = c.create_parameter_set()
+        >>> ps.add(c.parameters.lpmethod,
+        ...        c.parameters.lpmethod.values.auto)
         >>> status = c.parameters.tune_problem_set(
-        ...     ["lpex.mps", "example.mps"],
-        ...     fixed_parameters_and_values=[(c.parameters.lpmethod, 0)])
+        ...     filenames=["lpex.mps", "example.mps"],
+        ...     fixed_parameters_and_values=ps)
+        >>> c.parameters.tuning_status[status]
+        'completed'
+        >>> status = c.parameters.tune_problem_set(
+        ...     filenames=["lpex.mps", "example.mps"],
+        ...     fixed_parameters_and_values=[
+        ...         (c.parameters.lpmethod,
+        ...          c.parameters.lpmethod.values.auto)])
+        >>> c.parameters.tuning_status[status]
+        'completed'
+        >>> status = c.parameters.tune_problem_set(
+        ...     filenames=["lpex.mps", "example.mps"])
         >>> c.parameters.tuning_status[status]
         'completed'
         """
@@ -439,10 +475,11 @@ class RootParameterGroup(ParameterGroup):
     def tune_problem(self, fixed_parameters_and_values=None):
         """Tunes parameters for a Cplex problem.
 
-        fixed_parameters_and_values is a sequence of sequences of
-        length 2 containing instances of the Parameter class that are
-        to be fixed during the tuning process and the values at which
-        they are to be fixed.
+        If fixed_parameters_and_values is given, it may be either a
+        ParameterSet instance or a sequence of sequences of length 2
+        containing instances of the Parameter class that are to be fixed
+        during the tuning process and the values at which they are to be
+        fixed.
 
         tune_problem returns the status of the tuning procedure, which
         is an attribute of parameters.tuning_status.
@@ -450,7 +487,15 @@ class RootParameterGroup(ParameterGroup):
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> out = c.set_results_stream(None)
-        >>> status = c.parameters.tune_problem([(c.parameters.lpmethod, 0)])
+        >>> ps = c.create_parameter_set()
+        >>> ps.add(c.parameters.lpmethod,
+        ...        c.parameters.lpmethod.values.auto)
+        >>> status = c.parameters.tune_problem(ps)
+        >>> c.parameters.tuning_status[status]
+        'completed'
+        >>> status = c.parameters.tune_problem([
+        ...     (c.parameters.lpmethod,
+        ...      c.parameters.lpmethod.values.auto)])
         >>> c.parameters.tuning_status[status]
         'completed'
         >>> status = c.parameters.tune_problem()

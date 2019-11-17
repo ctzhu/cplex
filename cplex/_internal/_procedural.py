@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2019. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -12,14 +12,15 @@
 
 from __future__ import print_function
 
+from collections import namedtuple
 from contextlib import contextmanager
 from random import randrange
 import signal
 
+from . import _constants as _const
 from . import _list_array_utils as LAU
 from . import _pycplex as CR
 
-from ._constants import *
 from ..exceptions import CplexSolverError, CplexError, ErrorChannelMessage
 
 from .. import six
@@ -122,10 +123,9 @@ def _rangelen(begin, end):
 
     See functions like `_safeDoubleArray` and `safeLongArray`.
     """
-    # We allow arguments like begin=0, end=-1 on purpose.  This
-    # represents an empty set.  In most cases, the callable library will
-    # just do nothing when called with an empty set.  Unfortunately, this
-    # isn't consistent across the entire API.  See RTC-31484 for more.
+    # We allow arguments like begin=0, end=-1 on purpose. This represents
+    # an empty range; the callable library should do nothing in this case
+    # (see RTC-31484).
     result = end - begin + 1
     if result < 0:
         return 0
@@ -581,7 +581,138 @@ def fixparam(env, paramnum):
     status = CR.CPXXEfixparam(env, paramnum)
     check_status(env, status)
 
+########################################################################
+# Parameter Set API
+########################################################################
+
+def paramsetadd(env, ps, whichparam, newvalue, paramtype=None):
+    if paramtype is None:
+        paramtype = getparamtype(env, whichparam)
+    if paramtype == _const.CPX_PARAMTYPE_INT:
+        if isinstance(newvalue, float):
+            newvalue = int(newvalue)  # will upconvert to long, if necc.
+        paramsetaddint(env, ps, whichparam, newvalue)
+    elif paramtype == _const.CPX_PARAMTYPE_DOUBLE:
+        if isinstance(newvalue, six.integer_types):
+            newvalue = float(newvalue)
+        paramsetadddbl(env, ps, whichparam, newvalue)
+    elif paramtype == _const.CPX_PARAMTYPE_STRING:
+        paramsetaddstr(env, ps, whichparam, newvalue)
+    else:
+        assert paramtype == _const.CPX_PARAMTYPE_LONG
+        if isinstance(newvalue, float):
+            newvalue = int(newvalue)  # will upconvert to long, if necc.
+        paramsetaddlong(env, ps, whichparam, newvalue)
+
+
+def paramsetadddbl(env, ps, whichparam, newvalue):
+    status = CR.CPXXparamsetadddbl(env, ps, whichparam, newvalue)
+    check_status(env, status)
+
+def paramsetaddint(env, ps, whichparam, newvalue):
+    status = CR.CPXXparamsetaddint(env, ps, whichparam, newvalue)
+    check_status(env, status)
+
+def paramsetaddlong(env, ps, whichparam, newvalue):
+    status = CR.CPXXparamsetaddlong(env, ps, whichparam, newvalue)
+    check_status(env, status)
+
+def paramsetaddstr(env, ps, whichparam, newvalue):
+    status = CR.CPXXparamsetaddstr(env, ps, whichparam, newvalue)
+    check_status(env, status)
+
+def paramsetapply(env, ps):
+    status = CR.CPXXparamsetapply(env, ps)
+    check_status(env, status)
+
+def paramsetcopy(env, targetps, sourceps):
+    status = CR.CPXXparamsetcopy(env, targetps, sourceps)
+    check_status(env, status)
+
+def paramsetcreate(env):
+    status = CR.intPtr()
+    ps = CR.CPXXparamsetcreate(env, status)
+    check_status(env, status.value())
+    return ps
+
+def paramsetdel(env, ps, whichparam):
+    status = CR.CPXXparamsetdel(env, ps, whichparam)
+    check_status(env, status)
+
+def paramsetfree(env, ps):
+    ps_p = CR.CPXPARAMSETptrPtr()
+    ps_p.assign(ps)
+    status = CR.CPXXparamsetfree(env, ps_p)
+    check_status(env, status)
+
+def paramsetget(env, ps, whichparam, paramtype=None):
+    if paramtype is None:
+        paramtype = getparamtype(env, whichparam)
+    if paramtype == _const.CPX_PARAMTYPE_INT:
+        return paramsetgetint(env, ps, whichparam)
+    elif paramtype == _const.CPX_PARAMTYPE_DOUBLE:
+        return paramsetgetdbl(env, ps, whichparam)
+    elif paramtype == _const.CPX_PARAMTYPE_STRING:
+        return paramsetgetstr(env, ps, whichparam)
+    else:
+        assert paramtype == _const.CPX_PARAMTYPE_LONG
+        return paramsetgetlong(env, ps, whichparam)
+
+def paramsetgetdbl(env, ps, whichparam):
+    value = CR.doublePtr()
+    status = CR.CPXXparamsetgetdbl(env, ps, whichparam, value)
+    check_status(env, status)
+    return value.value()
+
+def paramsetgetint(env, ps, whichparam):
+    value = CR.intPtr()
+    status = CR.CPXXparamsetgetint(env, ps, whichparam, value)
+    check_status(env, status)
+    return value.value()
+
+def paramsetgetlong(env, ps, whichparam):
+    value = CR.cpxlongPtr()
+    status = CR.CPXXparamsetgetlong(env, ps, whichparam, value)
+    check_status(env, status)
+    return value.value()
+
+def paramsetgetstr(env, ps, whichparam):
+    output = []
+    status = CR.CPXXparamsetgetstr(env, ps, whichparam, output)
+    check_status(env, status)
+    return output[0]
+
+def paramsetgetids(env, ps):
+    cnt = paramsetgetnum(env, ps)
+    if cnt == 0:
+        return []
+    inout_list = [cnt]
+    status = CR.CPXXparamsetgetids(env, ps, inout_list)
+    check_status(env, status)
+    # We expect to get [whichparams]
+    assert len(inout_list) == 1
+    return inout_list[0]
+
+def paramsetreadcopy(env, ps, filename, enc=default_encoding):
+    status = CR.CPXXparamsetreadcopy(env, ps,
+                                     cpx_decode_noop3(filename, enc))
+    check_status(env, status)
+
+def paramsetwrite(env, ps, filename, enc=default_encoding):
+    status = CR.CPXXparamsetwrite(env, ps,
+                                  cpx_decode_noop3(filename, enc))
+    check_status(env, status)
+
+def paramsetgetnum(env, ps):
+    inout_list = [0]
+    status = CR.CPXXparamsetgetids(env, ps, inout_list)
+    if status != CR.CPXERR_NEGATIVE_SURPLUS:
+        check_status(env, status)
+    return inout_list[0]
+
+########################################################################
 # Runseeds
+########################################################################
 
 def runseeds(env, lp, cnt):
     with SigIntHandler():
@@ -731,6 +862,14 @@ def writeprob(env, lp, filename, filetype="", enc=default_encoding):
     check_status(env, status)
 
 
+def writeprobdev(env, lp, stream, filename, filetype,
+                 enc=default_encoding):
+    arg_list = [stream, cpx_decode_noop3(filename, enc),
+                cpx_decode_noop3(filetype, enc)]
+    status = CR.CPXEwriteprobdev(env, lp, arg_list)
+    check_status(env, status)
+
+
 def embwrite(env, lp, filename, enc=default_encoding):
     status = CR.CPXXembwrite(env, lp, cpx_decode_noop3(filename, enc))
     check_status(env, status)
@@ -826,13 +965,6 @@ def _getnumlazyconstraints(env, lp):
     return CR.CPXXgetnumlazyconstraints(env, lp)
 
 
-def _hasgeneralconstraints(env, lp):
-    for which in range(CPX_CON_SOS + 1, CPX_CON_LAST_CONTYPE):
-        if CR.CPXEgetnumgconstrs(env, lp, which) > 0:
-            return True
-    return False
-
-
 def getnumqconstrs(env, lp):
     return CR.CPXXgetnumqconstrs(env, lp)
 
@@ -887,8 +1019,9 @@ def strongbranch(env, lp, goodlist, itlim):
     downpen = _safeDoubleArray(goodlen)
     uppen = _safeDoubleArray(goodlen)
     with SigIntHandler():
-        status = CR.CPXXstrongbranch(env, lp, goodlen, goodlist,
-                                     downpen, uppen, itlim)
+        status = CR.CPXXstrongbranch(
+            env, lp, LAU.int_list_to_array(goodlist), goodlen,
+            downpen, uppen, itlim)
     check_status(env, status)
     return (LAU.array_to_list(downpen, goodlen),
             LAU.array_to_list(uppen, goodlen))
@@ -1287,9 +1420,6 @@ def getindconstr(env, lp, begin, end):
 
 
 def getindconstr_constant(env, lp, begin, end):
-    # FIXME: See RTC-31484.
-    if end < begin:
-        return ([], [], [], [], "", 0)
     # inout_list contains the linspace, begin, and end args to
     # CPXXgetindconstraints.
     inout_list = [0, begin, end]
@@ -1446,9 +1576,6 @@ def _getname(env, lp, idx, enc, namefn, index_first=True):
 
 
 def _getnamebyrange(env, lp, begin, end, enc, namefn):
-    # FIXME: See RTC-31484.
-    if end < begin:
-        return []
     inout_list = [0, begin, end]
     status = namefn(env, lp, inout_list)
     if status != CR.CPXERR_NEGATIVE_SURPLUS:
@@ -1770,6 +1897,115 @@ def getnumquad(env, lp):
 def getnumqpnz(env, lp):
     return CR.CPXXgetnumqpnz(env, lp)
 
+########################################################################
+# Multi-Objective API
+########################################################################
+
+def getnumobjs(env, lp):
+    return CR.CPXXgetnumobjs(env, lp)
+
+def multiobjchgattribs(env, lp, objidx,
+                       offset=_const.CPX_NO_OFFSET_CHANGE,
+                       weight=_const.CPX_NO_WEIGHT_CHANGE,
+                       priority=_const.CPX_NO_PRIORITY_CHANGE,
+                       abstol=_const.CPX_NO_ABSTOL_CHANGE,
+                       reltol=_const.CPX_NO_RELTOL_CHANGE,
+                       name=None, enc=default_encoding):
+    status = CR.CPXXmultiobjchgattribs(env, lp, objidx, offset, weight,
+                                       priority, abstol, reltol,
+                                       cpx_decode_noop3(name, enc))
+    check_status(env, status)
+
+def multiobjgetindex(env, lp, name, enc=default_encoding):
+    indexfn = CR.CPXXmultiobjgetindex
+    return _getindex(env, lp, name, enc, indexfn)
+
+def multiobjgetname(env, lp, objidx, enc=default_encoding):
+    namefn = CR.CPXXmultiobjgetname
+    return _getname(env, lp, objidx, enc, namefn, index_first=True)
+
+def multiobjgetobj(env, lp, objidx, begin, end):
+    coeffslen = _rangelen(begin, end)
+    coeffs = _safeDoubleArray(coeffslen)
+    offset = CR.doublePtr()
+    weight = CR.doublePtr()
+    priority = CR.intPtr()
+    abstol = CR.doublePtr()
+    reltol = CR.doublePtr()
+    status = CR.CPXXmultiobjgetobj(env, lp, objidx, coeffs, begin, end,
+                                   offset, weight, priority, abstol, reltol)
+    check_status(env, status)
+    return [LAU.array_to_list(coeffs, coeffslen), offset.value(),
+            weight.value(), priority.value(), abstol.value(),
+            reltol.value()]
+
+def multiobjsetobj(env, lp, objidx, objind, objval,
+                   offset=_const.CPX_NO_OFFSET_CHANGE,
+                   weight=_const.CPX_NO_WEIGHT_CHANGE,
+                   priority=_const.CPX_NO_PRIORITY_CHANGE,
+                   abstol=_const.CPX_NO_ABSTOL_CHANGE,
+                   reltol=_const.CPX_NO_RELTOL_CHANGE,
+                   objname=None,
+                   enc=default_encoding):
+    objnz = len(objind)
+    assert len(objval) == objnz
+    with LAU.int_c_array(objind) as c_objind, \
+         LAU.double_c_array(objval) as c_objval:
+        status = CR.CPXXmultiobjsetobj(env, lp, objidx, objnz, c_objind,
+                                       c_objval, offset, weight,
+                                       priority, abstol, reltol,
+                                       cpx_decode_noop3(objname, enc))
+    check_status(env, status)
+
+def setnumobjs(env, lp, n):
+    status = CR.CPXXsetnumobjs(env, lp, n)
+    check_status(env, status)
+
+def multiobjopt(env, lp, paramsets):
+    with SigIntHandler():
+        status = CR.CPXXmultiobjopt(env, lp, paramsets)
+    check_status(env, status)
+
+def multiobjgetobjval(env, lp, objidx):
+    objval_p = CR.doublePtr()
+    status = CR.CPXXmultiobjgetobjval(env, lp, objidx, objval_p)
+    check_status(env, status)
+    return objval_p.value()
+
+def multiobjgetobjvalbypriority(env, lp, priority):
+    objval_p = CR.doublePtr()
+    status = CR.CPXXmultiobjgetobjvalbypriority(env, lp, priority, objval_p)
+    check_status(env, status)
+    return objval_p.value()
+
+def _multiobjgetinfo(fn, env, lp, subprob, info_p, what):
+    status = fn(env, lp, subprob, info_p, what)
+    check_status(env, status)
+    return info_p.value()
+
+def multiobjgetdblinfo(env, lp, subprob, what):
+    info_p = CR.doublePtr()
+    return _multiobjgetinfo(CR.CPXXmultiobjgetdblinfo, env, lp, subprob,
+                            info_p, what)
+
+def multiobjgetintinfo(env, lp, subprob, what):
+    info_p = CR.intPtr()
+    return _multiobjgetinfo(CR.CPXXmultiobjgetintinfo, env, lp, subprob,
+                            info_p, what)
+
+def multiobjgetlonginfo(env, lp, subprob, what):
+    info_p = CR.cpxlongPtr()
+    return _multiobjgetinfo(CR.CPXXmultiobjgetlonginfo, env, lp, subprob,
+                            info_p, what)
+
+def multiobjgetnumsolves(env, lp):
+    return CR.CPXXmultiobjgetnumsolves(env, lp)
+
+def getnumprios(env, lp):
+    return CR.CPXEgetnumprios(env, lp)
+
+def ismultiobj(env, lp):
+    return CR.CPXEismultiobj(env, lp) != 0
 
 # Optimizing Problems
 
@@ -2716,28 +2952,28 @@ def get_wherefrom(cbstruct):
 
 
 cpxlong_callback_node_info = [
-    CPX_CALLBACK_INFO_NODE_SEQNUM_LONG,
-    CPX_CALLBACK_INFO_NODE_NODENUM_LONG,
-    CPX_CALLBACK_INFO_NODE_DEPTH_LONG,
+    _const.CPX_CALLBACK_INFO_NODE_SEQNUM_LONG,
+    _const.CPX_CALLBACK_INFO_NODE_NODENUM_LONG,
+    _const.CPX_CALLBACK_INFO_NODE_DEPTH_LONG,
 ]
 
 int_callback_node_info = [
-    CPX_CALLBACK_INFO_NODE_NIINF,
-    CPX_CALLBACK_INFO_NODE_VAR,
-    CPX_CALLBACK_INFO_NODE_SOS,
-    CPX_CALLBACK_INFO_LAZY_SOURCE,
+    _const.CPX_CALLBACK_INFO_NODE_NIINF,
+    _const.CPX_CALLBACK_INFO_NODE_VAR,
+    _const.CPX_CALLBACK_INFO_NODE_SOS,
+    _const.CPX_CALLBACK_INFO_LAZY_SOURCE,
 ]
 
 double_callback_node_info = [
-    CPX_CALLBACK_INFO_NODE_SIINF,
-    CPX_CALLBACK_INFO_NODE_ESTIMATE,
-    CPX_CALLBACK_INFO_NODE_OBJVAL,
+    _const.CPX_CALLBACK_INFO_NODE_SIINF,
+    _const.CPX_CALLBACK_INFO_NODE_ESTIMATE,
+    _const.CPX_CALLBACK_INFO_NODE_OBJVAL,
 ]
 
 # NB: CPX_CALLBACK_INFO_NODE_TYPE not used in the Python API.
 
 user_handle_callback_node_info = [
-    CPX_CALLBACK_INFO_NODE_USERHANDLE
+    _const.CPX_CALLBACK_INFO_NODE_USERHANDLE
 ]
 
 
@@ -2868,14 +3104,14 @@ def getcallbackseqinfo(cbstruct, node, which):
 
 
 int_sos_info = [
-    CPX_CALLBACK_INFO_SOS_NUM,
-    CPX_CALLBACK_INFO_SOS_SIZE,
-    CPX_CALLBACK_INFO_SOS_IS_FEASIBLE,
-    CPX_CALLBACK_INFO_SOS_MEMBER_INDEX,
+    _const.CPX_CALLBACK_INFO_SOS_NUM,
+    _const.CPX_CALLBACK_INFO_SOS_SIZE,
+    _const.CPX_CALLBACK_INFO_SOS_IS_FEASIBLE,
+    _const.CPX_CALLBACK_INFO_SOS_MEMBER_INDEX,
 ]
 
 double_sos_info = [
-    CPX_CALLBACK_INFO_SOS_MEMBER_REFVAL,
+    _const.CPX_CALLBACK_INFO_SOS_MEMBER_REFVAL,
 ]
 
 # NB: CPX_CALLBACK_INFO_SOS_TYPE not used in the Python API.
@@ -3257,6 +3493,95 @@ def finitlock(lock):
 # get problem statistics
 
 def getprobstats(env, lp):
+    ProbStats = namedtuple(
+        'ProbStats',
+        ['objs',  # 0
+         'rows',  # 1
+         'cols',  # 2
+         'objcnt',  # 3
+         'rhscnt',  # 4
+         'nzcnt',  # 5
+         'ecnt',  # 6
+         'gcnt',  # 7
+         'lcnt',  # 8
+         'rngcnt',  # 9
+         'ncnt',  # 10
+         'fcnt',  # 11
+         'xcnt',  # 12
+         'bcnt',  # 13
+         'ocnt',  # 14
+         'bicnt',  # 15
+         'icnt',  # 16
+         'scnt',  # 17
+         'sicnt',  # 18
+         'qpcnt',  # 19
+         'qpnzcnt',  # 20
+         'nqconstr',  # 21
+         'qrhscnt',  # 22
+         'qlcnt',  # 23
+         'qgcnt',  # 24
+         'quadnzcnt',  # 25
+         'linnzcnt',  # 26
+         'nindconstr',  # 27
+         'indrhscnt',  # 28
+         'indnzcnt',  # 29
+         'indcompcnt',  # 30
+         'indlcnt',  # 31
+         'indecnt',  # 32
+         'indgcnt',  # 33
+         'maxcoef',  # 34
+         'mincoef',  # 35
+         'minrhs',  # 36
+         'maxrhs',  # 37
+         'minrng',  # 38
+         'maxrng',  # 39
+         'minobj',  # 40
+         'maxobj',  # 41
+         'minlb',  # 42
+         'maxub',  # 43
+         'minqcoef',  # 44
+         'maxqcoef',  # 45
+         'minqcq',  # 46
+         'maxqcq',  # 47
+         'minqcl',  # 48
+         'maxqcl',  # 49
+         'minqcr',  # 50
+         'maxqcr',  # 51
+         'minind',  # 52
+         'maxind',  # 53
+         'minindrhs',  # 54
+         'maxindrhs',  # 55
+         'minlazy',  # 56
+         'maxlazy',  # 57
+         'minlazyrhs',  # 58
+         'maxlazyrhs',  # 59
+         'minucut',  # 60
+         'maxucut',  # 61
+         'minucutrhs',  # 62
+         'maxucutrhs',  # 63
+         'nsos',  # 64
+         'nsos1',  # 65
+         'sos1nmem',  # 66
+         'sos1type',  # 67
+         'nsos2',  # 68
+         'sos2nmem',  # 69
+         'sos2type',  # 70
+         'lazyrhscnt',  # 71
+         'lazygcnt',  # 72
+         'lazylcnt',  # 73
+         'lazyecnt',  # 74
+         'lazycnt',  # 75
+         'lazynzcnt',  # 76
+         'ucutrhscnt',  # 77
+         'ucutgcnt',  # 78
+         'ucutlcnt',  # 79
+         'ucutecnt',  # 80
+         'ucutcnt',  # 81
+         'ucutnzcnt',  # 82
+         'npwl',  # 83
+         'npwlbreaks'])   # 84
+
+    objs_p = CR.intPtr()
     rows_p = CR.intPtr()
     cols_p = CR.intPtr()
     objcnt_p = CR.intPtr()
@@ -3342,6 +3667,7 @@ def getprobstats(env, lp):
     npwl_p = CR.intPtr()
     npwlbreaks_p = CR.intPtr()
     status = CR.CPXEgetprobstats(env, lp,
+                                 objs_p,
                                  rows_p,
                                  cols_p,
                                  objcnt_p,
@@ -3427,90 +3753,92 @@ def getprobstats(env, lp):
                                  npwl_p,
                                  npwlbreaks_p)
     check_status(env, status)
-    return [rows_p.value(),  # 0
-            cols_p.value(),  # 1
-            objcnt_p.value(),  # 2
-            rhscnt_p.value(),  # 3
-            nzcnt_p.value(),  # 4
-            ecnt_p.value(),  # 5
-            gcnt_p.value(),  # 6
-            lcnt_p.value(),  # 7
-            rngcnt_p.value(),  # 8
-            ncnt_p.value(),  # 9
-            fcnt_p.value(),  # 10
-            xcnt_p.value(),  # 11
-            bcnt_p.value(),  # 12
-            ocnt_p.value(),  # 13
-            bicnt_p.value(),  # 14
-            icnt_p.value(),  # 15
-            scnt_p.value(),  # 16
-            sicnt_p.value(),  # 17
-            qpcnt_p.value(),  # 18
-            qpnzcnt_p.value(),  # 19
-            nqconstr_p.value(),  # 20
-            qrhscnt_p.value(),  # 21
-            qlcnt_p.value(),  # 22
-            qgcnt_p.value(),  # 23
-            quadnzcnt_p.value(),  # 24
-            linnzcnt_p.value(),  # 25
-            nindconstr_p.value(),  # 26
-            indrhscnt_p.value(),  # 27
-            indnzcnt_p.value(),  # 28
-            indcompcnt_p.value(),  # 29
-            indlcnt_p.value(),  # 30
-            indecnt_p.value(),  # 31
-            indgcnt_p.value(),  # 32
-            maxcoef_p.value(),  # 33
-            mincoef_p.value(),  # 34
-            minrhs_p.value(),  # 35
-            maxrhs_p.value(),  # 36
-            minrng_p.value(),  # 37
-            maxrng_p.value(),  # 38
-            minobj_p.value(),  # 39
-            maxobj_p.value(),  # 40
-            minlb_p.value(),  # 41
-            maxub_p.value(),  # 42
-            minqcoef_p.value(),  # 43
-            maxqcoef_p.value(),  # 44
-            minqcq_p.value(),  # 45
-            maxqcq_p.value(),  # 46
-            minqcl_p.value(),  # 47
-            maxqcl_p.value(),  # 48
-            minqcr_p.value(),  # 49
-            maxqcr_p.value(),  # 50
-            minind_p.value(),  # 51
-            maxind_p.value(),  # 52
-            minindrhs_p.value(),  # 53
-            maxindrhs_p.value(),  # 54
-            minlazy_p.value(),  # 55
-            maxlazy_p.value(),  # 56
-            minlazyrhs_p.value(),  # 57
-            maxlazyrhs_p.value(),  # 58
-            minucut_p.value(),  # 59
-            maxucut_p.value(),  # 60
-            minucutrhs_p.value(),  # 61
-            maxucutrhs_p.value(),  # 62
-            nsos_p.value(),  # 63
-            nsos1_p.value(),  # 64
-            sos1nmem_p.value(),  # 65
-            sos1type_p.value(),  # 66
-            nsos2_p.value(),  # 67
-            sos2nmem_p.value(),  # 68
-            sos2type_p.value(),  # 69
-            lazyrhscnt_p.value(),  # 70
-            lazygcnt_p.value(),  # 71
-            lazylcnt_p.value(),  # 72
-            lazyecnt_p.value(),  # 73
-            lazycnt_p.value(),  # 74
-            lazynzcnt_p.value(),  # 75
-            ucutrhscnt_p.value(),  # 76
-            ucutgcnt_p.value(),  # 77
-            ucutlcnt_p.value(),  # 78
-            ucutecnt_p.value(),  # 79
-            ucutcnt_p.value(),  # 80
-            ucutnzcnt_p.value(),  # 81
-            npwl_p.value(),  # 82
-            npwlbreaks_p.value(), ]  # 83
+    return ProbStats(
+        objs_p.value(),
+        rows_p.value(),
+        cols_p.value(),
+        objcnt_p.value(),
+        rhscnt_p.value(),
+        nzcnt_p.value(),
+        ecnt_p.value(),
+        gcnt_p.value(),
+        lcnt_p.value(),
+        rngcnt_p.value(),
+        ncnt_p.value(),
+        fcnt_p.value(),
+        xcnt_p.value(),
+        bcnt_p.value(),
+        ocnt_p.value(),
+        bicnt_p.value(),
+        icnt_p.value(),
+        scnt_p.value(),
+        sicnt_p.value(),
+        qpcnt_p.value(),
+        qpnzcnt_p.value(),
+        nqconstr_p.value(),
+        qrhscnt_p.value(),
+        qlcnt_p.value(),
+        qgcnt_p.value(),
+        quadnzcnt_p.value(),
+        linnzcnt_p.value(),
+        nindconstr_p.value(),
+        indrhscnt_p.value(),
+        indnzcnt_p.value(),
+        indcompcnt_p.value(),
+        indlcnt_p.value(),
+        indecnt_p.value(),
+        indgcnt_p.value(),
+        maxcoef_p.value(),
+        mincoef_p.value(),
+        minrhs_p.value(),
+        maxrhs_p.value(),
+        minrng_p.value(),
+        maxrng_p.value(),
+        minobj_p.value(),
+        maxobj_p.value(),
+        minlb_p.value(),
+        maxub_p.value(),
+        minqcoef_p.value(),
+        maxqcoef_p.value(),
+        minqcq_p.value(),
+        maxqcq_p.value(),
+        minqcl_p.value(),
+        maxqcl_p.value(),
+        minqcr_p.value(),
+        maxqcr_p.value(),
+        minind_p.value(),
+        maxind_p.value(),
+        minindrhs_p.value(),
+        maxindrhs_p.value(),
+        minlazy_p.value(),
+        maxlazy_p.value(),
+        minlazyrhs_p.value(),
+        maxlazyrhs_p.value(),
+        minucut_p.value(),
+        maxucut_p.value(),
+        minucutrhs_p.value(),
+        maxucutrhs_p.value(),
+        nsos_p.value(),
+        nsos1_p.value(),
+        sos1nmem_p.value(),
+        sos1type_p.value(),
+        nsos2_p.value(),
+        sos2nmem_p.value(),
+        sos2type_p.value(),
+        lazyrhscnt_p.value(),
+        lazygcnt_p.value(),
+        lazylcnt_p.value(),
+        lazyecnt_p.value(),
+        lazycnt_p.value(),
+        lazynzcnt_p.value(),
+        ucutrhscnt_p.value(),
+        ucutgcnt_p.value(),
+        ucutlcnt_p.value(),
+        ucutecnt_p.value(),
+        ucutcnt_p.value(),
+        ucutnzcnt_p.value(),
+        npwl_p.value(),
+        npwlbreaks_p.value())
 
 # get histogram of non-zero row/column counts
 
@@ -3706,3 +4034,12 @@ def callbackrejectcandidate(contextptr, rcnt, nzcnt, rhs, sense, rmat,
     check_status(None, status)
 
 # ########## Expert Callback END ##########################################
+
+# ########## Modeling Assistance Callback BEGIN ###########################
+
+def modelasstcallbacksetfunc(env, lp, cbhandle):
+    # See note in setgenericcallbackfunc (the same applies here).
+    status = CR.CPXXmodelasstcallbacksetfunc(env, lp, cbhandle)
+    check_status(env, status)
+
+# ########## Modeling Assistance Callback END #############################

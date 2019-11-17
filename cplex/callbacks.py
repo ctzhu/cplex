@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2019. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -52,7 +52,7 @@ from ._internal import _procedural as _proc
 from ._internal._aux_functions import (apply_freeform_two_args,
                                        apply_freeform_one_arg,
                                        init_list_args, convert, max_arg_length,
-                                       validate_arg_lengths)
+                                       validate_arg_lengths, unzip)
 from ._internal._matrices import SparsePair, _HBMatrix, unpack_pair
 from .exceptions import (CplexError, CplexSolverError,
                          WrongNumberOfArgumentsError)
@@ -132,6 +132,7 @@ from ._internal._constants import CPX_CALLBACK_INFO_LANDPCUT_COUNT
 from ._internal._constants import CPX_CALLBACK_INFO_USERCUT_COUNT
 from ._internal._constants import CPX_CALLBACK_INFO_TABLECUT_COUNT
 from ._internal._constants import CPX_CALLBACK_INFO_SOLNPOOLCUT_COUNT
+from ._internal._constants import CPX_CALLBACK_INFO_BENDERS_COUNT
 from ._internal._constants import CPX_CALLBACK_INFO_TUNING_PROGRESS
 from ._internal._constants import CPX_CALLBACK_INFO_KAPPA_STABLE
 from ._internal._constants import CPX_CALLBACK_INFO_KAPPA_SUSPICIOUS
@@ -439,6 +440,7 @@ class MIPInfoCallback(OptimizationCallback):
     class cut_type(object):
         """Arguments to MIPInfoCallback.get_num_cuts()."""
         # NB: If you edit these, look at _subinterfaces.py:CutType too!
+        #     Also add the cut to the list of valid values get_num_cuts()!
         cover = CPX_CALLBACK_INFO_COVER_COUNT
         GUB_cover = CPX_CALLBACK_INFO_GUBCOVER_COUNT
         flow_cover = CPX_CALLBACK_INFO_FLOWCOVER_COUNT
@@ -454,11 +456,11 @@ class MIPInfoCallback(OptimizationCallback):
         user = CPX_CALLBACK_INFO_USERCUT_COUNT
         table = CPX_CALLBACK_INFO_TABLECUT_COUNT
         solution_pool = CPX_CALLBACK_INFO_SOLNPOOLCUT_COUNT
+        benders = CPX_CALLBACK_INFO_BENDERS_COUNT
         # Not Implemented:
         # local_implied_bound
         # BQP
         # RLT
-        # benders
 
     def __init__(self, env):
         """non-public"""
@@ -482,6 +484,23 @@ class MIPInfoCallback(OptimizationCallback):
 
     def get_num_cuts(self, cut_type):
         """Returns the number of cuts of type cut_type added so far."""
+        if cut_type not in (CPX_CALLBACK_INFO_COVER_COUNT,
+                            CPX_CALLBACK_INFO_GUBCOVER_COUNT,
+                            CPX_CALLBACK_INFO_FLOWCOVER_COUNT,
+                            CPX_CALLBACK_INFO_CLIQUE_COUNT,
+                            CPX_CALLBACK_INFO_FRACCUT_COUNT,
+                            CPX_CALLBACK_INFO_MIRCUT_COUNT,
+                            CPX_CALLBACK_INFO_FLOWPATH_COUNT,
+                            CPX_CALLBACK_INFO_DISJCUT_COUNT,
+                            CPX_CALLBACK_INFO_IMPLBD_COUNT,
+                            CPX_CALLBACK_INFO_ZEROHALFCUT_COUNT,
+                            CPX_CALLBACK_INFO_MCFCUT_COUNT,
+                            CPX_CALLBACK_INFO_LANDPCUT_COUNT,
+                            CPX_CALLBACK_INFO_USERCUT_COUNT,
+                            CPX_CALLBACK_INFO_TABLECUT_COUNT,
+                            CPX_CALLBACK_INFO_SOLNPOOLCUT_COUNT,
+                            CPX_CALLBACK_INFO_BENDERS_COUNT):
+            raise ValueError("invalid value for cut_type ({0})".format(cut_type))
         return fast_getcallbackinfo(self._cbstruct, cut_type, CplexSolverError)
 
     def get_best_objective_value(self):
@@ -555,11 +574,10 @@ class MIPInfoCallback(OptimizationCallback):
           [self.get_incumbent_quadratic_slacks(i) for i in s]
 
         self.get_incumbent_quadratic_slacks(begin, end)
-          begin and end must be quadratic constraint indices with
-          begin <= end or quadratic constraint names whose indices
-          respect this order.  Returns the slack values associated
-          with the quadratic constraints with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be quadratic constraint indices or quadratic
+          constraint names. Returns the slack values associated with the
+          quadratic constraints with indices between begin and end,
+          inclusive of end. Equivalent to
           self.get_incumbent_quadratic_slacks(range(begin, end + 1)).
         """
         status = cb_qconstrslackfromx(
@@ -592,10 +610,9 @@ class MIPInfoCallback(OptimizationCallback):
           Equivalent to [self.get_incumbent_values(i) for i in s]
 
         self.get_incumbent_values(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with the same property.  Returns a list of
-          the values of the variables with indices between begin and
-          end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns a list of the values of the variables with indices
+          between begin and end, inclusive of end. Equivalent to
           self.get_incumbent_values(range(begin, end + 1))
         """
         def getcallbackincumbent(begin, end=self.num_cols - 1):
@@ -604,7 +621,13 @@ class MIPInfoCallback(OptimizationCallback):
             getcallbackincumbent, self._conv_col, args)
 
     def get_MIP_relative_gap(self):
-        """Returns the current relative MIP gap."""
+        """Returns the current relative MIP gap.
+
+        Accesses the current relative gap, like the routine
+        CPXgetmiprelgap in the Callable Library. See CPXgetcallbackinfo
+        and CPXgetmiprelgap in the Callable Library Reference Manual for
+        more detail.
+        """
         return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_MIP_REL_GAP, CplexSolverError)
 
     def get_num_iterations(self):
@@ -637,6 +660,13 @@ class MIPInfoCallback(OptimizationCallback):
         self.quality_metric.kappa_max
         self.quality_metric.kappa_attention
         """
+        if which not in (CPX_CALLBACK_INFO_KAPPA_STABLE,
+                         CPX_CALLBACK_INFO_KAPPA_SUSPICIOUS,
+                         CPX_CALLBACK_INFO_KAPPA_UNSTABLE,
+                         CPX_CALLBACK_INFO_KAPPA_ILLPOSED,
+                         CPX_CALLBACK_INFO_KAPPA_MAX,
+                         CPX_CALLBACK_INFO_KAPPA_ATTENTION):
+            raise ValueError("invalid value for which ({0})".format(which))
         return fast_getcallbackinfo(self._cbstruct, which, CplexSolverError)
 
 
@@ -682,10 +712,9 @@ class MIPCallback(MIPInfoCallback):
           for i in s]
 
         self.get_objective_coefficients(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with the same property.  Returns a list of
-          the objective coefficients of variables with indices
-          between begin and end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns a list of the objective coefficients of variables with
+          indices between begin and end, inclusive of end. Equivalent to
           self.get_objective_coefficients(range(begin, end + 1))
         """
         def getobj(begin, end=self.get_num_cols() - 1):
@@ -727,15 +756,14 @@ class ControlCallback(MIPCallback):
           [self.get_pseudo_costs(i) for i in s]
 
         self.get_pseudo_costs(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with the same property.  Returns a list of
-          pairs (up, down) of pseudo costs of branching on the
-          variables with indices between begin and end, inclusive of
-          end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns a list of pairs (up, down) of pseudo costs of branching
+          on the variables with indices between begin and end, inclusive
+          of end. Equivalent to
           self.get_pseudo_costs(range(begin, end + 1))
         """
         def getcallbackpseudocosts(begin, end=self.get_num_cols() - 1):
-            return list(zip(*_proc.getcallbackpseudocosts(self._cbstruct, begin, end)))
+            return unzip(_proc.getcallbackpseudocosts(self._cbstruct, begin, end))
         return apply_freeform_two_args(
             getcallbackpseudocosts, self._conv_col, args)
 
@@ -762,11 +790,10 @@ class ControlCallback(MIPCallback):
           in s.  Equivalent to [self.get_feasibilities(i) for i in s]
 
         self.get_feasibilities(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with the same property.  Returns a list of
-          the feasibility statuses of the variables with indices
-          between begin and end, inclusive of end.  Equivalent to
-          self.get_feasibilities(range(begin, end + 1))
+          begin and end must be variable indices or variable names.
+          Returns a list of the feasibility statuses of the variables
+          with indices between begin and end, inclusive of end.
+          Equivalent to self.get_feasibilities(range(begin, end + 1))
 
         Note
           Before you call this method from a solve callback, a
@@ -801,11 +828,10 @@ class ControlCallback(MIPCallback):
           Equivalent to [self.get_lower_bounds(i) for i in s]
 
         self.get_lower_bounds(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with the same property.  Returns a list of
-          the lower bounds of the variables with indices between
-          begin and end, inclusive of end.  Equivalent to
-          self.get_lower_bounds(range(begin, end + 1))
+          begin and end must be variable indices or variable names.
+          Returns a list of the lower bounds of the variables with
+          indices between begin and end, inclusive of end. Equivalent
+          to self.get_lower_bounds(range(begin, end + 1))
         """
         def getcallbacknodelb(begin, end=self.get_num_cols() - 1):
             return _proc.getcallbacknodelb(self._cbstruct, begin, end)
@@ -832,10 +858,9 @@ class ControlCallback(MIPCallback):
           Equivalent to [self.get_upper_bounds(i) for i in s]
 
         self.get_upper_bounds(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with the same property.  Returns a list of
-          the upper bounds of the variables with indices between
-          begin and end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns a list of the upper bounds of the variables with
+          indices between begin and end, inclusive of end. Equivalent to
           self.get_upper_bounds(range(begin, end + 1))
         """
         def getcallbacknodeub(begin, end=self.get_num_cols() - 1):
@@ -925,11 +950,10 @@ class ControlCallback(MIPCallback):
           Equivalent to [self.get_quadratic_slacks(i) for i in s]
 
         self.get_quadratic_slacks(begin, end)
-          begin and end must be quadratic constraint indices with
-          begin <= end or quadratic constraint names whose indices
-          respect this order.  Returns the slack values associated
-          with the quadratic constraints with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be quadratic constraint indices or quadratic
+          constraint names. Returns the slack values associated with the
+          quadratic constraints with indices between begin and end,
+          inclusive of end. Equivalent to
           self.get_quadratic_slacks(range(begin, end + 1)).
         """
         status = cb_qconstrslackfromx(
@@ -971,10 +995,9 @@ class ControlCallback(MIPCallback):
           Equivalent to [self.get_values(i) for i in s]
 
         self.get_values(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with the same property.  Returns a list of
-          the solution values of variables with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns a list of the solution values of variables with indices
+          between begin and end, inclusive of end. Equivalent to
           self.get_values(range(begin, end + 1))
         """
         def getcallbacknodex(begin, end=self.get_num_cols() - 1):
@@ -1006,11 +1029,10 @@ class ControlCallback(MIPCallback):
           [self.get_SOS_feasibilities(i) for i in s]
 
         self.get_SOS_feasibilities(begin, end)
-          begin and end must be integers with begin <= end or SOS
-          names with the same property.  Returns a list of the
-          feasibility statuses of the special ordered sets with
-          indices between begin and end, inclusive of end.
-          Equivalent to self.get_SOS_feasibilities(range(begin, end + 1))
+          begin and end must be SOS indices or SOS names. Returns a list
+          of the feasibility statuses of the special ordered sets with
+          indices between begin and end, inclusive of end. Equivalent to
+          self.get_SOS_feasibilities(range(begin, end + 1))
 
         Note
           Before you call this method from a solve callback, a
@@ -1158,14 +1180,14 @@ class BranchCallback(ControlCallback):
         if len(variables) == 0:
             a = [[], [], []]
         else:
-            a = list(zip(*variables))
+            a = unzip(variables)
         vars = list(a[0])
         dirs = ''.join(list(a[1]))
         bnds = list(a[2])
         if len(constraints) == 0:
             a = [[], [], []]
         else:
-            a = list(zip(*constraints))
+            a = unzip(constraints)
         rmat = _HBMatrix(a[0])
         sense = ''.join(list(a[1]))
         rhs = list(a[2])
@@ -1533,7 +1555,7 @@ class HeuristicCallback(HSCallback):
           node.
         """
         if len(args) == 1:
-            vars, lb, ub = list(zip(*args))
+            vars, lb, ub = unzip(args)
         elif len(args) == 3:
             vars = [args[0]]
             lb = [args[1]]
@@ -1785,11 +1807,10 @@ class IncumbentCallback(MIPCallback):
           Equivalent to [self.get_quadratic_slacks(i) for i in s]
 
         self.get_quadratic_slacks(begin, end)
-          begin and end must be quadratic constraint indices with
-          begin <= end or quadratic constraint names whose indices
-          respect this order.  Returns the slack values associated
-          with the quadratic constraints with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be quadratic constraint indices or
+          quadratic constraint names. Returns the slack values associated
+          with the quadratic constraints with indices between begin and
+          end, inclusive of end. Equivalent to
           self.get_quadratic_slacks(range(begin, end + 1)).
         """
         status = cb_qconstrslackfromx(
@@ -1821,11 +1842,10 @@ class IncumbentCallback(MIPCallback):
           appear in s.  Equivalent to [self.get_values(i) for i in s]
 
         self.get_values(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with this property.  Returns a list of the
-          potential incumbent values of variables with indices
-          between begin and end, inclusive of end.  Equivalent to
-          self.get_values(range(begin, end + 1))
+          begin and end must be variable indices or variable names.
+          Returns a list of the potential incumbent values of variables
+          with indices between begin and end, inclusive of end.
+          Equivalent to self.get_values(range(begin, end + 1))
         """
         def getx(begin, end=self.get_num_cols() - 1):
             return self._x[begin:end + 1]
@@ -2215,10 +2235,9 @@ class Context(object):
           Equivalent to [self.get_relaxation_point(i) for i in s]
 
         self.get_relaxation_point(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with the same property.  Returns a list of
-          solution values of variables with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns a list of solution values of variables with indices
+          between begin and end, inclusive of end. Equivalent to
           self.get_relaxation_point(range(begin, end + 1))
         """
         def callbackgetrelaxationpoint(begin, end=self._get_column_count() - 1):
@@ -2257,10 +2276,9 @@ class Context(object):
           Equivalent to [self.get_incumbent(i) for i in s]
 
         self.get_incumbent(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with the same property.  Returns a list of
-          solution values of variables with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns a list of solution values of variables with indices
+          between begin and end, inclusive of end. Equivalent to
           self.get_incumbent(range(begin, end + 1))
         """
         def callbackgetincumbent(begin, end=self._get_column_count() - 1):
@@ -2319,10 +2337,9 @@ class Context(object):
           Equivalent to [self.get_candidate_point(i) for i in s]
 
         self.get_candidate_point(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with the same property.  Returns a list of
-          solution values of variables with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns a list of solution values of variables with indices
+          between begin and end, inclusive of end. Equivalent to
           self.get_candidate_point(range(begin, end + 1))
         """
         def callbackgetcandidatepoint(begin, end=self._get_column_count() - 1):
@@ -2380,10 +2397,9 @@ class Context(object):
           Equivalent to [self.get_candidate_ray(i) for i in s]
 
         self.get_candidate_ray(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with the same property.  Returns a list of
-          unbounded reay values of variables with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns a list of unbounded reay values of variables with
+          indices between begin and end, inclusive of end. Equivalent to
           self.get_candidate_ray(range(begin, end + 1))
         """
         def callbackgetcandidateray(begin, end=self._get_column_count() - 1):
@@ -2414,10 +2430,9 @@ class Context(object):
           Equivalent to [self.get_local_lower_bounds(i) for i in s]
 
         self.get_local_lower_bounds(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with the same property.  Returns a list of
-          the local lower bounds of variables with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns a list of the local lower bounds of variables with
+          indices between begin and end, inclusive of end. Equivalent to
           self.get_local_lower_bounds(range(begin, end + 1))
         """
         def callbackgetlocallb(begin, end=self._get_column_count() - 1):
@@ -2448,10 +2463,9 @@ class Context(object):
           Equivalent to [self.get_local_upper_bounds(i) for i in s]
 
         self.get_local_upper_bounds(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with the same property.  Returns a list of
-          the local upper bounds of variables with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns a list of the local upper bounds of variables with
+          indices between begin and end, inclusive of end. Equivalent to
           self.get_local_upper_bounds(range(begin, end + 1))
         """
         def callbackgetlocalub(begin, end=self._get_column_count() - 1):
@@ -2483,10 +2497,9 @@ class Context(object):
           Equivalent to [self.get_global_lower_bounds(i) for i in s]
 
         self.get_global_lower_bounds(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with the same property.  Returns a list of
-          the global lower bounds of variables with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns a list of the global lower bounds of variables with
+          indices between begin and end, inclusive of end. Equivalent to
           self.get_global_lower_bounds(range(begin, end + 1))
         """
         def callbackgetgloballb(begin, end=self._get_column_count() - 1):
@@ -2517,10 +2530,9 @@ class Context(object):
           Equivalent to [self.get_global_upper_bounds(i) for i in s]
 
         self.get_global_upper_bounds(begin, end)
-          begin and end must be integers with begin <= end or
-          variable names with the same property.  Returns a list of
-          the global upper bounds of variables with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns a list of the global upper bounds of variables with
+          indices between begin and end, inclusive of end. Equivalent to
           self.get_global_upper_bounds(range(begin, end + 1))
         """
         def callbackgetglobalub(begin, end=self._get_column_count() - 1):

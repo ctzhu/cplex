@@ -1,0 +1,85 @@
+# ------------------------------------------------------------------------
+# File: model_info.py
+# ------------------------------------------------------------------------
+# Licensed Materials - Property of IBM
+# 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
+# Copyright IBM Corporation 2008, 2019. All Rights Reserved.
+#
+# US Government Users Restricted Rights - Use, duplication or
+# disclosure restricted by GSA ADP Schedule Contract with
+# IBM Corp.
+# ------------------------------------------------------------------------
+"""Modeling information IDs returned by the Callable Library.
+
+This module defines symbolic names for the integer modeling information
+IDs returned by the Callable Library. The names to which the modeling
+information IDs are assigned are the same names used in the Callable
+Library, all of which begin with CPXMI. The modeling information IDs are
+accessible through the modeling assistance callback. These symbolic names
+can be used to test if a particular modeling issue has been detected.
+
+See `Cplex.set_modeling_assistance_callback`.
+"""
+
+
+CPXMI_BIGM_COEF = 1040
+CPXMI_BIGM_TO_IND = 1041
+CPXMI_BIGM_VARBOUND = 1042
+CPXMI_CANCEL_TOL = 1045
+CPXMI_EPGAP_LARGE = 1038
+CPXMI_EPGAP_OBJOFFSET = 1037
+CPXMI_FEAS_TOL = 1043
+CPXMI_FRACTION_SCALING = 1047
+CPXMI_IND_NZ_LARGE_NUM = 1019
+CPXMI_IND_NZ_SMALL_NUM = 1020
+CPXMI_IND_RHS_LARGE_NUM = 1021
+CPXMI_IND_RHS_SMALL_NUM = 1022
+CPXMI_KAPPA_ILLPOSED = 1035
+CPXMI_KAPPA_SUSPICIOUS = 1033
+CPXMI_KAPPA_UNSTABLE = 1034
+CPXMI_LB_LARGE_NUM = 1003
+CPXMI_LB_SMALL_NUM = 1004
+CPXMI_LC_NZ_LARGE_NUM = 1023
+CPXMI_LC_NZ_SMALL_NUM = 1024
+CPXMI_LC_RHS_LARGE_NUM = 1025
+CPXMI_LC_RHS_SMALL_NUM = 1026
+CPXMI_MULTIOBJ_COEFFS = 1062
+CPXMI_MULTIOBJ_LARGE_NUM = 1058
+CPXMI_MULTIOBJ_MIX = 1063
+CPXMI_MULTIOBJ_OPT_TOL = 1060
+CPXMI_MULTIOBJ_SMALL_NUM = 1059
+CPXMI_NZ_LARGE_NUM = 1009
+CPXMI_NZ_SMALL_NUM = 1010
+CPXMI_OBJ_LARGE_NUM = 1001
+CPXMI_OBJ_SMALL_NUM = 1002
+CPXMI_OPT_TOL = 1044
+CPXMI_QC_LINNZ_LARGE_NUM = 1015
+CPXMI_QC_LINNZ_SMALL_NUM = 1016
+CPXMI_QC_QNZ_LARGE_NUM = 1017
+CPXMI_QC_QNZ_SMALL_NUM = 1018
+CPXMI_QC_RHS_LARGE_NUM = 1013
+CPXMI_QC_RHS_SMALL_NUM = 1014
+CPXMI_QOBJ_LARGE_NUM = 1011
+CPXMI_QOBJ_SMALL_NUM = 1012
+CPXMI_QOPT_TOL = 1046
+CPXMI_RHS_LARGE_NUM = 1007
+CPXMI_RHS_SMALL_NUM = 1008
+CPXMI_SAMECOEFF_COL = 1050
+CPXMI_SAMECOEFF_IND = 1051
+CPXMI_SAMECOEFF_LAZY = 1054
+CPXMI_SAMECOEFF_MULTIOBJ = 1061
+CPXMI_SAMECOEFF_OBJ = 1057
+CPXMI_SAMECOEFF_QLIN = 1052
+CPXMI_SAMECOEFF_QUAD = 1053
+CPXMI_SAMECOEFF_RHS = 1056
+CPXMI_SAMECOEFF_ROW = 1049
+CPXMI_SAMECOEFF_UCUT = 1055
+CPXMI_SINGLE_PRECISION = 1036
+CPXMI_SYMMETRY_BREAKING_INEQ = 1039
+CPXMI_UB_LARGE_NUM = 1005
+CPXMI_UB_SMALL_NUM = 1006
+CPXMI_UC_NZ_LARGE_NUM = 1027
+CPXMI_UC_NZ_SMALL_NUM = 1028
+CPXMI_UC_RHS_LARGE_NUM = 1029
+CPXMI_UC_RHS_SMALL_NUM = 1030
+CPXMI_WIDE_COEFF_RANGE = 1048

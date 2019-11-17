@@ -203,6 +203,7 @@ CPX_ALG_PIVOT = _pycplex_platform.CPX_ALG_PIVOT
 CPX_ALG_FEASOPT = _pycplex_platform.CPX_ALG_FEASOPT
 CPX_ALG_MIP = _pycplex_platform.CPX_ALG_MIP
 CPX_ALG_BENDERS = _pycplex_platform.CPX_ALG_BENDERS
+CPX_ALG_MULTIOBJ = _pycplex_platform.CPX_ALG_MULTIOBJ
 CPX_ALG_ROBUST = _pycplex_platform.CPX_ALG_ROBUST
 CPX_AT_LOWER = _pycplex_platform.CPX_AT_LOWER
 CPX_BASIC = _pycplex_platform.CPX_BASIC
@@ -440,6 +441,7 @@ CPX_CALLBACK_INFO_LANDPCUT_COUNT = _pycplex_platform.CPX_CALLBACK_INFO_LANDPCUT_
 CPX_CALLBACK_INFO_USERCUT_COUNT = _pycplex_platform.CPX_CALLBACK_INFO_USERCUT_COUNT
 CPX_CALLBACK_INFO_TABLECUT_COUNT = _pycplex_platform.CPX_CALLBACK_INFO_TABLECUT_COUNT
 CPX_CALLBACK_INFO_SOLNPOOLCUT_COUNT = _pycplex_platform.CPX_CALLBACK_INFO_SOLNPOOLCUT_COUNT
+CPX_CALLBACK_INFO_BENDERS_COUNT = _pycplex_platform.CPX_CALLBACK_INFO_BENDERS_COUNT
 CPX_CALLBACK_INFO_NODE_COUNT_LONG = _pycplex_platform.CPX_CALLBACK_INFO_NODE_COUNT_LONG
 CPX_CALLBACK_INFO_NODES_LEFT_LONG = _pycplex_platform.CPX_CALLBACK_INFO_NODES_LEFT_LONG
 CPX_CALLBACK_INFO_MIP_ITERATIONS_LONG = _pycplex_platform.CPX_CALLBACK_INFO_MIP_ITERATIONS_LONG
@@ -492,27 +494,10 @@ CPX_CON_LINEAR = _pycplex_platform.CPX_CON_LINEAR
 CPX_CON_QUADRATIC = _pycplex_platform.CPX_CON_QUADRATIC
 CPX_CON_SOS = _pycplex_platform.CPX_CON_SOS
 CPX_CON_INDICATOR = _pycplex_platform.CPX_CON_INDICATOR
-CPX_CON_MINEXPR = _pycplex_platform.CPX_CON_MINEXPR
-CPX_CON_MAXEXPR = _pycplex_platform.CPX_CON_MAXEXPR
 CPX_CON_PWL = _pycplex_platform.CPX_CON_PWL
 CPX_CON_ABS = _pycplex_platform.CPX_CON_ABS
-CPX_CON_DISJCST = _pycplex_platform.CPX_CON_DISJCST
-CPX_CON_INDDISJCST = _pycplex_platform.CPX_CON_INDDISJCST
-CPX_CON_SETVAR = _pycplex_platform.CPX_CON_SETVAR
-CPX_CON_SETVARMEMBER = _pycplex_platform.CPX_CON_SETVARMEMBER
-CPX_CON_SETVARCARD = _pycplex_platform.CPX_CON_SETVARCARD
-CPX_CON_SETVARSUM = _pycplex_platform.CPX_CON_SETVARSUM
-CPX_CON_SETVARMIN = _pycplex_platform.CPX_CON_SETVARMIN
-CPX_CON_SETVARMAX = _pycplex_platform.CPX_CON_SETVARMAX
-CPX_CON_SETVARSUBSET = _pycplex_platform.CPX_CON_SETVARSUBSET
-CPX_CON_SETVARDOMAIN = _pycplex_platform.CPX_CON_SETVARDOMAIN
-CPX_CON_SETVARUNION = _pycplex_platform.CPX_CON_SETVARUNION
-CPX_CON_SETVARINTERSECTION = _pycplex_platform.CPX_CON_SETVARINTERSECTION
-CPX_CON_SETVARNULLINTERSECT = _pycplex_platform.CPX_CON_SETVARNULLINTERSECT
-CPX_CON_SETVARINTERSECT = _pycplex_platform.CPX_CON_SETVARINTERSECT
-CPX_CON_SETVAREQ = _pycplex_platform.CPX_CON_SETVAREQ
-CPX_CON_SETVARNEQ = _pycplex_platform.CPX_CON_SETVARNEQ
-CPX_CON_SETVARNEQCST = _pycplex_platform.CPX_CON_SETVARNEQCST
+CPX_CON_MINEXPR = _pycplex_platform.CPX_CON_MINEXPR
+CPX_CON_MAXEXPR = _pycplex_platform.CPX_CON_MAXEXPR
 CPX_CON_LAST_CONTYPE = _pycplex_platform.CPX_CON_LAST_CONTYPE
 CPX_INDICATOR_IF = _pycplex_platform.CPX_INDICATOR_IF
 CPX_INDICATOR_ONLYIF = _pycplex_platform.CPX_INDICATOR_ONLYIF
@@ -561,6 +546,7 @@ CPX_MAX_INT_INFEAS = _pycplex_platform.CPX_MAX_INT_INFEAS
 CPX_MAX_PI = _pycplex_platform.CPX_MAX_PI
 CPX_MAX_PRIMAL_INFEAS = _pycplex_platform.CPX_MAX_PRIMAL_INFEAS
 CPX_MAX_PRIMAL_RESIDUAL = _pycplex_platform.CPX_MAX_PRIMAL_RESIDUAL
+CPX_MAX_PWLSLACK_INFEAS = _pycplex_platform.CPX_MAX_PWLSLACK_INFEAS
 CPX_MAX_QCPRIMAL_RESIDUAL = _pycplex_platform.CPX_MAX_QCPRIMAL_RESIDUAL
 CPX_MAX_QCSLACK = _pycplex_platform.CPX_MAX_QCSLACK
 CPX_MAX_QCSLACK_INFEAS = _pycplex_platform.CPX_MAX_QCSLACK_INFEAS
@@ -575,6 +561,28 @@ CPX_MAX_SCALED_SLACK = _pycplex_platform.CPX_MAX_SCALED_SLACK
 CPX_MAX_SCALED_X = _pycplex_platform.CPX_MAX_SCALED_X
 CPX_MAX_SLACK = _pycplex_platform.CPX_MAX_SLACK
 CPX_MAX_X = _pycplex_platform.CPX_MAX_X
+CPX_MULTIOBJ_BARITCNT = _pycplex_platform.CPX_MULTIOBJ_BARITCNT
+CPX_MULTIOBJ_BESTOBJVAL = _pycplex_platform.CPX_MULTIOBJ_BESTOBJVAL
+CPX_MULTIOBJ_BLEND = _pycplex_platform.CPX_MULTIOBJ_BLEND
+CPX_MULTIOBJ_DEGCNT = _pycplex_platform.CPX_MULTIOBJ_DEGCNT
+CPX_MULTIOBJ_DETTIME = _pycplex_platform.CPX_MULTIOBJ_DETTIME
+CPX_MULTIOBJ_DEXCH = _pycplex_platform.CPX_MULTIOBJ_DEXCH
+CPX_MULTIOBJ_DPUSH = _pycplex_platform.CPX_MULTIOBJ_DPUSH
+CPX_MULTIOBJ_ERROR = _pycplex_platform.CPX_MULTIOBJ_ERROR
+CPX_MULTIOBJ_ITCNT = _pycplex_platform.CPX_MULTIOBJ_ITCNT
+CPX_MULTIOBJ_METHOD = _pycplex_platform.CPX_MULTIOBJ_METHOD
+CPX_MULTIOBJ_NODECNT = _pycplex_platform.CPX_MULTIOBJ_NODECNT
+CPX_MULTIOBJ_NODELEFTCNT = _pycplex_platform.CPX_MULTIOBJ_NODELEFTCNT
+CPX_MULTIOBJ_OBJVAL = _pycplex_platform.CPX_MULTIOBJ_OBJVAL
+CPX_MULTIOBJ_PEXCH = _pycplex_platform.CPX_MULTIOBJ_PEXCH
+CPX_MULTIOBJ_PHASE1CNT = _pycplex_platform.CPX_MULTIOBJ_PHASE1CNT
+CPX_MULTIOBJ_PPUSH = _pycplex_platform.CPX_MULTIOBJ_PPUSH
+CPX_MULTIOBJ_PRIORITY = _pycplex_platform.CPX_MULTIOBJ_PRIORITY
+CPX_MULTIOBJ_SIFTITCNT = _pycplex_platform.CPX_MULTIOBJ_SIFTITCNT
+CPX_MULTIOBJ_SIFTPHASE1CNT = _pycplex_platform.CPX_MULTIOBJ_SIFTPHASE1CNT
+CPX_MULTIOBJ_STATUS = _pycplex_platform.CPX_MULTIOBJ_STATUS
+CPX_MULTIOBJ_TIME = _pycplex_platform.CPX_MULTIOBJ_TIME
+CPX_NO_PRIORITY_CHANGE = _pycplex_platform.CPX_NO_PRIORITY_CHANGE
 CPX_OBJ_GAP = _pycplex_platform.CPX_OBJ_GAP
 CPX_PRIMAL_OBJ = _pycplex_platform.CPX_PRIMAL_OBJ
 CPX_SOLNPOOL_DIV = _pycplex_platform.CPX_SOLNPOOL_DIV
@@ -608,6 +616,12 @@ CPX_STAT_FEASIBLE_RELAXED_SUM = _pycplex_platform.CPX_STAT_FEASIBLE_RELAXED_SUM
 CPX_STAT_FIRSTORDER = _pycplex_platform.CPX_STAT_FIRSTORDER
 CPX_STAT_INFEASIBLE = _pycplex_platform.CPX_STAT_INFEASIBLE
 CPX_STAT_INForUNBD = _pycplex_platform.CPX_STAT_INForUNBD
+CPX_STAT_MULTIOBJ_INFEASIBLE = _pycplex_platform.CPX_STAT_MULTIOBJ_INFEASIBLE
+CPX_STAT_MULTIOBJ_INForUNBD = _pycplex_platform.CPX_STAT_MULTIOBJ_INForUNBD
+CPX_STAT_MULTIOBJ_NON_OPTIMAL = _pycplex_platform.CPX_STAT_MULTIOBJ_NON_OPTIMAL
+CPX_STAT_MULTIOBJ_OPTIMAL = _pycplex_platform.CPX_STAT_MULTIOBJ_OPTIMAL
+CPX_STAT_MULTIOBJ_STOPPED = _pycplex_platform.CPX_STAT_MULTIOBJ_STOPPED
+CPX_STAT_MULTIOBJ_UNBOUNDED = _pycplex_platform.CPX_STAT_MULTIOBJ_UNBOUNDED
 CPX_STAT_NUM_BEST = _pycplex_platform.CPX_STAT_NUM_BEST
 CPX_STAT_OPTIMAL = _pycplex_platform.CPX_STAT_OPTIMAL
 CPX_STAT_OPTIMAL_FACE_UNBOUNDED = _pycplex_platform.CPX_STAT_OPTIMAL_FACE_UNBOUNDED
@@ -624,6 +638,7 @@ CPX_SUM_INT_INFEAS = _pycplex_platform.CPX_SUM_INT_INFEAS
 CPX_SUM_PI = _pycplex_platform.CPX_SUM_PI
 CPX_SUM_PRIMAL_INFEAS = _pycplex_platform.CPX_SUM_PRIMAL_INFEAS
 CPX_SUM_PRIMAL_RESIDUAL = _pycplex_platform.CPX_SUM_PRIMAL_RESIDUAL
+CPX_SUM_PWLSLACK_INFEAS = _pycplex_platform.CPX_SUM_PWLSLACK_INFEAS
 CPX_SUM_QCPRIMAL_RESIDUAL = _pycplex_platform.CPX_SUM_QCPRIMAL_RESIDUAL
 CPX_SUM_QCSLACK = _pycplex_platform.CPX_SUM_QCSLACK
 CPX_SUM_QCSLACK_INFEAS = _pycplex_platform.CPX_SUM_QCSLACK_INFEAS
@@ -642,7 +657,6 @@ CPXERR_ABORT_STRONGBRANCH = _pycplex_platform.CPXERR_ABORT_STRONGBRANCH
 CPXERR_ADJ_SIGN_QUAD = _pycplex_platform.CPXERR_ADJ_SIGN_QUAD
 CPXERR_ADJ_SIGN_SENSE = _pycplex_platform.CPXERR_ADJ_SIGN_SENSE
 CPXERR_ADJ_SIGNS = _pycplex_platform.CPXERR_ADJ_SIGNS
-CPXERR_ALGNOTLICENSED = _pycplex_platform.CPXERR_ALGNOTLICENSED
 CPXERR_ARC_INDEX_RANGE = _pycplex_platform.CPXERR_ARC_INDEX_RANGE
 CPXERR_ARRAY_BAD_SOS_TYPE = _pycplex_platform.CPXERR_ARRAY_BAD_SOS_TYPE
 CPXERR_ARRAY_NOT_ASCENDING = _pycplex_platform.CPXERR_ARRAY_NOT_ASCENDING
@@ -664,6 +678,7 @@ CPXERR_BAD_INDTYPE = _pycplex_platform.CPXERR_BAD_INDTYPE
 CPXERR_BAD_LAZY_UCUT = _pycplex_platform.CPXERR_BAD_LAZY_UCUT
 CPXERR_BAD_LUB = _pycplex_platform.CPXERR_BAD_LUB
 CPXERR_BAD_METHOD = _pycplex_platform.CPXERR_BAD_METHOD
+CPXERR_BAD_MULTIOBJ_ATTR = _pycplex_platform.CPXERR_BAD_MULTIOBJ_ATTR
 CPXERR_BAD_NUMBER = _pycplex_platform.CPXERR_BAD_NUMBER
 CPXERR_BAD_OBJ_SENSE = _pycplex_platform.CPXERR_BAD_OBJ_SENSE
 CPXERR_BAD_PARAM_NAME = _pycplex_platform.CPXERR_BAD_PARAM_NAME
@@ -678,7 +693,6 @@ CPXERR_BAD_SECTION_QMATRIX = _pycplex_platform.CPXERR_BAD_SECTION_QMATRIX
 CPXERR_BAD_SENSE = _pycplex_platform.CPXERR_BAD_SENSE
 CPXERR_BAD_SOS_TYPE = _pycplex_platform.CPXERR_BAD_SOS_TYPE
 CPXERR_BAD_STATUS = _pycplex_platform.CPXERR_BAD_STATUS
-CPXERR_BADPRODUCT = _pycplex_platform.CPXERR_BADPRODUCT
 CPXERR_BAS_FILE_SHORT = _pycplex_platform.CPXERR_BAS_FILE_SHORT
 CPXERR_BAS_FILE_SIZE = _pycplex_platform.CPXERR_BAS_FILE_SIZE
 CPXERR_BENDERS_MASTER_SOLVE = _pycplex_platform.CPXERR_BENDERS_MASTER_SOLVE
@@ -686,8 +700,6 @@ CPXERR_CALLBACK = _pycplex_platform.CPXERR_CALLBACK
 CPXERR_CALLBACK_INCONSISTENT = _pycplex_platform.CPXERR_CALLBACK_INCONSISTENT
 CPXERR_CAND_NOT_POINT = _pycplex_platform.CPXERR_CAND_NOT_POINT
 CPXERR_CAND_NOT_RAY = _pycplex_platform.CPXERR_CAND_NOT_RAY
-CPXERR_CANT_CLOSE_CHILD = _pycplex_platform.CPXERR_CANT_CLOSE_CHILD
-CPXERR_CHILD_OF_CHILD = _pycplex_platform.CPXERR_CHILD_OF_CHILD
 CPXERR_CNTRL_IN_NAME = _pycplex_platform.CPXERR_CNTRL_IN_NAME
 CPXERR_COL_INDEX_RANGE = _pycplex_platform.CPXERR_COL_INDEX_RANGE
 CPXERR_COL_REPEAT_PRINT = _pycplex_platform.CPXERR_COL_REPEAT_PRINT
@@ -719,7 +731,6 @@ CPXERR_FILE_FORMAT = _pycplex_platform.CPXERR_FILE_FORMAT
 CPXERR_FILE_IO = _pycplex_platform.CPXERR_FILE_IO
 CPXERR_FILTER_VARIABLE_TYPE = _pycplex_platform.CPXERR_FILTER_VARIABLE_TYPE
 CPXERR_ILL_DEFINED_PWL = _pycplex_platform.CPXERR_ILL_DEFINED_PWL
-CPXERR_ILOG_LICENSE = _pycplex_platform.CPXERR_ILOG_LICENSE
 CPXERR_IN_INFOCALLBACK = _pycplex_platform.CPXERR_IN_INFOCALLBACK
 CPXERR_INDEX_NOT_BASIC = _pycplex_platform.CPXERR_INDEX_NOT_BASIC
 CPXERR_INDEX_RANGE = _pycplex_platform.CPXERR_INDEX_RANGE
@@ -740,6 +751,7 @@ CPXERR_MISS_SOS_TYPE = _pycplex_platform.CPXERR_MISS_SOS_TYPE
 CPXERR_MSG_NO_CHANNEL = _pycplex_platform.CPXERR_MSG_NO_CHANNEL
 CPXERR_MSG_NO_FILEPTR = _pycplex_platform.CPXERR_MSG_NO_FILEPTR
 CPXERR_MSG_NO_FUNCTION = _pycplex_platform.CPXERR_MSG_NO_FUNCTION
+CPXERR_MULTIOBJ_SUBPROB_SOLVE = _pycplex_platform.CPXERR_MULTIOBJ_SUBPROB_SOLVE
 CPXERR_MULTIPLE_PROBS_IN_REMOTE_ENVIRONMENT = _pycplex_platform.CPXERR_MULTIPLE_PROBS_IN_REMOTE_ENVIRONMENT
 CPXERR_NAME_CREATION = _pycplex_platform.CPXERR_NAME_CREATION
 CPXERR_NAME_NOT_FOUND = _pycplex_platform.CPXERR_NAME_NOT_FOUND
@@ -774,6 +786,7 @@ CPXERR_NO_NORMS = _pycplex_platform.CPXERR_NO_NORMS
 CPXERR_NO_NUMBER = _pycplex_platform.CPXERR_NO_NUMBER
 CPXERR_NO_NUMBER_BOUND = _pycplex_platform.CPXERR_NO_NUMBER_BOUND
 CPXERR_NO_NUMBER_FIRST = _pycplex_platform.CPXERR_NO_NUMBER_FIRST
+CPXERR_NO_OBJ_NAME = _pycplex_platform.CPXERR_NO_OBJ_NAME
 CPXERR_NO_OBJ_SENSE = _pycplex_platform.CPXERR_NO_OBJ_SENSE
 CPXERR_NO_OBJECTIVE = _pycplex_platform.CPXERR_NO_OBJECTIVE
 CPXERR_NO_OP_OR_SENSE = _pycplex_platform.CPXERR_NO_OP_OR_SENSE
@@ -799,6 +812,7 @@ CPXERR_NOT_DUAL_UNBOUNDED = _pycplex_platform.CPXERR_NOT_DUAL_UNBOUNDED
 CPXERR_NOT_FIXED = _pycplex_platform.CPXERR_NOT_FIXED
 CPXERR_NOT_FOR_BENDERS = _pycplex_platform.CPXERR_NOT_FOR_BENDERS
 CPXERR_NOT_FOR_MIP = _pycplex_platform.CPXERR_NOT_FOR_MIP
+CPXERR_NOT_FOR_MULTIOBJ = _pycplex_platform.CPXERR_NOT_FOR_MULTIOBJ
 CPXERR_NOT_FOR_QCP = _pycplex_platform.CPXERR_NOT_FOR_QCP
 CPXERR_NOT_FOR_QP = _pycplex_platform.CPXERR_NOT_FOR_QP
 CPXERR_NOT_MILPCLASS = _pycplex_platform.CPXERR_NOT_MILPCLASS
@@ -908,6 +922,11 @@ CPXMI_LC_NZ_LARGE_NUM = _pycplex_platform.CPXMI_LC_NZ_LARGE_NUM
 CPXMI_LC_NZ_SMALL_NUM = _pycplex_platform.CPXMI_LC_NZ_SMALL_NUM
 CPXMI_LC_RHS_LARGE_NUM = _pycplex_platform.CPXMI_LC_RHS_LARGE_NUM
 CPXMI_LC_RHS_SMALL_NUM = _pycplex_platform.CPXMI_LC_RHS_SMALL_NUM
+CPXMI_MULTIOBJ_COEFFS = _pycplex_platform.CPXMI_MULTIOBJ_COEFFS
+CPXMI_MULTIOBJ_LARGE_NUM = _pycplex_platform.CPXMI_MULTIOBJ_LARGE_NUM
+CPXMI_MULTIOBJ_MIX = _pycplex_platform.CPXMI_MULTIOBJ_MIX
+CPXMI_MULTIOBJ_OPT_TOL = _pycplex_platform.CPXMI_MULTIOBJ_OPT_TOL
+CPXMI_MULTIOBJ_SMALL_NUM = _pycplex_platform.CPXMI_MULTIOBJ_SMALL_NUM
 CPXMI_NZ_LARGE_NUM = _pycplex_platform.CPXMI_NZ_LARGE_NUM
 CPXMI_NZ_SMALL_NUM = _pycplex_platform.CPXMI_NZ_SMALL_NUM
 CPXMI_OBJ_LARGE_NUM = _pycplex_platform.CPXMI_OBJ_LARGE_NUM
@@ -927,6 +946,7 @@ CPXMI_RHS_SMALL_NUM = _pycplex_platform.CPXMI_RHS_SMALL_NUM
 CPXMI_SAMECOEFF_COL = _pycplex_platform.CPXMI_SAMECOEFF_COL
 CPXMI_SAMECOEFF_IND = _pycplex_platform.CPXMI_SAMECOEFF_IND
 CPXMI_SAMECOEFF_LAZY = _pycplex_platform.CPXMI_SAMECOEFF_LAZY
+CPXMI_SAMECOEFF_MULTIOBJ = _pycplex_platform.CPXMI_SAMECOEFF_MULTIOBJ
 CPXMI_SAMECOEFF_OBJ = _pycplex_platform.CPXMI_SAMECOEFF_OBJ
 CPXMI_SAMECOEFF_QLIN = _pycplex_platform.CPXMI_SAMECOEFF_QLIN
 CPXMI_SAMECOEFF_QUAD = _pycplex_platform.CPXMI_SAMECOEFF_QUAD
@@ -986,8 +1006,10 @@ CPXCALLBACKINFO_THREADS = _pycplex_platform.CPXCALLBACKINFO_THREADS
 CPXCALLBACKINFO_FEASIBLE = _pycplex_platform.CPXCALLBACKINFO_FEASIBLE
 CPXCALLBACKINFO_TIME = _pycplex_platform.CPXCALLBACKINFO_TIME
 CPXCALLBACKINFO_DETTIME = _pycplex_platform.CPXCALLBACKINFO_DETTIME
+CPXCALLBACKSOLUTION_NOCHECK = _pycplex_platform.CPXCALLBACKSOLUTION_NOCHECK
 CPXCALLBACKSOLUTION_CHECKFEAS = _pycplex_platform.CPXCALLBACKSOLUTION_CHECKFEAS
 CPXCALLBACKSOLUTION_PROPAGATE = _pycplex_platform.CPXCALLBACKSOLUTION_PROPAGATE
+CPXCALLBACKSOLUTION_SOLVE = _pycplex_platform.CPXCALLBACKSOLUTION_SOLVE
 CPXINFO_BYTE = _pycplex_platform.CPXINFO_BYTE
 CPXINFO_SHORT = _pycplex_platform.CPXINFO_SHORT
 CPXINFO_INT = _pycplex_platform.CPXINFO_INT
@@ -1057,14 +1079,17 @@ CPX_PARAM_CLONELOG = _pycplex_platform.CPX_PARAM_CLONELOG
 CPX_PARAM_TUNINGDETTILIM = _pycplex_platform.CPX_PARAM_TUNINGDETTILIM
 CPX_PARAM_CPUMASK = _pycplex_platform.CPX_PARAM_CPUMASK
 CPX_PARAM_SOLUTIONTYPE = _pycplex_platform.CPX_PARAM_SOLUTIONTYPE
+CPX_PARAM_WARNLIM = _pycplex_platform.CPX_PARAM_WARNLIM
 CPX_PARAM_SIFTSIM = _pycplex_platform.CPX_PARAM_SIFTSIM
 CPX_PARAM_DYNAMICROWS = _pycplex_platform.CPX_PARAM_DYNAMICROWS
 CPX_PARAM_RECORD = _pycplex_platform.CPX_PARAM_RECORD
 CPX_PARAM_PARAMDISPLAY = _pycplex_platform.CPX_PARAM_PARAMDISPLAY
+CPX_PARAM_FOLDING = _pycplex_platform.CPX_PARAM_FOLDING
 CPX_PARAM_WORKERALG = _pycplex_platform.CPX_PARAM_WORKERALG
 CPX_PARAM_BENDERSSTRATEGY = _pycplex_platform.CPX_PARAM_BENDERSSTRATEGY
 CPX_PARAM_BENDERSFEASCUTTOL = _pycplex_platform.CPX_PARAM_BENDERSFEASCUTTOL
 CPX_PARAM_BENDERSOPTCUTTOL = _pycplex_platform.CPX_PARAM_BENDERSOPTCUTTOL
+CPX_PARAM_MULTIOBJDISPLAY = _pycplex_platform.CPX_PARAM_MULTIOBJDISPLAY
 CPX_PARAM_BRDIR = _pycplex_platform.CPX_PARAM_BRDIR
 CPX_PARAM_BTTOL = _pycplex_platform.CPX_PARAM_BTTOL
 CPX_PARAM_CLIQUES = _pycplex_platform.CPX_PARAM_CLIQUES
@@ -1114,7 +1139,6 @@ CPX_PARAM_MIPEMPHASIS = _pycplex_platform.CPX_PARAM_MIPEMPHASIS
 CPX_PARAM_SYMMETRY = _pycplex_platform.CPX_PARAM_SYMMETRY
 CPX_PARAM_DIVETYPE = _pycplex_platform.CPX_PARAM_DIVETYPE
 CPX_PARAM_RINSHEUR = _pycplex_platform.CPX_PARAM_RINSHEUR
-CPX_PARAM_SUBMIPNODELIM = _pycplex_platform.CPX_PARAM_SUBMIPNODELIM
 CPX_PARAM_LBHEUR = _pycplex_platform.CPX_PARAM_LBHEUR
 CPX_PARAM_REPEATPRESOLVE = _pycplex_platform.CPX_PARAM_REPEATPRESOLVE
 CPX_PARAM_PROBETIME = _pycplex_platform.CPX_PARAM_PROBETIME
@@ -1345,6 +1369,10 @@ def cpxpygenericcallbackfuncwrap(*args):
   return _pycplex_platform.cpxpygenericcallbackfuncwrap(*args)
 cpxpygenericcallbackfuncwrap = _pycplex_platform.cpxpygenericcallbackfuncwrap
 
+def cpxpymodelasstcallbackfuncwrap(*args):
+  return _pycplex_platform.cpxpymodelasstcallbackfuncwrap(*args)
+cpxpymodelasstcallbackfuncwrap = _pycplex_platform.cpxpymodelasstcallbackfuncwrap
+
 def messagewrap(*args):
   return _pycplex_platform.messagewrap(*args)
 messagewrap = _pycplex_platform.messagewrap
@@ -1528,6 +1556,63 @@ CPXAUTOE_H = _pycplex_platform.CPXAUTOE_H
 CPX_AUTOES_H = _pycplex_platform.CPX_AUTOES_H
 CPX_AUTOEL_H = _pycplex_platform.CPX_AUTOEL_H
 CPX_AUTOEX_H = _pycplex_platform.CPX_AUTOEX_H
+class cpxpyiodevice(_object):
+    __swig_setmethods__ = {}
+    __setattr__ = lambda self, name, value: _swig_setattr(self, cpxpyiodevice, name, value)
+    __swig_getmethods__ = {}
+    __getattr__ = lambda self, name: _swig_getattr(self, cpxpyiodevice, name)
+    __repr__ = _swig_repr
+    __swig_setmethods__["dev"] = _pycplex_platform.cpxpyiodevice_dev_set
+    __swig_getmethods__["dev"] = _pycplex_platform.cpxpyiodevice_dev_get
+    if _newclass:dev = _swig_property(_pycplex_platform.cpxpyiodevice_dev_get, _pycplex_platform.cpxpyiodevice_dev_set)
+    __swig_setmethods__["stream"] = _pycplex_platform.cpxpyiodevice_stream_set
+    __swig_getmethods__["stream"] = _pycplex_platform.cpxpyiodevice_stream_get
+    if _newclass:stream = _swig_property(_pycplex_platform.cpxpyiodevice_stream_get, _pycplex_platform.cpxpyiodevice_stream_set)
+    def __init__(self): 
+        this = _pycplex_platform.new_cpxpyiodevice()
+        try: self.this.append(this)
+        except: self.this = this
+    __swig_destroy__ = _pycplex_platform.delete_cpxpyiodevice
+    __del__ = lambda self : None;
+cpxpyiodevice_swigregister = _pycplex_platform.cpxpyiodevice_swigregister
+cpxpyiodevice_swigregister(cpxpyiodevice)
+
+
+def init_callback_lock():
+  return _pycplex_platform.init_callback_lock()
+init_callback_lock = _pycplex_platform.init_callback_lock
+
+def finit_callback_lock(*args):
+  return _pycplex_platform.finit_callback_lock(*args)
+finit_callback_lock = _pycplex_platform.finit_callback_lock
+
+def CPXPyObject_AsInt(*args):
+  return _pycplex_platform.CPXPyObject_AsInt(*args)
+CPXPyObject_AsInt = _pycplex_platform.CPXPyObject_AsInt
+
+def CPXPyObject_AsChar(*args):
+  return _pycplex_platform.CPXPyObject_AsChar(*args)
+CPXPyObject_AsChar = _pycplex_platform.CPXPyObject_AsChar
+
+def CPXPyObject_AsCPXSIZE(*args):
+  return _pycplex_platform.CPXPyObject_AsCPXSIZE(*args)
+CPXPyObject_AsCPXSIZE = _pycplex_platform.CPXPyObject_AsCPXSIZE
+
+def CPXPyObject_AsCPXLONG(*args):
+  return _pycplex_platform.CPXPyObject_AsCPXLONG(*args)
+CPXPyObject_AsCPXLONG = _pycplex_platform.CPXPyObject_AsCPXLONG
+
+def CPXPyObject_AsCPXCNT(*args):
+  return _pycplex_platform.CPXPyObject_AsCPXCNT(*args)
+CPXPyObject_AsCPXCNT = _pycplex_platform.CPXPyObject_AsCPXCNT
+
+def CPXPyObject_AsDouble(*args):
+  return _pycplex_platform.CPXPyObject_AsDouble(*args)
+CPXPyObject_AsDouble = _pycplex_platform.CPXPyObject_AsDouble
+
+def CPXPyIODevInit(*args):
+  return _pycplex_platform.CPXPyIODevInit(*args)
+CPXPyIODevInit = _pycplex_platform.CPXPyIODevInit
 
 def CPXXdualopt(*args):
   return _pycplex_platform.CPXXdualopt(*args)
@@ -1713,13 +1798,9 @@ def CPXXreadcopymipstarts(*args):
   return _pycplex_platform.CPXXreadcopymipstarts(*args)
 CPXXreadcopymipstarts = _pycplex_platform.CPXXreadcopymipstarts
 
-def init_callback_lock():
-  return _pycplex_platform.init_callback_lock()
-init_callback_lock = _pycplex_platform.init_callback_lock
-
-def finit_callback_lock(*args):
-  return _pycplex_platform.finit_callback_lock(*args)
-finit_callback_lock = _pycplex_platform.finit_callback_lock
+def CPXXmultiobjopt(*args):
+  return _pycplex_platform.CPXXmultiobjopt(*args)
+CPXXmultiobjopt = _pycplex_platform.CPXXmultiobjopt
 
 def pack_env_lp_ptr(*args):
   return _pycplex_platform.pack_env_lp_ptr(*args)
@@ -2905,10 +2986,6 @@ def CPXXgetnumusercuts(*args):
   return _pycplex_platform.CPXXgetnumusercuts(*args)
 CPXXgetnumusercuts = _pycplex_platform.CPXXgetnumusercuts
 
-def CPXEgetnumgconstrs(*args):
-  return _pycplex_platform.CPXEgetnumgconstrs(*args)
-CPXEgetnumgconstrs = _pycplex_platform.CPXEgetnumgconstrs
-
 def CPXEgetprobstats(*args):
   return _pycplex_platform.CPXEgetprobstats(*args)
 CPXEgetprobstats = _pycplex_platform.CPXEgetprobstats
@@ -3000,6 +3077,138 @@ CPXXcallbackaddusercuts = _pycplex_platform.CPXXcallbackaddusercuts
 def CPXXcallbackrejectcandidate(*args):
   return _pycplex_platform.CPXXcallbackrejectcandidate(*args)
 CPXXcallbackrejectcandidate = _pycplex_platform.CPXXcallbackrejectcandidate
+
+def CPXXmodelasstcallbacksetfunc(*args):
+  return _pycplex_platform.CPXXmodelasstcallbacksetfunc(*args)
+CPXXmodelasstcallbacksetfunc = _pycplex_platform.CPXXmodelasstcallbacksetfunc
+
+def CPXXgetnumobjs(*args):
+  return _pycplex_platform.CPXXgetnumobjs(*args)
+CPXXgetnumobjs = _pycplex_platform.CPXXgetnumobjs
+
+def CPXXmultiobjchgattribs(*args):
+  return _pycplex_platform.CPXXmultiobjchgattribs(*args)
+CPXXmultiobjchgattribs = _pycplex_platform.CPXXmultiobjchgattribs
+
+def CPXXmultiobjgetindex(*args):
+  return _pycplex_platform.CPXXmultiobjgetindex(*args)
+CPXXmultiobjgetindex = _pycplex_platform.CPXXmultiobjgetindex
+
+def CPXXmultiobjgetname(*args):
+  return _pycplex_platform.CPXXmultiobjgetname(*args)
+CPXXmultiobjgetname = _pycplex_platform.CPXXmultiobjgetname
+
+def CPXXmultiobjgetobj(*args):
+  return _pycplex_platform.CPXXmultiobjgetobj(*args)
+CPXXmultiobjgetobj = _pycplex_platform.CPXXmultiobjgetobj
+
+def CPXXmultiobjgetobjval(*args):
+  return _pycplex_platform.CPXXmultiobjgetobjval(*args)
+CPXXmultiobjgetobjval = _pycplex_platform.CPXXmultiobjgetobjval
+
+def CPXXmultiobjgetobjvalbypriority(*args):
+  return _pycplex_platform.CPXXmultiobjgetobjvalbypriority(*args)
+CPXXmultiobjgetobjvalbypriority = _pycplex_platform.CPXXmultiobjgetobjvalbypriority
+
+def CPXXmultiobjsetobj(*args):
+  return _pycplex_platform.CPXXmultiobjsetobj(*args)
+CPXXmultiobjsetobj = _pycplex_platform.CPXXmultiobjsetobj
+
+def CPXXsetnumobjs(*args):
+  return _pycplex_platform.CPXXsetnumobjs(*args)
+CPXXsetnumobjs = _pycplex_platform.CPXXsetnumobjs
+
+def CPXXmultiobjgetdblinfo(*args):
+  return _pycplex_platform.CPXXmultiobjgetdblinfo(*args)
+CPXXmultiobjgetdblinfo = _pycplex_platform.CPXXmultiobjgetdblinfo
+
+def CPXXmultiobjgetintinfo(*args):
+  return _pycplex_platform.CPXXmultiobjgetintinfo(*args)
+CPXXmultiobjgetintinfo = _pycplex_platform.CPXXmultiobjgetintinfo
+
+def CPXXmultiobjgetlonginfo(*args):
+  return _pycplex_platform.CPXXmultiobjgetlonginfo(*args)
+CPXXmultiobjgetlonginfo = _pycplex_platform.CPXXmultiobjgetlonginfo
+
+def CPXXmultiobjgetnumsolves(*args):
+  return _pycplex_platform.CPXXmultiobjgetnumsolves(*args)
+CPXXmultiobjgetnumsolves = _pycplex_platform.CPXXmultiobjgetnumsolves
+
+def CPXEgetnumprios(*args):
+  return _pycplex_platform.CPXEgetnumprios(*args)
+CPXEgetnumprios = _pycplex_platform.CPXEgetnumprios
+
+def CPXEismultiobj(*args):
+  return _pycplex_platform.CPXEismultiobj(*args)
+CPXEismultiobj = _pycplex_platform.CPXEismultiobj
+
+def CPXXparamsetadddbl(*args):
+  return _pycplex_platform.CPXXparamsetadddbl(*args)
+CPXXparamsetadddbl = _pycplex_platform.CPXXparamsetadddbl
+
+def CPXXparamsetaddint(*args):
+  return _pycplex_platform.CPXXparamsetaddint(*args)
+CPXXparamsetaddint = _pycplex_platform.CPXXparamsetaddint
+
+def CPXXparamsetaddlong(*args):
+  return _pycplex_platform.CPXXparamsetaddlong(*args)
+CPXXparamsetaddlong = _pycplex_platform.CPXXparamsetaddlong
+
+def CPXXparamsetaddstr(*args):
+  return _pycplex_platform.CPXXparamsetaddstr(*args)
+CPXXparamsetaddstr = _pycplex_platform.CPXXparamsetaddstr
+
+def CPXXparamsetapply(*args):
+  return _pycplex_platform.CPXXparamsetapply(*args)
+CPXXparamsetapply = _pycplex_platform.CPXXparamsetapply
+
+def CPXXparamsetcopy(*args):
+  return _pycplex_platform.CPXXparamsetcopy(*args)
+CPXXparamsetcopy = _pycplex_platform.CPXXparamsetcopy
+
+def CPXXparamsetcreate(*args):
+  return _pycplex_platform.CPXXparamsetcreate(*args)
+CPXXparamsetcreate = _pycplex_platform.CPXXparamsetcreate
+
+def CPXXparamsetdel(*args):
+  return _pycplex_platform.CPXXparamsetdel(*args)
+CPXXparamsetdel = _pycplex_platform.CPXXparamsetdel
+
+def CPXXparamsetfree(*args):
+  return _pycplex_platform.CPXXparamsetfree(*args)
+CPXXparamsetfree = _pycplex_platform.CPXXparamsetfree
+
+def CPXXparamsetgetdbl(*args):
+  return _pycplex_platform.CPXXparamsetgetdbl(*args)
+CPXXparamsetgetdbl = _pycplex_platform.CPXXparamsetgetdbl
+
+def CPXXparamsetgetids(*args):
+  return _pycplex_platform.CPXXparamsetgetids(*args)
+CPXXparamsetgetids = _pycplex_platform.CPXXparamsetgetids
+
+def CPXXparamsetgetint(*args):
+  return _pycplex_platform.CPXXparamsetgetint(*args)
+CPXXparamsetgetint = _pycplex_platform.CPXXparamsetgetint
+
+def CPXXparamsetgetlong(*args):
+  return _pycplex_platform.CPXXparamsetgetlong(*args)
+CPXXparamsetgetlong = _pycplex_platform.CPXXparamsetgetlong
+
+def CPXXparamsetgetstr(*args):
+  return _pycplex_platform.CPXXparamsetgetstr(*args)
+CPXXparamsetgetstr = _pycplex_platform.CPXXparamsetgetstr
+
+def CPXXparamsetreadcopy(*args):
+  return _pycplex_platform.CPXXparamsetreadcopy(*args)
+CPXXparamsetreadcopy = _pycplex_platform.CPXXparamsetreadcopy
+
+def CPXXparamsetwrite(*args):
+  return _pycplex_platform.CPXXparamsetwrite(*args)
+CPXXparamsetwrite = _pycplex_platform.CPXXparamsetwrite
+
+def CPXEwriteprobdev(*args):
+  return _pycplex_platform.CPXEwriteprobdev(*args)
+CPXEwriteprobdev = _pycplex_platform.CPXEwriteprobdev
 class intPtr(_object):
     __swig_setmethods__ = {}
     __setattr__ = lambda self, name, value: _swig_setattr(self, intPtr, name, value)
@@ -3143,6 +3352,30 @@ CPXCHANNELptrPtr_swigregister(CPXCHANNELptrPtr)
 def CPXCHANNELptrPtr_frompointer(*args):
   return _pycplex_platform.CPXCHANNELptrPtr_frompointer(*args)
 CPXCHANNELptrPtr_frompointer = _pycplex_platform.CPXCHANNELptrPtr_frompointer
+
+class CPXPARAMSETptrPtr(_object):
+    __swig_setmethods__ = {}
+    __setattr__ = lambda self, name, value: _swig_setattr(self, CPXPARAMSETptrPtr, name, value)
+    __swig_getmethods__ = {}
+    __getattr__ = lambda self, name: _swig_getattr(self, CPXPARAMSETptrPtr, name)
+    __repr__ = _swig_repr
+    def __init__(self): 
+        this = _pycplex_platform.new_CPXPARAMSETptrPtr()
+        try: self.this.append(this)
+        except: self.this = this
+    __swig_destroy__ = _pycplex_platform.delete_CPXPARAMSETptrPtr
+    __del__ = lambda self : None;
+    def assign(self, *args): return _pycplex_platform.CPXPARAMSETptrPtr_assign(self, *args)
+    def value(self): return _pycplex_platform.CPXPARAMSETptrPtr_value(self)
+    def cast(self): return _pycplex_platform.CPXPARAMSETptrPtr_cast(self)
+    __swig_getmethods__["frompointer"] = lambda x: _pycplex_platform.CPXPARAMSETptrPtr_frompointer
+    if _newclass:frompointer = staticmethod(_pycplex_platform.CPXPARAMSETptrPtr_frompointer)
+CPXPARAMSETptrPtr_swigregister = _pycplex_platform.CPXPARAMSETptrPtr_swigregister
+CPXPARAMSETptrPtr_swigregister(CPXPARAMSETptrPtr)
+
+def CPXPARAMSETptrPtr_frompointer(*args):
+  return _pycplex_platform.CPXPARAMSETptrPtr_frompointer(*args)
+CPXPARAMSETptrPtr_frompointer = _pycplex_platform.CPXPARAMSETptrPtr_frompointer
 
 class intArray(_object):
     __swig_setmethods__ = {}

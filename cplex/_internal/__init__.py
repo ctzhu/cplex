@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2019. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -18,11 +18,14 @@ import os
 import sys
 
 from . import _aux_functions
+from . import _baseinterface
 from . import _list_array_utils
 from . import _ostream
 from . import _procedural
 from . import _constants
 from . import _matrices
+from . import _multiobj
+from . import _multiobjsoln
 from . import _parameter_classes
 from . import _parameter_hierarchy
 from . import _subinterfaces
@@ -35,12 +38,13 @@ from . import _callbackinfoenum
 from . import _solutionstrategyenum
 from ..exceptions import CplexError
 
-__all__ = ["Environment", "_aux_functions", "_list_array_utils",
-           "_ostream", "_procedural", "_constants", "_matrices",
+__all__ = ["Environment", "_aux_functions", "_baseinterface",
+           "_list_array_utils", "_ostream", "_procedural",
+           "_constants", "_matrices", "_multiobj", "_multiobjsoln",
            "_parameter_classes", "_subinterfaces", "_pycplex",
            "_parameters_auto", "_anno", "_pwl", "ProblemType",
-           "_constantsenum",
-           "_callbackinfoenum", "_solutionstrategyenum"]
+           "_constantsenum", "_callbackinfoenum",
+           "_solutionstrategyenum"]
 
 
 class ProblemType(object):
@@ -157,6 +161,28 @@ class Environment(object):
         # method (and all who inherit from these).
         return hasattr(callback_instance, "set_node_data")
 
+    def _getcbattrname(self, cb_type_string):
+        """Returns the attribute name to be used to store the callback
+        instance.
+        """
+        return "_{0}_callback".format(cb_type_string)
+
+    def _checkcbcls(self, cb):
+        """Checks callback class instance for expected attribute.
+
+        Raises a CplexError if it is not found.
+        """
+        if getattr(cb, "_cb_type_string", None) is None:
+            raise CplexError(str(cb) +
+                             " is not a subclass of a subclassable Callback class.")
+
+    def _get_num_delete(self):
+        """Count the callbacks that are installed and require a delete
+        callback.
+        """
+        return sum(1 for c in self._callbacks
+                   if self._needs_delete_callback(c))
+
     def register_callback(self, callback_class):
         """Registers a callback for use when solving.
 
@@ -169,35 +195,28 @@ class Environment(object):
         instance of callback_class registered for use.  Any previously
         registered callback of the same class will no longer be
         registered.
-
         """
         cb = callback_class(self)
-        if cb._cb_type_string is None:
-            raise CplexError(str(callback_class) +
-                             " is not a subclass of a subclassable Callback class.")
-        if hasattr(cb, "_unregister"):
-            cb._cb_set_function(self._e, None)
+        self._checkcbcls(cb)
+        num_delete = self._get_num_delete()
+        old_cb = getattr(
+            self, self._getcbattrname(cb._cb_type_string), None)
+        if old_cb:
+            self._callbacks.remove(old_cb)
+        setattr(self, self._getcbattrname(cb._cb_type_string), cb)
+        if cb._cb_type_string == "MIP_info":
+            # self._MIP_info_callback is set above with the call to
+            # setattr. So, we are passing the callback instance as the
+            # second argument here rather than the environment
+            # (i.e., self).
+            cb._cb_set_function(self._e, self._MIP_info_callback)
         else:
-            # Count the callbacks that are installed and require a
-            # delete callback.
-            num_delete = 0
-            for c in self._callbacks:
-                if self._needs_delete_callback(c):
-                    num_delete = num_delete + 1
-            old_cb = getattr(
-                self, "_" + cb._cb_type_string + "_callback", None)
-            if old_cb is not None:
-                self._callbacks.remove(old_cb)
-            setattr(self, "_" + cb._cb_type_string + "_callback", cb)
-            if cb._cb_type_string == "MIP_info":
-                cb._cb_set_function(self._e, self._MIP_info_callback)
-            else:
-                cb._cb_set_function(self._e, self)
-            self._callbacks.append(cb)
-            if self._needs_delete_callback(cb) and num_delete < 1:
-                # We need a delete callback and did not have one
-                # before -> install it.
-                _procedural.setpydel(self._e)
+            cb._cb_set_function(self._e, self)
+        self._callbacks.append(cb)
+        if self._needs_delete_callback(cb) and num_delete < 1:
+            # We need a delete callback and did not have one
+            # before -> install it.
+            _procedural.setpydel(self._e)
         return cb
 
     def unregister_callback(self, callback_class):
@@ -213,29 +232,18 @@ class Environment(object):
 
         """
         cb = callback_class(self)
+        self._checkcbcls(cb)
         current_cb = getattr(
-            self, "_" + cb._cb_type_string + "_callback", None)
-        if current_cb is not None:
-            # Count the number of installed callbacks that require
-            # need a delete callback
-            num_delete = 0
-            for c in self._callbacks:
-                if self._needs_delete_callback(c):
-                    num_delete = num_delete + 1
-            if self._needs_delete_callback(current_cb) and num_delete < 2:
+            self, self._getcbattrname(cb._cb_type_string), None)
+        if current_cb:
+            if (self._needs_delete_callback(current_cb) and
+                self._get_num_delete() < 2):
                 # We are about to remove the last callback that requires
                 # a delete callback.
                 _procedural.delpydel(self._e)
+            current_cb._cb_set_function(self._e, None)
             self._callbacks.remove(current_cb)
-
-            class do_nothing(callback_class):
-                def __init__(self, env):
-                    super(do_nothing, self).__init__(env)
-                    self._unregister = True
-
-                def __call__(self):
-                    return
-            self.register_callback(do_nothing)
+            delattr(self, self._getcbattrname(current_cb._cb_type_string))
         return current_cb
 
     def _add_stream(self, which_channel):
@@ -265,8 +273,8 @@ class Environment(object):
 
         The first argument must be either a file-like object (that is, an
         object with a write method and a flush method) or the name of
-        a file to be written to.  Use None as the first argument to
-        suppress output.
+        a file to be written to (the later is deprecated since V12.9.0).
+        Use None as the first argument to suppress output.
 
         The second optional argument is a function that takes a string
         as input and returns a string.  If specified, strings sent to
@@ -286,8 +294,8 @@ class Environment(object):
 
         The first argument must be either a file-like object (that is, an
         object with a write method and a flush method) or the name of
-        a file to be written to.  Use None as the first argument to
-        suppress output.
+        a file to be written to (the later is deprecated since V12.9.0).
+        Use None as the first argument to suppress output.
 
         The second optional argument is a function that takes a string
         as input and returns a string.  If specified, strings sent to
@@ -307,8 +315,8 @@ class Environment(object):
 
         The first argument must be either a file-like object (that is, an
         object with a write method and a flush method) or the name of
-        a file to be written to.  Use None as the first argument to
-        suppress output.
+        a file to be written to (the later is deprecated since V12.9.0).
+        Use None as the first argument to suppress output.
 
         The second optional argument is a function that takes a string
         as input and returns a string.  If specified, strings sent to
@@ -328,8 +336,8 @@ class Environment(object):
 
         The first argument must be either a file-like object (that is, an
         object with a write method and a flush method) or the name of
-        a file to be written to.  Use None as the first argument to
-        suppress output.
+        a file to be written to (the later is deprecated since V12.9.0).
+        Use None as the first argument to suppress output.
 
         The second optional argument is a function that takes a string
         as input and returns a string.  If specified, strings sent to

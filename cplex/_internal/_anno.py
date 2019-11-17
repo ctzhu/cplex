@@ -3,14 +3,14 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2019. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 # ------------------------------------------------------------------------
 """Annotation API"""
-from ._subinterfaces import BaseInterface
+from ._baseinterface import BaseInterface
 from . import _procedural as _proc
 from . import _aux_functions as _aux
 from . import _constants
@@ -135,29 +135,32 @@ class LongAnnotationInterface(AnnotationInterface):
         return self._add_single(self.get_num, _add, name, defval)
 
     def delete(self, *args):
-        """Deletes a set of long annotations.
+        """Deletes long annotations from the problem.
 
-        May be called by four forms.
+        There are four forms by which long_annotations.delete may be
+        called.
 
         long_annotations.delete()
           deletes all long annotations from the problem.
 
         long_annotations.delete(i)
-          i must be an annotation name or index.  Deletes the long
+          i must be an annotation name or index. Deletes the long
           annotation whose index or name is i.
 
         long_annotations.delete(seq)
           seq must be a sequence of annotation names or indices.
-          Deletes the long annotations with names or indices in s.
-          Equivalent to
-          [long_annotations.delete(i) for i in s]
+          Deletes the long annotations with names or indices contained
+          within s. Equivalent to [long_annotations.delete(i) for i in s].
 
         long_annotations.delete(begin, end)
-          begin and end must be annotation indices with begin <= end
-          or annotation names whose indices respect this order.  Deletes
-          the long annotations with indices between begin and end,
-          inclusive of end.  Equivalent to
-          long_annotations.delete(list(range(begin, end + 1)))
+          begin and end must be annotation indices or annotation names.
+          Deletes the long annotations with indices between begin and
+          end, inclusive of end. Equivalent to
+          long_annotations.delete(range(begin, end + 1)). This will give
+          the best performance when deleting batches of long annotations.
+
+        See CPXdellongannotations in the Callable Library Reference
+        Manual for more detail.
 
         Example usage:
 
@@ -193,10 +196,9 @@ class LongAnnotationInterface(AnnotationInterface):
           [long_annotations.get_names(i) for i in s]
 
         long_annotations.get_names(begin, end)
-          begin and end must be annotation indices with begin <= end
-          or annotation names whose indices respect this order.  Returns
-          the names of long annotations with indices between begin and
-          end, inclusive of end.  Equivalent to
+          begin and end must be annotation indices or annotation names.
+          Returns the names of long annotations with indices between
+          begin and end, inclusive of end. Equivalent to
           long_annotations.get_names(range(begin, end + 1))
 
         Example usage:
@@ -242,10 +244,9 @@ class LongAnnotationInterface(AnnotationInterface):
           [long_annotations.get_default_values(i) for i in s]
 
         long_annotations.get_default_values(begin, end)
-          begin and end must be annotation indices with begin <= end
-          or annotation names whose indices respect this order.  Returns
-          the default values of long annotations with indices between
-          begin and end, inclusive of end.  Equivalent to
+          begin and end must be annotation indices or annotation names.
+          Returns the default values of long annotations with indices
+          between begin and end, inclusive of end. Equivalent to
           long_annotations.get_default_values(list(range(begin, end + 1)))
 
         Example usage:
@@ -324,10 +325,9 @@ class LongAnnotationInterface(AnnotationInterface):
           [long_annotations.get_values(idx, objtype, i) for i in seq]
 
         long_annotations.get_values(idx, objtype, begin, end)
-          begin and end must be object indices with begin <= end or
-          object names whose indices respect this order.  Returns the
-          long annotation values of objects with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be object indices or object names. Returns
+          the long annotation values of objects with indices between
+          begin and end, inclusive of end. Equivalent to
           long_annotations.get_values(range(begin, end + 1))
 
         Example usage:
@@ -406,29 +406,34 @@ class DoubleAnnotationInterface(AnnotationInterface):
         return self._add_single(self.get_num, _add, name, defval)
 
     def delete(self, *args):
-        """Deletes a set of double annotations.
+        """Deletes double annotations from the problem.
 
-        May be called by four forms.
+        There are four forms by which double_annotations.delete may be
+        called.
 
         double_annotations.delete()
           deletes all double annotations from the problem.
 
         double_annotations.delete(i)
-          i must be an annotation name or index.  Deletes the double
+          i must be an annotation name or index. Deletes the double
           annotation whose index or name is i.
 
         double_annotations.delete(seq)
           seq must be a sequence of annotation names or indices.
-          Deletes the double annotations with names or indices in s.
-          Equivalent to
-          [double_annotations.delete(i) for i in s]
+          Deletes the double annotations with names or indices contained
+          within s. Equivalent to
+          [double_annotations.delete(i) for i in s].
 
         double_annotations.delete(begin, end)
-          begin and end must be annotation indices with begin <= end
-          or annotation names whose indices respect this order.  Deletes
-          the double annotations with indices between begin and end,
-          inclusive of end.  Equivalent to
-          double_annotations.delete(list(range(begin, end + 1)))
+          begin and end must be annotation indices or annotation names.
+          Deletes the double annotations with indices between begin and
+          end, inclusive of end. Equivalent to
+          double_annotations.delete(range(begin, end + 1)). This will
+          give the best performance when deleting batches of double
+          annotations.
+
+        See CPXdeldblannotations in the Callable Library Reference Manual
+        for more detail.
 
         Example usage:
 
@@ -464,10 +469,9 @@ class DoubleAnnotationInterface(AnnotationInterface):
           [double_annotations.get_names(i) for i in s]
 
         double_annotations.get_names(begin, end)
-          begin and end must be annotation indices with begin <= end
-          or annotation names whose indices respect this order.  Returns
-          the names of double annotations with indices between begin and
-          end, inclusive of end.  Equivalent to
+          begin and end must be annotation indices or annotation names.
+          Returns the names of double annotations with indices between
+          begin and end, inclusive of end. Equivalent to
           double_annotations.get_names(range(begin, end + 1))
 
         Example usage:
@@ -513,10 +517,9 @@ class DoubleAnnotationInterface(AnnotationInterface):
           [double_annotations.get_default_values(i) for i in s]
 
         double_annotations.get_default_values(begin, end)
-          begin and end must be annotation indices with begin <= end
-          or annotation names whose indices respect this order.  Returns
-          the default values of double annotations with indices between
-          begin and end, inclusive of end.  Equivalent to
+          begin and end must be annotation indices or annotation names.
+          Returns the default values of double annotations with indices
+          between begin and end, inclusive of end. Equivalent to
           double_annotations.get_default_values(list(range(begin, end + 1)))
 
         Example usage:
@@ -596,10 +599,9 @@ class DoubleAnnotationInterface(AnnotationInterface):
           [double_annotations.get_values(idx, objtype, i) for i in seq]
 
         double_annotations.get_values(idx, objtype, begin, end)
-          begin and end must be object indices with begin <= end or
-          object names whose indices respect this order.  Returns the
-          double annotation values of objects with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be object indices or object names. Returns
+          the double annotation values of objects with indices between
+          begin and end, inclusive of end. Equivalent to
           double_annotations.get_values(range(begin, end + 1))
 
         Example usage:

@@ -3,14 +3,14 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2019. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 # ------------------------------------------------------------------------
 """Piecewise Linear API"""
-from ._subinterfaces import BaseInterface
+from ._baseinterface import BaseInterface
 from . import _procedural as _proc
 from . import _aux_functions as _aux
 
@@ -118,29 +118,32 @@ class PWLConstraintInterface(BaseInterface):
                                 name)
 
     def delete(self, *args):
-        """Deletes a set of PWL constraints.
+        """Deletes PWL constraints from the problem.
 
-        May be called by four forms.
+        There are four forms by which pwl_constraints.delete may be
+        called.
 
         pwl_constraints.delete()
           deletes all PWL constraints from the problem.
 
         pwl_constraints.delete(i)
-          i must be a PWL constraint name or index.  Deletes the PWL
+          i must be a PWL constraint name or index. Deletes the PWL
           constraint whose index or name is i.
 
         pwl_constraints.delete(seq)
           seq must be a sequence of PWL constraint names or indices.
-          Deletes the PWL constraints with names or indices in s.
-          Equivalent to
-          [pwl_constraints.delete(i) for i in s]
+          Deletes the PWL constraints with names or indices contained
+          within s. Equivalent to [pwl_constraints.delete(i) for i in s].
 
         pwl_constraints.delete(begin, end)
-          begin and end must be PWL constraint indices with begin <= end
-          or PWL constraint names whose indices respect this order.
-          Deletes the PWL constraints with indices between begin and end,
-          inclusive of end.  Equivalent to
-          pwl_constraints.delete(list(range(begin, end + 1)))
+          begin and end must be PWL constraint indices or PWL constraint
+          names. Deletes the PWL constraints with indices between begin
+          and end, inclusive of end. Equivalent to
+          pwl_constraints.delete(range(begin, end + 1)). This will give
+          the best performance when deleting batches of PWL constraints.
+
+        See CPXdelpwl in the Callable Library Reference Manual for more
+        detail.
 
         Example usage:
 
@@ -181,10 +184,9 @@ class PWLConstraintInterface(BaseInterface):
           [pwl_constraints.get_names(i) for i in s]
 
         pwl_constraints.get_names(begin, end)
-          begin and end must be PWL constraint indices with begin <= end
-          or PWL constraint names whose indices respect this order.
-          Returns the names of PWL constraints with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be PWL constraint indices or PWL constraint
+          names. Returns the names of PWL constraints with indices
+          between begin and end, inclusive of end.  Equivalent to
           pwl_constraints.get_names(range(begin, end + 1))
 
         Example usage:
@@ -231,10 +233,9 @@ class PWLConstraintInterface(BaseInterface):
           [pwl_constraints.get_definitions(i) for i in s]
 
         pwl_constraints.get_definitions(begin, end)
-          begin and end must be PWL constraint indices with begin <= end
-          or PWL constraint names whose indices respect this order.  Returns
-          the definitions of PWL constraints with indices between
-          begin and end, inclusive of end.  Equivalent to
+          begin and end must be PWL constraint indices or PWL constraint
+          names. Returns the definitions of PWL constraints with indices
+          between begin and end, inclusive of end. Equivalent to
           pwl_constraints.get_definitions(list(range(begin, end + 1)))
 
         Example usage:

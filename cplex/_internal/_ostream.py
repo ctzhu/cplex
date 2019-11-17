@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2019. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -13,33 +13,47 @@
 """
 
 import weakref
+import warnings
 
 from ._procedural import check_status
 from ..exceptions import CplexError, ErrorChannelMessage
 from .. import six
 
 
-class OutputStream(object):
-    """Class to parse and write strings to a file object.
+class _NoOpStream(object):
+    """Simple no-op file-like object."""
 
-    Methods:
-    __init__(self, outputfile, fn = None)
-    __del__(self)
-    write(self)
-    flush(self)
-    """
+    def write(self, str):
+        """No-op write method."""
+        pass
+
+    def flush(self):
+        """No-op flush method."""
+        pass
+
+
+def _identity(x):
+    """Simple identity function."""
+    return x
+
+
+class OutputStream(object):
+    """Class to parse and write strings to a file object."""
 
     def __init__(self, outputfile, env, fn=None, initerrorstr=False):
         """OutputStream constructor.
 
-        outputfile must provide methods write(self, str) and
-        flush(self).
+        outputfile must provide methods write(self, str) and flush(self).
+        Can be None to suppress output.
 
         If fn is specified, it must be a fuction with signature
         fn(str) -> str.
         """
         self._env = weakref.proxy(env)
-        self._fn = fn
+        if fn:
+            self._fn = fn
+        else:
+            self._fn = _identity
         self._is_valid = False
         self._was_opened = False
         self._disposed = False
@@ -47,23 +61,29 @@ class OutputStream(object):
         if initerrorstr:
             self._error_string = None
         if isinstance(outputfile, six.string_types):
+            warnings.warn("passing a file name to the "
+                          "Cplex.set_*_stream methods is deprecated "
+                          "since V12.9.0",
+                          DeprecationWarning)
             self._file = open(outputfile, "w")
             self._was_opened = True
         else:
-            self._file = outputfile
-        if self._file is not None:
-            try:
-                tst = callable(self._file.write)
-            except AttributeError:
-                tst = False
-            if not tst:
-                raise CplexError("Output object must have write method")
-            try:
-                tst = callable(self._file.flush)
-            except AttributeError:
-                tst = False
-            if not tst:
-                raise CplexError("Output object must have flush method")
+            if outputfile:
+                self._file = outputfile
+            else:
+                self._file = _NoOpStream()
+        try:
+            tst = callable(self._file.write)
+        except AttributeError:
+            tst = False
+        if not tst:
+            raise CplexError("Output object must have write method")
+        try:
+            tst = callable(self._file.flush)
+        except AttributeError:
+            tst = False
+        if not tst:
+            raise CplexError("Output object must have flush method")
         self._is_valid = True
 
     def _end(self):
@@ -75,17 +95,19 @@ class OutputStream(object):
         if self._disposed:
             return
         self._disposed = True
-        # File-like objects should implement this attribute.  If we come
-        # across one that doesn't, don't assume anything.
-        try:
-            isclosed = self._file.closed
-        except AttributeError:
-            isclosed = False
-        # If something bad happened in the constructor, then don't flush.
-        if self._is_valid and not isclosed:
-            self.flush()
+        # If something bad happened in the constructor, then don't
+        # attempt to flush or close.
+        if self._is_valid:
+            try:
+                self.flush()
+            except ValueError:
+                # If the file is already closed, then ignore the error
+                # and continue.
+                pass
             # If we opened the file, then we need to close it.
             if self._was_opened:
+                # The Python docs state that, "close() may be called more
+                # than once without error."
                 self._file.close()
 
     def __del__(self):
@@ -134,18 +156,12 @@ class OutputStream(object):
         """Parses and writes a string.
 
         If self._fn is not None, self._fn(msg) is passed to
-        self._file.write.  Otherwise, msg is passed to self._file.write.
+        self._file.write. Otherwise, msg is passed to self._file.write.
         """
-        if self._file is None:
-            return
         if msg is None:
             msg = ""
-        if self._fn is None:
-            self._file.write(msg)
-        else:
-            self._file.write(self._fn(msg))
+        self._file.write(self._fn(msg))
 
     def flush(self):
         """Flushes the buffer."""
-        if self._file is not None:
-            self._file.flush()
+        self._file.flush()

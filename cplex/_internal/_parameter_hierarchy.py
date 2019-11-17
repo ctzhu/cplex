@@ -1,9 +1,9 @@
 # --------------------------------------------------------------------------
-# Version 12.8.0
+# Version 12.9.0
 # --------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2000, 2017. All Rights Reserved.
+# Copyright IBM Corporation 2000, 2019. All Rights Reserved.
 # 
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -130,7 +130,6 @@ def mip_limits_members(env, parent):
                 solutions = NumParameter(env, MIPLimitsSolutions, parent, 'solutions'),
                 strongcand = NumParameter(env, MIPLimitsStrongCand, parent, 'strongcand'),
                 strongit = NumParameter(env, MIPLimitsStrongIt, parent, 'strongit'),
-                submipnodelim = NumParameter(env, MIPLimitsSubMIPNodeLim, parent, 'submipnodelim'),
                 treememory = NumParameter(env, MIPLimitsTreeMemory, parent, 'treememory'),
                 )
 
@@ -153,15 +152,6 @@ def mip_pool_members(env, parent):
                 intensity = NumParameter(env, MIPPoolIntensity, parent, 'intensity', v_agg_constants),
                 relgap = NumParameter(env, MIPPoolRelGap, parent, 'relgap'),
                 replace = NumParameter(env, MIPPoolReplace, parent, 'replace', replace_constants),
-                )
-
-def mip_submip_members(env, parent):
-    return dict(_name = "submip",
-                help = lambda : "Parameters used when solving sub-MIPs.",
-                startalg = NumParameter(env, MIPSubMIPStartAlg, parent, 'startalg', subalg_constants),
-                subalg = NumParameter(env, MIPSubMIPSubAlg, parent, 'subalg', subalg_constants),
-                nodelimit = NumParameter(env, MIPSubMIPNodeLimit, parent, 'nodelimit'),
-                scale = NumParameter(env, MIPSubMIPScale, parent, 'scale', scale_constants),
                 )
 
 def mip_strategy_members(env, parent):
@@ -188,6 +178,15 @@ def mip_strategy_members(env, parent):
                 variableselect = NumParameter(env, MIPStrategyVariableSelect, parent, 'variableselect', varsel_constants),
                 )
 
+def mip_submip_members(env, parent):
+    return dict(_name = "submip",
+                help = lambda : "Parameters used when solving sub-MIPs.",
+                startalg = NumParameter(env, MIPSubMIPStartAlg, parent, 'startalg', subalg_constants),
+                subalg = NumParameter(env, MIPSubMIPSubAlg, parent, 'subalg', subalg_constants),
+                nodelimit = NumParameter(env, MIPSubMIPNodeLimit, parent, 'nodelimit'),
+                scale = NumParameter(env, MIPSubMIPScale, parent, 'scale', scale_constants),
+                )
+
 def mip_tolerances_members(env, parent):
     return dict(_name = "tolerances",
                 help = lambda : "Tolerances for mixed integer optimization.",
@@ -210,9 +209,15 @@ def mip_members(env, parent):
                 ordertype = NumParameter(env, MIPOrderType, parent, 'ordertype', ordertype_constants),
                 polishafter = ParameterGroup(env, mip_polishafter_members, parent),
                 pool = ParameterGroup(env, mip_pool_members, parent),
-                submip = ParameterGroup(env, mip_submip_members, parent),
                 strategy = ParameterGroup(env, mip_strategy_members, parent),
+                submip = ParameterGroup(env, mip_submip_members, parent),
                 tolerances = ParameterGroup(env, mip_tolerances_members, parent),
+                )
+
+def multiobjective_members(env, parent):
+    return dict(_name = "multiobjective",
+                help = lambda : "Parameters for multi-objective optimization.",
+                display = NumParameter(env, MultiObjectiveDisplay, parent, 'display', display_constants),
                 )
 
 def network_tolerances_members(env, parent):
@@ -250,6 +255,7 @@ def preprocessing_members(env, parent):
                 dependency = NumParameter(env, PreprocessingDependency, parent, 'dependency', dependency_constants),
                 dual = NumParameter(env, PreprocessingDual, parent, 'dual', dual_constants),
                 fill = NumParameter(env, PreprocessingFill, parent, 'fill'),
+                folding = NumParameter(env, PreprocessingFolding, parent, 'folding'),
                 linear = NumParameter(env, PreprocessingLinear, parent, 'linear', linear_constants),
                 numpass = NumParameter(env, PreprocessingNumPass, parent, 'numpass'),
                 presolve = NumParameter(env, PreprocessingPresolve, parent, 'presolve', off_on_constants),
@@ -273,6 +279,7 @@ def read_members(env, parent):
                 qpnonzeros = NumParameter(env, ReadQPNonzeros, parent, 'qpnonzeros'),
                 scale = NumParameter(env, ReadScale, parent, 'scale', scale_constants),
                 variables = NumParameter(env, ReadVariables, parent, 'variables'),
+                warninglimit = NumParameter(env, ReadWarningLimit, parent, 'warninglimit'),
                 )
 
 def sifting_members(env, parent):
@@ -349,6 +356,7 @@ def root_members(env, parent):
                 feasopt = ParameterGroup(env, feasopt_members, parent),
                 lpmethod = NumParameter(env, setLPMethod, parent, 'lpmethod', alg_constants),
                 mip = ParameterGroup(env, mip_members, parent),
+                multiobjective = ParameterGroup(env, multiobjective_members, parent),
                 network = ParameterGroup(env, network_members, parent),
                 optimalitytarget = NumParameter(env, setOptimalityTarget, parent, 'optimalitytarget', optimalitytarget_constants),
                 output = ParameterGroup(env, output_members, parent),

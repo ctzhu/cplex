@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2019. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -19,6 +19,7 @@ except ImportError:
     import collections as collections_abc
 import functools
 import inspect
+import itertools
 import warnings
 
 from ..exceptions import CplexError, WrongNumberOfArgumentsError
@@ -109,19 +110,17 @@ else:
 
 def make_ranges(indices):
     """non-public"""
-    ranges = []
     i = 0
     j = 0
     while i < len(indices):
         while j < len(indices) - 1 and indices[j + 1] == indices[j] + 1:
             j += 1
-        ranges.append((indices[i], indices[j]))
+        yield (indices[i], indices[j])
         i = j + 1
         j = i
-    return ranges
 
 
-def apply_freeform_two_args(fn, convert, args):
+def apply_freeform_two_args(fn, convert, args, unpack_single=True):
     """non-public"""
     if convert is None:
         def convert(x): return x
@@ -134,13 +133,15 @@ def apply_freeform_two_args(fn, convert, args):
             raise TypeError("expecting names or indices")
     elif len(args) == 1:
         if isinstance(args[0], (list, tuple)):
-            retval = []
-            for member in map(fn, *zip(*make_ranges(convert(args[0])))):
-                retval.extend(member)
-            return retval
+            return list(itertools.chain.from_iterable(
+                fn(i, j) for i, j in make_ranges(convert(args[0]))))
         conarg0 = convert(args[0])
         if isinstance(conarg0, six.integer_types):
-            return fn(conarg0, conarg0)[0]
+            result = fn(conarg0, conarg0)
+            if unpack_single:
+                return result[0]
+            else:
+                return result
         else:
             raise TypeError("expecting name or index")
     elif len(args) == 0:
@@ -180,7 +181,7 @@ def apply_pairs(fn, convert, *args):
     if len(args) == 2:
         fn([convert(args[0])], [args[1]])
     else:
-        a1, a2 = zip(*args[0])
+        a1, a2 = unzip(args[0])
         fn(convert(a1), list(a2))
 
 
@@ -193,8 +194,9 @@ def delete_set_by_range(fn, convert, max_num, *args):
     elif len(args) == 1:
         # Delete all items from a possibly unordered list of mixed types:
         args = listify(convert(args[0]))
-        for i in sorted(args, reverse=True):
-            fn(i, i)
+        ranges = make_ranges(list(sorted(args)))
+        for i, j in reversed(list(ranges)):
+            fn(i, j)
     elif len(args) == 2:
         # Delete range from arg[0] to arg[1]:
         fn(convert(args[0]), convert(args[1]))
@@ -324,3 +326,17 @@ def convert(name, getindexfunc, cache=None):
         return _convert_sequence(name, getindexfunc, cache)
     else:
         return name
+
+def unzip(iterable=None):
+    """Inverse of the zip function.
+
+    Example usage:
+
+    >>> z = list(zip([1, 2, 3], [4, 5, 6]))
+    >>> unzip(z)
+    [(1, 2, 3), (4, 5, 6)]
+    """
+    if iterable is None:
+        iterable = []
+    # NOTE: we are using six.moves.zip here (see import at the top)!
+    return list(zip(*iterable))

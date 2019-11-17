@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2019. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -11,10 +11,13 @@
 # ------------------------------------------------------------------------
 """Sub-interfaces of the CPLEX API."""
 from contextlib import closing, contextmanager
+import numbers
 import weakref
 
 from . import _constants
 from . import _procedural as CPX_PROC
+from ._baseinterface import BaseInterface
+from ._multiobjsoln import MultiObjSolnInterface
 from ._matrices import (SparsePair, SparseTriple, _HBMatrix,
                         unpack_pair, unpack_triple)
 from ._aux_functions import (apply_freeform_one_arg,
@@ -24,7 +27,7 @@ from ._aux_functions import (apply_freeform_one_arg,
                              delete_set_by_range,
                              make_group, _group,
                              deprecated, init_list_args, listify,
-                             convert)
+                             convert, unzip)
 from ..exceptions import CplexError, WrongNumberOfArgumentsError
 from .. import six
 from ..six.moves import map, zip, cStringIO
@@ -110,78 +113,6 @@ class Histogram(object):
             ret = ret + "\n\n"
             i = jj
         return ret
-
-
-class BaseInterface(object):
-    """Common methods for sub-interfaces."""
-
-    def __init__(self, cplex, advanced=False, getindexfunc=None):
-        """Creates a new BaseInterface.
-
-        This class is not meant to be instantiated directly nor used
-        externally.
-        """
-        if type(self) == BaseInterface:
-            raise TypeError("BaseInterface must be sub-classed")
-        if advanced:
-            self._cplex = cplex
-        else:
-            self._cplex = weakref.proxy(cplex)
-        self._env = weakref.proxy(cplex._env)
-        self._get_index_function = getindexfunc
-
-    def _conv(self, name, cache=None):
-        """Converts from names to indices as necessary."""
-        return convert(name, self._get_index, cache)
-
-    @staticmethod
-    def _add_iter(getnumfun, addfun, *args, **kwargs):
-        """non-public"""
-        old = getnumfun()
-        addfun(*args, **kwargs)
-        return six.moves.range(old, getnumfun())
-
-    @staticmethod
-    def _add_single(getnumfun, addfun, *args, **kwargs):
-        """non-public"""
-        addfun(*args, **kwargs)
-        return getnumfun() - 1  # minus one for zero-based indices
-
-    def _get_index(self, name):
-        return self._get_index_function(
-            self._env._e, self._cplex._lp, name,
-            self._env._apienc)
-
-    def get_indices(self, name):
-        """Converts from names to indices.
-
-        If name is a string, get_indices returns the index of the
-        object with that name.  If no such object exists, an
-        exception is raised.
-
-        If name is a sequence of strings, get_indices returns a list
-        of the indices corresponding to the strings in name.
-        Equivalent to map(self.get_indices, name).
-
-        If the subclass does not provide an index function (i.e., the
-        interface is not indexed), then a NotImplementedError is raised.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names=["a", "b"])
-        >>> c.variables.get_indices("a")
-        0
-        >>> c.variables.get_indices(["a", "b"])
-        [0, 1]
-        """
-        if self._get_index_function is None:
-            raise NotImplementedError("This is not an indexed interface")
-        if isinstance(name, six.string_types):
-            return self._get_index(name)
-        else:
-            return [self._get_index(x) for x in name]
 
 
 class AdvancedVariablesInterface(BaseInterface):
@@ -548,33 +479,38 @@ class VariablesInterface(BaseInterface):
           deletes all variables from the problem.
 
         variables.delete(i)
-          i must be a variable name or index.  Deletes the variable
+          i must be a variable name or index. Deletes the variable
           whose index or name is i.
 
         variables.delete(s)
-          s must be a sequence of variable names or indices.  Deletes
-          the variables with indices the members of s.  Equivalent to
-          [variables.delete(i) for i in s]
+          s must be a sequence of variable names or indices. Deletes
+          the variables with names or indices contained within s.
+          Equivalent to [variables.delete(i) for i in s].
 
         variables.delete(begin, end)
-          begin and end must be variable indices with begin <= end or
-          variable names whose indices respect this order.  Deletes
-          the variables with indices between begin and end, inclusive
-          of end.  Equivalent to
-          variables.delete(range(begin, end + 1)).
+          begin and end must be variable indices or variable names.
+          Deletes the variables with indices between begin and end,
+          inclusive of end. Equivalent to
+          variables.delete(range(begin, end + 1)). This will give the
+          best performance when deleting batches of variables.
+
+        See CPXdelcols in the Callable Library Reference Manual for
+        more detail.
+
+        Example usage:
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = [str(i) for i in range(10)])
+        >>> indices = c.variables.add(names=[str(i) for i in range(10)])
         >>> c.variables.get_num()
         10
         >>> c.variables.delete(8)
         >>> c.variables.get_names()
         ['0', '1', '2', '3', '4', '5', '6', '7', '9']
-        >>> c.variables.delete("1",3)
+        >>> c.variables.delete("1", 3)
         >>> c.variables.get_names()
         ['0', '4', '5', '6', '7', '9']
-        >>> c.variables.delete([2,"0",5])
+        >>> c.variables.delete([2, "0", 5])
         >>> c.variables.get_names()
         ['4', '6', '7']
         >>> c.variables.delete()
@@ -716,7 +652,7 @@ class VariablesInterface(BaseInterface):
             indices = [self._conv(args[0])]
             xctypes = args[1]
         elif len(args) == 1:
-            indices, xctypes = list(zip(*args[0]))
+            indices, xctypes = unzip(args[0])
             indices = self._conv(indices)
             xctypes = "".join(xctypes)
         else:
@@ -742,10 +678,9 @@ class VariablesInterface(BaseInterface):
           [variables.get_lower_bounds(i) for i in s]
 
         variables.get_lower_bounds(begin, end)
-          begin and end must be variable indices with begin <= end or
-          variable names whose indices respect this order.  Returns
-          the lower bounds on the variables with indices between
-          begin and end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns the lower bounds on the variables with indices between
+          begin and end, inclusive of end. Equivalent to
           variables.get_lower_bounds(range(begin, end + 1)).
 
         >>> import cplex
@@ -786,10 +721,9 @@ class VariablesInterface(BaseInterface):
           [variables.get_upper_bounds(i) for i in s]
 
         variables.get_upper_bounds(begin, end)
-          begin and end must be variable indices with begin <= end or
-          variable names whose indices respect this order.  Returns
-          the upper bounds on the variables with indices between
-          begin and end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns the upper bounds on the variables with indices between
+          begin and end, inclusive of end. Equivalent to
           variables.get_upper_bounds(range(begin, end + 1)).
 
         >>> import cplex
@@ -828,10 +762,9 @@ class VariablesInterface(BaseInterface):
           Equivalent to [variables.get_names(i) for i in s]
 
         variables.get_names(begin, end)
-          begin and end must be variable indices with begin <= end.
-          Returns the names of the variables with indices between
-          begin and end, inclusive of end.  Equivalent to
-          variables.get_names(range(begin, end + 1)).
+          begin and end must be variable indices. Returns the names of
+          the variables with indices between begin and end, inclusive of
+          end. Equivalent to variables.get_names(range(begin, end + 1)).
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -868,14 +801,13 @@ class VariablesInterface(BaseInterface):
         variables.types(s)
           s must be a sequence of variable names or indices.  Returns
           the types of the variables with indices the members of s.
-          Equivalent to [variables.types(i) for i in s]
+          Equivalent to [variables.get_types(i) for i in s]
 
         variables.types(begin, end)
-          begin and end must be variable indices with begin <= end or
-          variable names whose indices respect this order.  Returns
-          the types of the variables with indices between begin and
-          end, inclusive of end.  Equivalent to
-          variables.get_upper_bounds(range(begin, end + 1)).
+          begin and end must be variable indices or variable names.
+          Returns the types of the variables with indices between begin
+          and end, inclusive of end. Equivalent to
+          variables.get_types(range(begin, end + 1)).
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -922,11 +854,10 @@ class VariablesInterface(BaseInterface):
           [variables.get_cols(i) for i in s]
 
         variables.get_cols(begin, end)
-          begin and end must be variable indices with begin <= end or
-          variable names whose indices respect this order.  Returns
-          the columns of the linear constraint matrix associated with
-          the variables with indices between begin and end, inclusive
-          of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns the columns of the linear constraint matrix associated
+          with the variables with indices between begin and end,
+          inclusive of end. Equivalent to
           variables.get_cols(range(begin, end + 1)).
 
         >>> import cplex
@@ -1340,39 +1271,46 @@ class LinearConstraintInterface(BaseInterface):
     def delete(self, *args):
         """Removes linear constraints from the problem.
 
-        There are four forms by which linear_constraints.delete may be called.
+        There are four forms by which linear_constraints.delete may be
+        called.
 
         linear_constraints.delete()
           deletes all linear constraints from the problem.
 
         linear_constraints.delete(i)
-          i must be a linear constraint name or index.  Deletes the
+          i must be a linear constraint name or index. Deletes the
           linear constraint whose index or name is i.
 
         linear_constraints.delete(s)
           s must be a sequence of linear constraint names or indices.
-          Deletes the linear constraints with indices the members of
-          s.  Equivalent to [linear_constraints.delete(i) for i in s]
+          Deletes the linear constraints with names or indices contained
+          within s. Equivalent to [linear_constraints.delete(i) for i in s].
 
         linear_constraints.delete(begin, end)
-          begin and end must be linear constraint indices with begin
-          <= end or linear constraint names whose indices respect
-          this order.  Deletes the linear constraints with indices
-          between begin and end, inclusive of end.  Equivalent to
-          linear_constraints.delete(range(begin, end + 1)).
+          begin and end must be linear constraint indices or linear
+          constraint names. Deletes the linear constraints with indices
+          between begin and end, inclusive of end. Equivalent to
+          linear_constraints.delete(range(begin, end + 1)). This will
+          give the best performance when deleting batches of linear
+          constraints.
+
+        See CPXdelrows in the Callable Library Reference Manual for
+        more detail.
+
+        Example usage:
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.linear_constraints.add(names = [str(i) for i in range(10)])
+        >>> indices = c.linear_constraints.add(names=[str(i) for i in range(10)])
         >>> c.linear_constraints.get_num()
         10
         >>> c.linear_constraints.delete(8)
         >>> c.linear_constraints.get_names()
         ['0', '1', '2', '3', '4', '5', '6', '7', '9']
-        >>> c.linear_constraints.delete("1",3)
+        >>> c.linear_constraints.delete("1", 3)
         >>> c.linear_constraints.get_names()
         ['0', '4', '5', '6', '7', '9']
-        >>> c.linear_constraints.delete([2,"0",5])
+        >>> c.linear_constraints.delete([2, "0", 5])
         >>> c.linear_constraints.get_names()
         ['4', '6', '7']
         >>> c.linear_constraints.delete()
@@ -1486,7 +1424,7 @@ class LinearConstraintInterface(BaseInterface):
             indices = [self._conv(args[0])]
             senses = args[1]
         elif len(args) == 1:
-            indices, senses = list(zip(*args[0]))
+            indices, senses = unzip(args[0])
             indices = self._conv(indices)
             senses = "".join(senses)
         else:
@@ -1616,7 +1554,7 @@ class LinearConstraintInterface(BaseInterface):
         if len(args) == 3:
             arg_list = [[arg] for arg in args]
         elif len(args) == 1:
-            arg_list = list(zip(*args[0]))
+            arg_list = unzip(args[0])
         else:
             raise WrongNumberOfArgumentsError()
         CPX_PROC.chgcoeflist(
@@ -1646,11 +1584,10 @@ class LinearConstraintInterface(BaseInterface):
           [linear_constraints.get_rhs(i) for i in s]
 
         linear_constraints.get_rhs(begin, end)
-          begin and end must be linear constraint indices with begin
-          <= end or linear constraint names whose indices respect
-          this order.  Returns the righthand side of the linear
+          begin and end must be linear constraint indices or linear
+          constraint names. Returns the righthand side of the linear
           constraints with indices between begin and end, inclusive
-          of end.  Equivalent to
+          of end. Equivalent to
           linear_constraints.get_rhs(range(begin, end + 1)).
 
         >>> import cplex
@@ -1692,12 +1629,11 @@ class LinearConstraintInterface(BaseInterface):
           [linear_constraints.get_senses(i) for i in s]
 
         linear_constraints.get_senses(begin, end)
-          begin and end must be linear constraint indices with begin
-          <= end or linear constraint names whose indices respect
-          this order.  Returns the senses of the linear constraints
+          begin and end must be linear constraint indices or linear
+          constraint names. Returns the senses of the linear constraints
           with indices between begin and end, inclusive of end.
-          Equivalent to linear_constraints.get_senses(range(begin,
-          end + 1)).
+          Equivalent to
+          linear_constraints.get_senses(range(begin, end + 1)).
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -1753,11 +1689,10 @@ class LinearConstraintInterface(BaseInterface):
           [linear_constraints.get_range_values(i) for i in s]
 
         linear_constraints.get_range_values(begin, end)
-          begin and end must be linear constraint indices with begin
-          <= end or linear constraint names whose indices respect
-          this order.  Returns the range values of the linear
+          begin and end must be linear constraint indices or linear
+          constraint names. Returns the range values of the linear
           constraints with indices between begin and end, inclusive
-          of end.  Equivalent to
+          of end. Equivalent to
           linear_constraints.get_range_values(range(begin, end + 1)).
 
         >>> import cplex
@@ -1836,10 +1771,9 @@ class LinearConstraintInterface(BaseInterface):
           [linear_constraints.get_rows(i) for i in s]
 
         linear_constraints.get_rows(begin, end)
-          begin and end must be row indices with begin <= end or row
-          names whose indices respect this order.  Returns the rows
-          of the linear constraint matrix with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be row indices or row names. Returns the
+          rows of the linear constraint matrix with indices between begin
+          and end, inclusive of end. Equivalent to
           linear_constraints.get_rows(range(begin, end + 1)).
 
         >>> import cplex
@@ -1904,10 +1838,10 @@ class LinearConstraintInterface(BaseInterface):
           Equivalent to [linear_constraints.get_names(i) for i in s]
 
         linear_constraints.get_names(begin, end)
-          begin and end must be linear constraint indices with begin
-          <= end.  Returns the names of the linear constraints with
-          indices between begin and end, inclusive of end.
-          Equivalent to linear_constraints.get_names(range(begin, end + 1)).
+          begin and end must be linear constraint indices. Returns the
+          names of the linear constraints with indices between begin and
+          end, inclusive of end. Equivalent to
+          linear_constraints.get_names(range(begin, end + 1)).
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -2168,29 +2102,36 @@ class IndicatorConstraintInterface(BaseInterface):
                                 name, indtype)
 
     def delete(self, *args):
-        """Deletes a set of indicator constraints from the problem.
+        """Deletes indicator constraints from the problem.
 
-        May be called by four forms.
+        There are four forms by which indicator_constraints.delete may be
+        called.
 
         indicator_constraints.delete()
           deletes all indicator constraints from the problem.
 
         indicator_constraints.delete(i)
-          i must be an indicator constraint name or index.  Deletes
+          i must be an indicator constraint name or index. Deletes
           the indicator constraint whose index or name is i.
 
         indicator_constraints.delete(s)
           s must be a sequence of indicator constraint names or
-          indices.  Deletes the indicator constraints with indices
-          the members of s.  Equivalent to
-          [indicator_constraints.delete(i) for i in s]
+          indices.  Deletes the indicator constraints with names or
+          indices contained within s. Equivalent to
+          [indicator_constraints.delete(i) for i in s].
 
         indicator_constraints.delete(begin, end)
-          begin and end must be indicator constraint indices with
-          begin <= end or indicator constraint names whose indices
-          respect this order.  Deletes the indicator constraints with
-          indices between begin and end, inclusive of end.
-          Equivalent to indicator_constraints.delete(range(begin, end + 1)).
+          begin and end must be indicator constraint indices or indicator
+          constraint names. Deletes the indicator constraints with
+          indices between begin and end, inclusive of end. Equivalent to
+          indicator_constraints.delete(range(begin, end + 1)). This will
+          give the best performance when deleting batches of indicator
+          constraints.
+
+        See CPXdelindconstrs in the Callable Library Reference Manual for
+        more detail.
+
+        Example usage:
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -2201,10 +2142,10 @@ class IndicatorConstraintInterface(BaseInterface):
         >>> c.indicator_constraints.delete(8)
         >>> c.indicator_constraints.get_names()
         ['0', '1', '2', '3', '4', '5', '6', '7', '9']
-        >>> c.indicator_constraints.delete("1",3)
+        >>> c.indicator_constraints.delete("1", 3)
         >>> c.indicator_constraints.get_names()
         ['0', '4', '5', '6', '7', '9']
-        >>> c.indicator_constraints.delete([2,"0",5])
+        >>> c.indicator_constraints.delete([2, "0", 5])
         >>> c.indicator_constraints.get_names()
         ['4', '6', '7']
         >>> c.indicator_constraints.delete()
@@ -2236,11 +2177,10 @@ class IndicatorConstraintInterface(BaseInterface):
           [indicator_constraints.get_indicator_variables(i) for i in s]
 
         indicator_constraints.get_indicator_variables(begin, end)
-          begin and end must be indicator constraint indices with
-          begin <= end or indicator constraint names whose indices
-          respect this order.  Returns the indicator variables of the
+          begin and end must be indicator constraint indices or indicator
+          constraint names. Returns the indicator variables of the
           indicator constraints with indices between begin and end,
-          inclusive of end.  Equivalent to
+          inclusive of end. Equivalent to
           indicator_constraints.get_indicator_variables(range(begin, end + 1)).
 
         >>> import cplex
@@ -2288,11 +2228,10 @@ class IndicatorConstraintInterface(BaseInterface):
           to [indicator_constraints.get_complemented(i) for i in s]
 
         indicator_constraints.get_complemented(begin, end)
-          begin and end must be indicator constraint indices with
-          begin <= end or indicator constraint names whose indices
-          respect this order.  Returns whether or not the indicator
-          constraints with indices between begin and end, inclusive
-          of end, are complemented.  Equivalent to
+          begin and end must be indicator constraint indices or indicator
+          constraint names. Returns whether or not the indicator
+          constraints with indices between begin and end, inclusive of
+          end, are complemented. Equivalent to
           indicator_constraints.get_complemented(range(begin, end + 1)).
 
         >>> import cplex
@@ -2340,11 +2279,10 @@ class IndicatorConstraintInterface(BaseInterface):
           [indicator_constraints.get_num_nonzeros(i) for i in s]
 
         indicator_constraints.get_num_nonzeros(begin, end)
-          begin and end must be indicator constraint indices with
-          begin <= end or indicator constraint names whose indices
-          respect this order.  Returns the number of nonzeros in the
+          begin and end must be indicator constraint indices or indicator
+          constraint names. Returns the number of nonzeros in the
           indicator constraints with indices between begin and end,
-          inclusive of end.  Equivalent to
+          inclusive of end. Equivalent to
           indicator_constraints.get_num_nonzeros(range(begin, end + 1)).
 
         >>> import cplex
@@ -2394,11 +2332,10 @@ class IndicatorConstraintInterface(BaseInterface):
           [indicator_constraints.get_rhs(i) for i in s]
 
         indicator_constraints.get_rhs(begin, end)
-          begin and end must be indicator constraint indices with
-          begin <= end or indicator constraint names whose indices
-          respect this order.  Returns the righthand side of the
-          indicator constraints with indices between begin and end,
-          inclusive of end.  Equivalent to
+          begin and end must be indicator constraint indices or indicator
+          constraint names. Returns the righthand side of the indicator
+          constraints with indices between begin and end, inclusive of
+          end. Equivalent to
           indicator_constraints.get_rhs(range(begin, end + 1)).
 
         >>> import cplex
@@ -2441,11 +2378,10 @@ class IndicatorConstraintInterface(BaseInterface):
           [indicator_constraints.get_senses(i) for i in s]
 
         indicator_constraints.get_senses(begin, end)
-          begin and end must be indicator constraint indices with
-          begin <= end or indicator constraint names whose indices
-          respect this order.  Returns the senses of the indicator
-          constraints with indices between begin and end, inclusive
-          of end.  Equivalent to
+          begin and end must be indicator constraint indices or indicator
+          constraint names. Returns the senses of the indicator
+          constraints with indices between begin and end, inclusive of
+          end. Equivalent to
           indicator_constraints.get_senses(range(begin, end + 1)).
 
 
@@ -2494,11 +2430,10 @@ class IndicatorConstraintInterface(BaseInterface):
           [indicator_constraints.get_types(i) for i in s]
 
         indicator_constraints.get_types(begin, end)
-          begin and end must be indicator constraint indices with
-          begin <= end or indicator constraint names whose indices
-          respect this order.  Returns the types of the indicator
-          constraints with indices between begin and end, inclusive
-          of end.  Equivalent to
+          begin and end must be indicator constraint indices or indicator
+          constraint names. Returns the types of the indicator
+          constraints with indices between begin and end, inclusive of
+          end. Equivalent to
           indicator_constraints.get_types(range(begin, end + 1)).
 
         >>> import cplex
@@ -2538,11 +2473,10 @@ class IndicatorConstraintInterface(BaseInterface):
           [indicator_constraints.get_linear_components(i) for i in s]
 
         indicator_constraints.get_linear_components(begin, end)
-          begin and end must be indicator constraint indices with
-          begin <= end or indicator constraint names whose indices
-          respect this order.  Returns the linear components of the
+          begin and end must be indicator constraint indices or indicator
+          constraint names. Returns the linear components of the
           indicator constraints with indices between begin and end,
-          inclusive of end.  Equivalent to
+          inclusive of end. Equivalent to
           indicator_constraints.get_linear_components(range(begin, end + 1)).
 
         >>> import cplex
@@ -2592,10 +2526,9 @@ class IndicatorConstraintInterface(BaseInterface):
           [indicator_constraints.get_names(i) for i in s]
 
         indicator_constraints.get_names(begin, end)
-          begin and end must be indicator constraint indices with
-          begin <= end.  Returns the names of the indicator
-          constraints with indices between begin and end, inclusive
-          of end.  Equivalent to
+          begin and end must be indicator constraint indices. Returns the
+          names of the indicator constraints with indices between begin
+          and end, inclusive of end. Equivalent to
           indicator_constraints.get_names(range(begin, end + 1)).
 
         >>> import cplex
@@ -2721,35 +2654,42 @@ class QuadraticConstraintInterface(BaseInterface):
                                 lin_expr, quad_expr, sense, rhs, name)
 
     def delete(self, *args):
-        """Deletes a set of quadratic constraints.
+        """Deletes quadratic constraints from the problem.
 
-        Can be called by four forms.
+        There are four forms by which quadratic_constraints.delete may be
+        called.
 
         quadratic_constraints.delete()
           deletes all quadratic constraints from the problem.
 
         quadratic_constraints.delete(i)
-          i must be a quadratic constraint name or index.  Deletes
+          i must be a quadratic constraint name or index. Deletes
           the quadratic constraint whose index or name is i.
 
         quadratic_constraints.delete(s)
           s must be a sequence of quadratic constraint names or
-          indices.  Deletes the quadratic constraints with indices
-          the members of s.  Equivalent to
-          [quadratic_constraints.delete(i) for i in s]
+          indices. Deletes the quadratic constraints with names or
+          indices contained within s. Equivalent to
+          [quadratic_constraints.delete(i) for i in s].
 
         quadratic_constraints.delete(begin, end)
-          begin and end must be quadratic constraint indices with
-          begin <= end or quadratic constraint names whose indices
-          respect this order.  Deletes the quadratic constraints with
-          indices between begin and end, inclusive of end.
-          Equivalent to quadratic_constraints.delete(range(begin, end + 1)).
+          begin and end must be quadratic constraint indices or quadratic
+          constraint names. Deletes the quadratic constraints with
+          indices between begin and end, inclusive of end. Equivalent to
+          quadratic_constraints.delete(range(begin, end + 1)). This will
+          give the best performance when deleting batches of quadratic
+          constraints.
+
+        See CPXdelqconstrs in the Callable Library Reference Manual for
+        more detail.
+
+        Example usage:
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = ['x','y'])
-        >>> l = cplex.SparsePair(ind = ['x'], val = [1.0])
-        >>> q = cplex.SparseTriple(ind1 = ['x'], ind2 = ['y'], val = [1.0])
+        >>> indices = c.variables.add(names=['x', 'y'])
+        >>> l = cplex.SparsePair(ind=['x'], val=[1.0])
+        >>> q = cplex.SparseTriple(ind1=['x'], ind2=['y'], val=[1.0])
         >>> [c.quadratic_constraints.add(
         ...      name=str(i), lin_expr=l, quad_expr=q)
         ...  for i in range(10)]
@@ -2759,10 +2699,10 @@ class QuadraticConstraintInterface(BaseInterface):
         >>> c.quadratic_constraints.delete(8)
         >>> c.quadratic_constraints.get_names()
         ['0', '1', '2', '3', '4', '5', '6', '7', '9']
-        >>> c.quadratic_constraints.delete("1",3)
+        >>> c.quadratic_constraints.delete("1", 3)
         >>> c.quadratic_constraints.get_names()
         ['0', '4', '5', '6', '7', '9']
-        >>> c.quadratic_constraints.delete([2,"0",5])
+        >>> c.quadratic_constraints.delete([2, "0", 5])
         >>> c.quadratic_constraints.get_names()
         ['4', '6', '7']
         >>> c.quadratic_constraints.delete()
@@ -2794,11 +2734,10 @@ class QuadraticConstraintInterface(BaseInterface):
           [quadratic_constraints.get_rhs(i) for i in s]
 
         quadratic_constraints.get_rhs(begin, end)
-          begin and end must be quadratic constraint indices with
-          begin <= end or quadratic constraint names whose indices
-          respect this order.  Returns the righthand side of the
-          quadratic constraints with indices between begin and end,
-          inclusive of end.  Equivalent to
+          begin and end must be quadratic constraint indices or quadratic
+          constraint names. Returns the righthand side of the quadratic
+          constraints with indices between begin and end, inclusive of
+          end. Equivalent to
           quadratic_constraints.get_rhs(range(begin, end + 1)).
 
         >>> import cplex
@@ -2844,13 +2783,11 @@ class QuadraticConstraintInterface(BaseInterface):
           [quadratic_constraints.get_senses(i) for i in s]
 
         quadratic_constraints.get_senses(begin, end)
-          begin and end must be quadratic constraint indices with
-          begin <= end or quadratic constraint names whose indices
-          respect this order.  Returns the senses of the quadratic
-          constraints with indices between begin and end, inclusive
-          of end.  Equivalent to
+          begin and end must be quadratic constraint indices or quadratic
+          constraint names. Returns the senses of the quadratic
+          constraints with indices between begin and end, inclusive of
+          end. Equivalent to
           quadratic_constraints.get_senses(range(begin, end + 1)).
-
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -2896,11 +2833,10 @@ class QuadraticConstraintInterface(BaseInterface):
           [quadratic_constraints.get_linear_num_nonzeros(i) for i in s]
 
         quadratic_constraints.get_linear_num_nonzeros(begin, end)
-          begin and end must be quadratic constraint indices with
-          begin <= end or quadratic constraint names whose indices
-          respect this order.  Returns the number of nonzeros in the
+          begin and end must be quadratic constraint indices or quadratic
+          constraint names. Returns the number of nonzeros in the
           quadratic constraints with indices between begin and end,
-          inclusive of end.  Equivalent to
+          inclusive of end. Equivalent to
           quadratic_constraints.get_linear_num_nonzeros(range(begin, end + 1)).
 
         >>> import cplex
@@ -2951,11 +2887,10 @@ class QuadraticConstraintInterface(BaseInterface):
           [quadratic_constraints.get_linear_components(i) for i in s]
 
         quadratic_constraints.get_linear_components(begin, end)
-          begin and end must be quadratic constraint indices with
-          begin <= end or quadratic constraint names whose indices
-          respect this order.  Returns the linear components of the
+          begin and end must be quadratic constraint indices or quadratic
+          constraint names. Returns the linear components of the
           quadratic constraints with indices between begin and end,
-          inclusive of end.  Equivalent to
+          inclusive of end. Equivalent to
           quadratic_constraints.get_linear_components(range(begin, end + 1)).
 
         >>> import cplex
@@ -3005,11 +2940,10 @@ class QuadraticConstraintInterface(BaseInterface):
           [quadratic_constraints.get_quad_num_nonzeros(i) for i in s]
 
         quadratic_constraints.get_quad_num_nonzeros(begin, end)
-          begin and end must be quadratic constraint indices with
-          begin <= end or quadratic constraint names whose indices
-          respect this order.  Returns the number of nonzeros in the
+          begin and end must be quadratic constraint indices or quadratic
+          constraint names. Returns the number of nonzeros in the
           quadratic constraints with indices between begin and end,
-          inclusive of end.  Equivalent to
+          inclusive of end. Equivalent to
           quadratic_constraints.get_quad_num_nonzeros(range(begin, end + 1)).
 
         >>> import cplex
@@ -3058,11 +2992,10 @@ class QuadraticConstraintInterface(BaseInterface):
           [quadratic_constraints.get_quadratic_components(i) for i in s]
 
         quadratic_constraints.get_quadratic_components(begin, end)
-          begin and end must be quadratic constraint indices with
-          begin <= end or quadratic constraint names whose indices
-          respect this order.  Returns the quadratic components of the
+          begin and end must be quadratic constraint indices or quadratic
+          constraint names. Returns the quadratic components of the
           quadratic constraints with indices between begin and end,
-          inclusive of end.  Equivalent to
+          inclusive of end. Equivalent to
           quadratic_constraints.get_quadratic_components(range(begin, end + 1)).
 
         >>> import cplex
@@ -3111,10 +3044,9 @@ class QuadraticConstraintInterface(BaseInterface):
           [quadratic_constraints.get_names(i) for i in s]
 
         quadratic_constraints.get_names(begin, end)
-          begin and end must be quadratic constraint indices with
-          begin <= end.  Returns the names of the quadratic
-          constraints with indices between begin and end, inclusive
-          of end.  Equivalent to
+          begin and end must be quadratic constraint indices. Returns
+          the names of the quadratic constraints with indices between
+          begin and end, inclusive of end. Equivalent to
           quadratic_constraints.get_names(range(begin, end + 1)).
 
         >>> import cplex
@@ -3235,44 +3167,49 @@ class SOSInterface(BaseInterface):
                                 type, SOS, name)
 
     def delete(self, *args):
-        """Deletes a set of special ordered sets.
+        """Deletes special ordered sets from the problem.
 
-        Can be called by four forms.
+        There are four forms by which SOS.delete may be called.
 
         SOS.delete()
           deletes all SOS constraints from the problem.
 
         SOS.delete(i)
-          i must be a SOS constraint name or index.  Deletes the SOS
+          i must be a SOS constraint name or index. Deletes the SOS
           constraint indexed as i or named i.
 
         SOS.delete(s)
           s must be a sequence of SOS constraint names or indices.
-          Deletes the SOS constraints with indices the members of s.
-          Equivalent to [SOS_constraints.delete(i) for i in s]
+          Deletes the SOS constraints with names or indices contained
+          within s. Equivalent to [SOS.delete(i) for i in s].
 
         SOS.delete(begin, end)
-          begin and end must be SOS constraint indices with begin <=
-          end or SOS constraint names whose indices respect this
-          order.  Deletes the SOS constraints with indices between
-          begin and end, inclusive of end.  Equivalent to
-          SOS_constraints.delete(range(begin, end + 1)).
+          begin and end must be SOS constraint indices or SOS constraint
+          names. Deletes the SOS constraints with indices between begin
+          and end, inclusive of end. Equivalent to
+          SOS.delete(range(begin, end + 1)). This will give the best
+          performance when deleting batches of SOS constraints.
+
+        See CPXdelsos in the Callable Library Reference Manual for
+        more detail.
+
+        Example usage:
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = ['x','y'])
-        >>> l = cplex.SparsePair(ind = ['x'], val = [1.0])
-        >>> [c.SOS.add(name = str(i), SOS = l) for i in range(10)]
+        >>> indices = c.variables.add(names=['x', 'y'])
+        >>> l = cplex.SparsePair(ind=['x'], val=[1.0])
+        >>> [c.SOS.add(name=str(i), SOS=l) for i in range(10)]
         [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
         >>> c.SOS.get_num()
         10
         >>> c.SOS.delete(8)
         >>> c.SOS.get_names()
         ['0', '1', '2', '3', '4', '5', '6', '7', '9']
-        >>> c.SOS.delete("1",3)
+        >>> c.SOS.delete("1", 3)
         >>> c.SOS.get_names()
         ['0', '4', '5', '6', '7', '9']
-        >>> c.SOS.delete([2,"0",5])
+        >>> c.SOS.delete([2, "0", 5])
         >>> c.SOS.get_names()
         ['4', '6', '7']
         >>> c.SOS.delete()
@@ -3306,11 +3243,10 @@ class SOSInterface(BaseInterface):
           [SOS.get_sets(i) for i in s]
 
         SOS.get_sets(begin, end)
-          begin and end must be SOS constraint indices with begin <=
-          end or SOS constraint names whose indices respect this
-          order.  Returns the variables and weights of the SOS
-          constraints with indices between begin and end, inclusive
-          of end.  Equivalent to SOS.get_sets(range(begin, end + 1)).
+          begin and end must be SOS constraint indices or SOS constraint
+          names. Returns the variables and weights of the SOS constraints
+          with indices between begin and end, inclusive of end.
+          Equivalent to SOS.get_sets(range(begin, end + 1)).
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -3347,24 +3283,23 @@ class SOSInterface(BaseInterface):
 
         Can be called by four forms.
 
-        SOS.get_type()
+        SOS.get_types()
           return the type of all SOS constraints.
 
-        SOS.get_type(i)
+        SOS.get_types(i)
           i must be a SOS constraint name or index.  Returns the type
           of the SOS constraint whose index or name is i.
 
-        SOS.get_type(s)
+        SOS.get_types(s)
           s must be a sequence of SOS constraint names or indices.
           Returns the type of the SOS constraints with indices the
-          members of s.  Equivalent to [SOS.get_type(i) for i in s]
+          members of s.  Equivalent to [SOS.get_types(i) for i in s]
 
-        SOS.get_type(begin, end)
-          begin and end must be SOS constraint indices with begin <=
-          end or SOS constraint names whose indices respect this
-          order.  Returns the type of the SOS constraints with
-          indices between begin and end, inclusive of end.
-          Equivalent to SOS.get_type(range(begin, end + 1)).
+        SOS.get_types(begin, end)
+          begin and end must be SOS constraint indices or SOS constraint
+          names. Returns the type of the SOS constraints with indices
+          between begin and end, inclusive of end. Equivalent to
+          SOS.get_types(range(begin, end + 1)).
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -3410,11 +3345,10 @@ class SOSInterface(BaseInterface):
           [SOS.get_num_members(i) for i in s]
 
         SOS.get_num_members(begin, end)
-          begin and end must be SOS constraint indices with begin <=
-          end or SOS constraint names whose indices respect this
-          order.  Returns the number of variables in the SOS
-          constraints with indices between begin and end, inclusive
-          of end.  Equivalent to SOS.get_num_members(range(begin, end + 1)).
+          begin and end must be SOS constraint indices or SOS constraint
+          names. Returns the number of variables in the SOS constraints
+          with indices between begin and end, inclusive of end.
+          Equivalent to SOS.get_num_members(range(begin, end + 1)).
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -3457,9 +3391,9 @@ class SOSInterface(BaseInterface):
           of s.  Equivalent to [SOS.get_names(i) for i in s]
 
         SOS.get_names(begin, end)
-          begin and end must be SOS constraint indices with begin <=
-          end.  Returns the names of the SOS constraints with indices
-          between begin and end, inclusive of end.  Equivalent to
+          begin and end must be SOS constraint indices. Returns the names
+          of the SOS constraints with indices between begin and end,
+          inclusive of end. Equivalent to
           SOS.get_names(range(begin, end + 1)).
 
         >>> import cplex
@@ -3744,35 +3678,39 @@ class MIPStartsInterface(BaseInterface):
             raise WrongNumberOfArgumentsError()
 
     def delete(self, *args):
-        """Deletes a set of MIP starts.
+        """Deletes MIP starts from the problem.
 
-        Can be called by four forms.
+        There are four forms by which MIP_starts.delete may be called.
 
         MIP_starts.delete()
           deletes all MIP starts from the problem.
 
         MIP_starts.delete(i)
-          i must be a MIP start name or index.  Deletes the MIP start
+          i must be a MIP start name or index. Deletes the MIP start
           whose index or name is i.
 
         MIP_starts.delete(s)
           s must be a sequence of MIP start names or indices.
-          Deletes the MIP starts with indices the members of s.
-          Equivalent to [MIP_starts.delete(i) for i in s]
+          Deletes the MIP starts with names or indices contained within
+          s. Equivalent to [MIP_starts.delete(i) for i in s].
 
         MIP_starts.delete(begin, end)
-          begin and end must be MIP start indices with begin <= end
-          or MIP start names whose indices respect this order.
+          begin and end must be MIP start indices or MIP start names.
           Deletes the MIP starts with indices between begin and end,
-          inclusive of end.  Equivalent to
-          MIP_starts.delete(range(begin, end + 1)).
+          inclusive of end. Equivalent to
+          MIP_starts.delete(range(begin, end + 1)). This will give the
+          best performance when deleting batches of MIP starts.
 
+        See CPXdelmipstarts in the Callable Library Reference Manual for
+        more detail.
+
+        Example usage:
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = ['x','y'], types = ["II"])
+        >>> indices = c.variables.add(names=['x', 'y'], types=["II"])
         >>> indices = c.MIP_starts.add(
-        ...     [(cplex.SparsePair(ind = ['x'],val = [1.0]),
+        ...     [(cplex.SparsePair(ind=['x'], val=[1.0]),
         ...       c.MIP_starts.effort_level.auto, str(i))
         ...      for i in range(10)])
         >>> c.MIP_starts.get_num()
@@ -3780,10 +3718,10 @@ class MIPStartsInterface(BaseInterface):
         >>> c.MIP_starts.delete(8)
         >>> c.MIP_starts.get_names()
         ['0', '1', '2', '3', '4', '5', '6', '7', '9']
-        >>> c.MIP_starts.delete("1",3)
+        >>> c.MIP_starts.delete("1", 3)
         >>> c.MIP_starts.get_names()
         ['0', '4', '5', '6', '7', '9']
-        >>> c.MIP_starts.delete([2,"0",5])
+        >>> c.MIP_starts.delete([2, "0", 5])
         >>> c.MIP_starts.get_names()
         ['4', '6', '7']
         >>> c.MIP_starts.delete()
@@ -3817,10 +3755,9 @@ class MIPStartsInterface(BaseInterface):
           for i in s]
 
         MIP_starts.get_starts(begin, end)
-          begin and end must be MIP start indices with begin <= end
-          or MIP start names whose indices respect this order.
+          begin and end must be MIP start indices or MIP start names.
           Returns the starting vector for the MIP starts with indices
-          between begin and end, inclusive of end.  Equivalent to
+          between begin and end, inclusive of end. Equivalent to
           MIP_starts.get_starts(range(begin, end + 1)).
 
         >>> import cplex
@@ -3875,10 +3812,9 @@ class MIPStartsInterface(BaseInterface):
           [MIP_starts.get_effort_levels(i) for i in s]
 
         MIP_starts.get_effort_levels(begin, end)
-          begin and end must be MIP start indices with begin <= end
-          or MIP start names whose indices respect this order.
+          begin and end must be MIP start indices or MIP start names.
           Returns the effort level for the MIP starts with indices
-          between begin and end, inclusive of end.  Equivalent to
+          between begin and end, inclusive of end. Equivalent to
           MIP_starts.get_effort_levels(range(begin, end + 1)).
 
         >>> import cplex
@@ -3931,12 +3867,11 @@ class MIPStartsInterface(BaseInterface):
           [MIP_starts.get_num_entries(i) for i in s]
 
         MIP_starts.get_num_entries(begin, end)
-          begin and end must be MIP start indices with begin <= end
-          or MIP start names whose indices respect this order.
-          Returns the length of the starting vector for the MIP
-          starts with indices between begin and end, inclusive of
-          end.  Equivalent to MIP_starts.get_num_entries(range(begin,
-          end + 1)).
+          begin and end must be MIP start indices or MIP start names.
+          Returns the length of the starting vector for the MIP starts
+          with indices between begin and end, inclusive of end.
+          Equivalent to
+          MIP_starts.get_num_entries(range(begin, end + 1)).
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -3980,10 +3915,9 @@ class MIPStartsInterface(BaseInterface):
           Equivalent to [MIP_starts.get_names(i) for i in s]
 
         MIP_starts.get_names(begin, end)
-          begin and end must be MIP start indices with begin <= end.
-          Returns the names of the MIP starts with indices between
-          begin and end, inclusive of end.  Equivalent to
-          MIP_starts.get_names(range(begin, end + 1)).
+          begin and end must be MIP start indices. Returns the names of
+          the MIP starts with indices between begin and end, inclusive of
+          end. Equivalent to MIP_starts.get_names(range(begin, end + 1)).
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -4082,7 +4016,7 @@ class ObjectiveInterface(BaseInterface):
         of variables in the problem.
 
         If the quadratic objective function is separable, the entries
-        of the list must all be of type float.
+        of the list must all be of type float, int, or long.
 
         If the quadratic objective function is not separable, the
         entries of the list must be either SparsePair instances or
@@ -4115,7 +4049,7 @@ class ObjectiveInterface(BaseInterface):
                 self._env._e, self._cplex._lp, args[0].matbeg,
                 self._cplex.variables._conv(args[0].matind),
                 args[0].matval)
-        elif isinstance(args[0][0], float):
+        elif isinstance(args[0][0], numbers.Number):
             CPX_PROC.copyqpsep(self._env._e, self._cplex._lp, args[0])
         else:
             self.set_quadratic(_HBMatrix(args[0]))
@@ -4143,6 +4077,11 @@ class ObjectiveInterface(BaseInterface):
           the (v1, v2) coefficient and the (v2, v1) coefficient.  If
           (v1, v2) and (v2, v1) are set with a single call, the second
           value is stored.
+
+        Note
+          Attempting to set many coefficients with set_quadratic_coefficients
+          can be time consuming. Instead, use the method set_quadratic to set
+          the quadratic part of the objective efficiently.
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -4225,11 +4164,10 @@ class ObjectiveInterface(BaseInterface):
           [objective.get_linear(i) for i in s]
 
         objective.get_linear(begin, end)
-          begin and end must be variable indices with begin <= end or
-          variable names whose indices respect this order.  Returns
-          the linear objective coefficient of the variables with
-          indices between begin and end, inclusive of end.
-          Equivalent to objective.get_linear(range(begin, end + 1)).
+          begin and end must be variable indices or variable names.
+          Returns the linear objective coefficient of the variables with
+          indices between begin and end, inclusive of end. Equivalent to
+          objective.get_linear(range(begin, end + 1)).
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -4273,11 +4211,10 @@ class ObjectiveInterface(BaseInterface):
           Equivalent to [objective.get_quadratic(i) for i in s]
 
         objective.get_quadratic(begin, end)
-          begin and end must be variable indices with begin <= end or
-          variable names whose indices respect this order.  Returns
-          the columns of the quadratic objective function associated
-          with the variables with indices between begin and end,
-          inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns the columns of the quadratic objective function
+          associated with the variables with indices between begin and
+          end, inclusive of end. Equivalent to
           objective.get_quadratic(range(begin, end + 1)).
 
         >>> import cplex
@@ -4465,8 +4402,7 @@ class ProgressInterface(BaseInterface):
         >>> out = c.set_log_stream(None)
         >>> c.read("example.mps")
         >>> c.solve()
-        >>> int(c.solution.progress.get_num_iterations())
-        2
+        >>> num_iter = c.solution.progress.get_num_iterations()
         """
         if self._cplex._is_MIP():
             return CPX_PROC.getmipitcnt(self._env._e, self._cplex._lp)
@@ -4489,8 +4425,7 @@ class ProgressInterface(BaseInterface):
         >>> out = c.set_log_stream(None)
         >>> c.read("qcp.lp")
         >>> c.solve()
-        >>> int(c.solution.progress.get_num_barrier_iterations())
-        8
+        >>> num_iter = c.solution.progress.get_num_barrier_iterations()
         """
         return CPX_PROC.getbaritcnt(self._env._e, self._cplex._lp)
 
@@ -4506,8 +4441,7 @@ class ProgressInterface(BaseInterface):
         >>> c.read("lpex.mps")
         >>> c.parameters.lpmethod.set(c.parameters.lpmethod.values.sifting)
         >>> c.solve()
-        >>> int(c.solution.progress.get_num_sifting_iterations())
-        3
+        >>> num_iter = c.solution.progress.get_num_sifting_iterations()
         """
         return CPX_PROC.getsiftitcnt(self._env._e, self._cplex._lp)
 
@@ -4522,8 +4456,7 @@ class ProgressInterface(BaseInterface):
         >>> out = c.set_log_stream(None)
         >>> c.read("lpex.mps")
         >>> c.solve()
-        >>> int(c.solution.progress.get_num_phase_one_iterations())
-        4
+        >>> num_iter = c.solution.progress.get_num_phase_one_iterations()
         """
         return CPX_PROC.getphase1cnt(self._env._e, self._cplex._lp)
 
@@ -4539,8 +4472,7 @@ class ProgressInterface(BaseInterface):
         >>> c.read("lpex.mps")
         >>> c.parameters.lpmethod.set(c.parameters.lpmethod.values.sifting)
         >>> c.solve()
-        >>> int(c.solution.progress.get_num_sifting_phase_one_iterations())
-        0
+        >>> num_iter = c.solution.progress.get_num_sifting_phase_one_iterations()
         """
         return CPX_PROC.getsiftphase1cnt(self._env._e, self._cplex._lp)
 
@@ -4571,8 +4503,7 @@ class ProgressInterface(BaseInterface):
         >>> out = c.set_log_stream(None)
         >>> c.read("ind.lp")
         >>> c.solve()
-        >>> int(c.solution.progress.get_num_nodes_remaining())
-        0
+        >>> num_nodes = c.solution.progress.get_num_nodes_remaining()
         """
         return CPX_PROC.getnodeleftcnt(self._env._e, self._cplex._lp)
 
@@ -4588,8 +4519,7 @@ class ProgressInterface(BaseInterface):
         >>> c.read("lpex.mps")
         >>> c.parameters.lpmethod.set(c.parameters.lpmethod.values.barrier)
         >>> c.solve()
-        >>> int(c.solution.progress.get_num_primal_push())
-        0
+        >>> num_push = c.solution.progress.get_num_primal_push()
         """
         return CPX_PROC.getcrossppushcnt(self._env._e, self._cplex._lp)
 
@@ -4605,8 +4535,7 @@ class ProgressInterface(BaseInterface):
         >>> c.read("lpex.mps")
         >>> c.parameters.lpmethod.set(c.parameters.lpmethod.values.barrier)
         >>> c.solve()
-        >>> int(c.solution.progress.get_num_primal_exchange())
-        1
+        >>> num_exch = c.solution.progress.get_num_primal_exchange()
         """
         return CPX_PROC.getcrosspexchcnt(self._env._e, self._cplex._lp)
 
@@ -4622,8 +4551,7 @@ class ProgressInterface(BaseInterface):
         >>> c.read("lpex.mps")
         >>> c.parameters.lpmethod.set(c.parameters.lpmethod.values.barrier)
         >>> c.solve()
-        >>> int(c.solution.progress.get_num_dual_push())
-        0
+        >>> num_push = c.solution.progress.get_num_dual_push()
         """
         return CPX_PROC.getcrossdpushcnt(self._env._e, self._cplex._lp)
 
@@ -4639,8 +4567,7 @@ class ProgressInterface(BaseInterface):
         >>> c.read("lpex.mps")
         >>> c.parameters.lpmethod.set(c.parameters.lpmethod.values.barrier)
         >>> c.solve()
-        >>> int(c.solution.progress.get_num_dual_exchange())
-        0
+        >>> num_exch = c.solution.progress.get_num_dual_exchange()
         """
         return CPX_PROC.getcrossdexchcnt(self._env._e, self._cplex._lp)
 
@@ -4969,6 +4896,9 @@ class MIPSolutionInterface(BaseInterface):
     def get_mip_relative_gap(self):
         """Returns the MIP relative gap.
 
+        See CPXgetmiprelgap in the Callable Library Reference Manual for
+        more detail.
+
         Example usage:
 
         >>> import cplex
@@ -5263,7 +5193,7 @@ class SensitivityInterface(BaseInterface):
         [(-1e+20, 40.0), (-1e+20, 17.5), (-1e+20, 42.5), (-1e+20, 0.625)]
         """
         def sa(a, b=self._cplex.variables.get_num() - 1):
-            return list(zip(*CPX_PROC.boundsa_lower(self._env._e, self._cplex._lp, a, b)))
+            return unzip(CPX_PROC.boundsa_lower(self._env._e, self._cplex._lp, a, b))
         return apply_freeform_two_args(
             sa, self._cplex.variables._conv, args)
 
@@ -5296,7 +5226,7 @@ class SensitivityInterface(BaseInterface):
         True
         """
         def sa(a, b=self._cplex.variables.get_num() - 1):
-            return list(zip(*CPX_PROC.boundsa_upper(self._env._e, self._cplex._lp, a, b)))
+            return unzip(CPX_PROC.boundsa_upper(self._env._e, self._cplex._lp, a, b))
         return apply_freeform_two_args(
             sa, self._cplex.variables._conv, args)
 
@@ -5322,7 +5252,7 @@ class SensitivityInterface(BaseInterface):
         (-1e+20, 17.5, 17.5, 1e+20)
         """
         def sa(a, b=self._cplex.variables.get_num() - 1):
-            return list(zip(*CPX_PROC.boundsa(self._env._e, self._cplex._lp, a, b)))
+            return unzip(CPX_PROC.boundsa(self._env._e, self._cplex._lp, a, b))
         return apply_freeform_two_args(
             sa, self._cplex.variables._conv, args)
 
@@ -5347,7 +5277,7 @@ class SensitivityInterface(BaseInterface):
         [(-1e+20, 2.5), (-3.0, 5.0), (-1e+20, -2.0), (0.0, 4.0)]
         """
         def sa(a, b=self._cplex.variables.get_num() - 1):
-            return list(zip(*CPX_PROC.objsa(self._env._e, self._cplex._lp, a, b)))
+            return unzip(CPX_PROC.objsa(self._env._e, self._cplex._lp, a, b))
         return apply_freeform_two_args(
             sa, self._cplex.variables._conv, args)
 
@@ -5384,7 +5314,7 @@ class SensitivityInterface(BaseInterface):
         True
         """
         def sa(a, b=self._cplex.linear_constraints.get_num() - 1):
-            return list(zip(*CPX_PROC.rhssa(self._env._e, self._cplex._lp, a, b)))
+            return unzip(CPX_PROC.rhssa(self._env._e, self._cplex._lp, a, b))
         return apply_freeform_two_args(
             sa, self._cplex.linear_constraints._conv, args)
 
@@ -5632,9 +5562,33 @@ class SolnPoolFilterInterface(BaseInterface):
             getnnz, self._conv, self.get_num(), args)
 
     def delete(self, *args):
-        """Deletes a set of filters.
+        """Deletes filters from the problem.
 
-        Can be called by four forms.
+        There are four forms by which filters.delete may be called.
+
+        filters.delete()
+          deletes all filters from the problem.
+
+        filters.delete(i)
+          i must be a filter name or index. Deletes the filter whose
+          index or name is i.
+
+        filters.delete(s)
+          s must be a sequence of filter names or indices. Deletes
+          the filters with names or indices contained within s.
+          Equivalent to [filters.delete(i) for i in s].
+
+        filters.delete(begin, end)
+          begin and end must be filter indices or filter names. Deletes
+          the filters with indices between begin and end, inclusive of
+          end. Equivalent to filters.delete(range(begin, end + 1)). This
+          will give the best performance when deleting batches of
+          filters.
+
+        See CPXdelsolnpoolfilters in the Callable Library Reference
+        Manual for more detail.
+
+        Example usage:
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -5706,10 +5660,10 @@ class SolnPoolFilterInterface(BaseInterface):
           Equivalent to [solution.pool.filter.get_names(i) for i in s]
 
         solution.pool.filter.get_names(begin, end)
-          begin and end must be solution filter indices with begin
-          <= end.  Returns the names of the solution pool filter with
-          indices between begin and end, inclusive of end.
-          Equivalent to solution.pool.filter.get_names(range(begin, end + 1)).
+          begin and end must be solution filter indices. Returns the
+          names of the solution pool filter with indices between begin
+          and end, inclusive of end. Equivalent to
+          solution.pool.filter.get_names(range(begin, end + 1)).
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -5843,6 +5797,8 @@ class QualityMetric(object):
     sum_quadratic_slack = _constants.CPX_SUM_QCSLACK
     max_indicator_slack_infeasibility = _constants.CPX_MAX_INDSLACK_INFEAS
     sum_indicator_slack_infeasibility = _constants.CPX_SUM_INDSLACK_INFEAS
+    max_pwl_slack_infeasibility = _constants.CPX_MAX_PWLSLACK_INFEAS
+    sum_pwl_slack_infeasibility = _constants.CPX_SUM_PWLSLACK_INFEAS
     exact_kappa = _constants.CPX_EXACT_KAPPA
     kappa_stable = _constants.CPX_KAPPA_STABLE
     kappa_suspicious = _constants.CPX_KAPPA_SUSPICIOUS
@@ -5959,6 +5915,10 @@ class QualityMetric(object):
             return 'max_indicator_slack_infeasibility'
         if item == _constants.CPX_SUM_INDSLACK_INFEAS:
             return 'sum_indicator_slack_infeasibility'
+        if item == _constants.CPX_MAX_PWLSLACK_INFEAS:
+            return 'max_pwl_slack_infeasibility'
+        if item == _constants.CPX_SUM_PWLSLACK_INFEAS:
+            return 'sum_pwl_slack_infeasibility'
         if item == _constants.CPX_EXACT_KAPPA:
             return 'exact_kappa'
         if item == _constants.CPX_KAPPA_STABLE:
@@ -5982,7 +5942,16 @@ def _temp_results_stream(cpx, temp_stream):
         cpx._env.set_results_stream(temp_stream)
         yield
     finally:
-        cpx._env.set_results_stream(old_results_stream)
+        if old_results_stream._was_opened:
+            # If this was a file-like object opened within
+            # _ostream.__init__, then it was closed when we set the temp
+            # stream above. We can get the name of the file using the
+            # 'name' attribute and re-open the file when we reset the
+            # stream below.
+            tmp = old_results_stream._file.name
+        else:
+            tmp = old_results_stream._file
+        cpx._env.set_results_stream(tmp)
 
 
 class QualityMetrics(object):
@@ -6142,6 +6111,11 @@ class QualityMetrics(object):
     indicator_slack_bound_error_total
     indicator_slack_bound_error_max
 
+    if in addition the problem this instance was generated for has
+    piecewise linear constraints, it has the members:
+
+    piecewise_linear_error_total
+    piecewise_linear_error_max
 
     If solver is "MIQCP" this instance also has the members:
 
@@ -6317,6 +6291,9 @@ class QualityMetrics(object):
                 if idata[3] == 1:
                     self.indicator_slack_bound_error_total = data[16]
                     self.indicator_slack_bound_error_max = data[17]
+                if idata[5] == 1:
+                    self.piecewise_linear_error_total = data[24]
+                    self.piecewise_linear_error_max = data[25]
             if idata[1] == 1:
                 self.max_kappa = data[18]
                 self.pct_kappa_stable = data[19]
@@ -6538,9 +6515,34 @@ class SolnPoolInterface(BaseInterface):
         return CPX_PROC.getsolnpoolmeanobjval(self._env._e, self._cplex._lp)
 
     def delete(self, *args):
-        """Deletes a set of solutions from the solution pool.
+        """Deletes solutions from the solution pool.
 
-        Can be called by four forms.
+        There are four forms by which pool.delete may be called.
+
+        pool.delete()
+          deletes all solutions from the problem.
+
+        pool.delete(i)
+          i must be a solution name or index. Deletes the solution
+          whose index or name is i.
+
+        pool.delete(s)
+          s must be a sequence of solution names or indices. Deletes
+          the solutions with names or indices contained within s.
+          Equivalent to [pool.delete(i) for i in s].
+
+        pool.delete(begin, end)
+          begin and end must be solution indices or solution names.
+          Deletes the solutions with indices between begin and end,
+          inclusive of end. Equivalent to
+          pool.delete(range(begin, end + 1)). This will give the best
+          performance when deleting batches of solutions from the
+          solution pool.
+
+        See CPXdelsolnpoolsolns in the Callable Library Reference Manual
+        for more detail.
+
+        Example usage:
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -6593,10 +6595,10 @@ class SolnPoolInterface(BaseInterface):
           Equivalent to [solution.pool.get_names(i) for i in s]
 
         solution.pool.get_names(begin, end)
-          begin and end must be solution indices with begin
-          <= end.  Returns the names of the solutions with
-          indices between begin and end, inclusive of end.
-          Equivalent to solution.pool.get_names(range(begin, end + 1)).
+          begin and end must be solution indices. Returns the names of
+          the solutions with indices between begin and end, inclusive of
+          end. Equivalent to
+          solution.pool.get_names(range(begin, end + 1)).
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -6649,8 +6651,7 @@ class SolnPoolInterface(BaseInterface):
         >>> out = c.set_log_stream(None)
         >>> c.read("ind.lp")
         >>> c.solve()
-        >>> c.solution.pool.get_num()
-        6
+        >>> num = c.solution.pool.get_num()
         """
         return CPX_PROC.getsolnpoolnumsolns(self._env._e, self._cplex._lp)
 
@@ -6751,11 +6752,10 @@ class AdvancedSolutionInterface(BaseInterface):
           [solution.advanced.binvcol(i) for i in s]
 
         solution.advanced.binvcol(begin, end)
-          begin and end must be linear constraint indices with begin
-          <= end or linear constraint names whose indices respect
-          this order.  Returns the columns of the inverted basis
+          begin and end must be linear constraint indices or linear
+          constraint names. Returns the columns of the inverted basis
           matrix associated with the linear constraints between begin
-          and end, inclusive of end.  Equivalent to
+          and end, inclusive of end. Equivalent to
           solution.advanced.binvcol(range(begin, end + 1)).
 
         >>> import cplex
@@ -6793,11 +6793,10 @@ class AdvancedSolutionInterface(BaseInterface):
           [solution.advanced.binvrow(i) for i in s]
 
         solution.advanced.binvrow(begin, end)
-          begin and end must be linear constraint indices with begin
-          <= end or linear constraint names whose indices respect
-          this order.  Returns the rows of the inverted basis matrix
-          associated with the linear constraints between begin and
-          end, inclusive of end.  Equivalent to
+          begin and end must be linear constraint indices or linear
+          constraint names. Returns the rows of the inverted basis matrix
+          associated with the linear constraints between begin and end,
+          inclusive of end. Equivalent to
           solution.advanced.binvrow(range(begin, end + 1)).
 
         >>> import cplex
@@ -6834,11 +6833,10 @@ class AdvancedSolutionInterface(BaseInterface):
           Equivalent to [solution.advanced.binvacol(i) for i in s]
 
         solution.advanced.binvacol(begin, end)
-          begin and end must be variable indices with begin <= end or
-          variable names whose indices respect this order.  Returns
-          the columns of the tableau associated with the variables
-          between begin and end, inclusive of end.  Equivalent to
-          solution.advanced.binvacol(range(begin, end + 1)).
+          begin and end must be variable indices or variable names.
+          Returns the columns of the tableau associated with the
+          variables between begin and end, inclusive of end. Equivalent
+          to solution.advanced.binvacol(range(begin, end + 1)).
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -6875,12 +6873,10 @@ class AdvancedSolutionInterface(BaseInterface):
           for i in s]
 
         solution.advanced.binvacol(begin, end)
-          begin and end must be linear constraint indices with begin
-          <= end or variable names whose indices respect this order.
-          Returns the rows of the tableau associated with the
-          variables between begin and end, inclusive of end.
-          Equivalent to solution.advanced.binvacol(range(begin,
-          end + 1)).
+          begin and end must be linear constraint indices or variable
+          names. Returns the rows of the tableau associated with the
+          variables between begin and end, inclusive of end. Equivalent
+          to solution.advanced.binvacol(range(begin, end + 1)).
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -7054,9 +7050,9 @@ class AdvancedSolutionInterface(BaseInterface):
         >>> penalties[0]
         (0.34477142857142856, 8.021494102228047)
         """
-        return list(zip(*CPX_PROC.mdleave(
-                    self._env._e, self._cplex._lp,
-                    self._cplex.variables._conv(basic_variables))))
+        return unzip(CPX_PROC.mdleave(
+            self._env._e, self._cplex._lp,
+            self._cplex.variables._conv(basic_variables)))
 
     def get_quadratic_indefinite_certificate(self):
         """Compute a vector x that satisfies x'Qx < 0
@@ -7278,6 +7274,13 @@ class SolutionStatus(object):
     MIP_feasible = _constants.CPXMIP_FEASIBLE
     MIP_benders_master_unbounded = _constants.CPXMIP_BENDERS_MASTER_UNBOUNDED
 
+    multiobj_optimal = _constants.CPX_STAT_MULTIOBJ_OPTIMAL
+    multiobj_infeasible = _constants.CPX_STAT_MULTIOBJ_INFEASIBLE
+    multiobj_inforunbd = _constants.CPX_STAT_MULTIOBJ_INForUNBD
+    multiobj_non_optimal = _constants.CPX_STAT_MULTIOBJ_NON_OPTIMAL
+    multiobj_stopped = _constants.CPX_STAT_MULTIOBJ_STOPPED
+    multiobj_unbounded = _constants.CPX_STAT_MULTIOBJ_UNBOUNDED
+
     def __getitem__(self, item):
         """Converts a constant to a string.
 
@@ -7428,6 +7431,18 @@ class SolutionStatus(object):
             return 'MIP_feasible'
         if item == _constants.CPXMIP_BENDERS_MASTER_UNBOUNDED:
             return 'MIP_benders_master_unbounded'
+        if item == _constants.CPX_STAT_MULTIOBJ_OPTIMAL:
+            return "multiobj_optimal"
+        if item == _constants.CPX_STAT_MULTIOBJ_INFEASIBLE:
+            return "multiobj_infeasible"
+        if item == _constants.CPX_STAT_MULTIOBJ_INForUNBD:
+            return "multiobj_inforunbd"
+        if item == _constants.CPX_STAT_MULTIOBJ_NON_OPTIMAL:
+            return "multiobj_non_optimal"
+        if item == _constants.CPX_STAT_MULTIOBJ_STOPPED:
+            return "multiobj_stopped"
+        if item == _constants.CPX_STAT_MULTIOBJ_UNBOUNDED:
+            return "multiobj_unbounded"
         raise CplexError("Unexpected solution status code!")
 
 
@@ -7494,6 +7509,8 @@ class SolutionInterface(BaseInterface):
         """See `SolnPoolInterface()` """
         self.advanced = AdvancedSolutionInterface(self)
         """See `AdvancedSolutionInterface()` """
+        self.multiobj = MultiObjSolnInterface(self)
+        """See `MultiObjSolnInterface()` """
 
     def get_status(self):
         """Returns the status of the solution.
@@ -7583,10 +7600,9 @@ class SolutionInterface(BaseInterface):
           Equivalent to [solution.get_values(i) for i in s]
 
         solution.get_values(begin, end)
-          begin and end must be variable indices with begin <= end or
-          variable names whose indices respect this order.  Returns
-          the values of the variables with indices between begin and
-          end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns the values of the variables with indices between begin
+          and end, inclusive of end. Equivalent to
           solution.get_values(range(begin, end + 1)).
 
         >>> import cplex
@@ -7625,10 +7641,9 @@ class SolutionInterface(BaseInterface):
           in s]
 
         solution.get_reduced_costs(begin, end)
-          begin and end must be variable indices with begin <= end or
-          variable names whose indices respect this order.  Returns
-          the reduced costs of the variables with indices between
-          begin and end, inclusive of end.  Equivalent to
+          begin and end must be variable indices or variable names.
+          Returns the reduced costs of the variables with indices between
+          begin and end, inclusive of end. Equivalent to
           solution.get_reduced_costs(range(begin, end + 1)).
 
         >>> import cplex
@@ -7671,11 +7686,10 @@ class SolutionInterface(BaseInterface):
           [solution.get_dual_values(i) for i in s]
 
         solution.get_dual_values(begin, end)
-          begin and end must be linear constraint indices with begin
-          <= end or linear constraint names whose indices respect
-          this order.  Returns the dual values associated with the
+          begin and end must be linear constraint indices or linear
+          constraint names. Returns the dual values associated with the
           linear constraints with indices between begin and end,
-          inclusive of end.  Equivalent to
+          inclusive of end. Equivalent to
           solution.get_dual_values(range(begin, end + 1)).
 
         >>> import cplex
@@ -7736,11 +7750,10 @@ class SolutionInterface(BaseInterface):
           [solution.get_linear_slacks(i) for i in s]
 
         solution.get_linear_slacks(begin, end)
-          begin and end must be linear constraint indices with begin
-          <= end or linear constraint names whose indices respect
-          this order.  Returns the slack values associated with the
+          begin and end must be linear constraint indices or linear
+          constraint names. Returns the slack values associated with the
           linear constraints with indices between begin and end,
-          inclusive of end.  Equivalent to
+          inclusive of end. Equivalent to
           solution.get_linear_slacks(range(begin, end + 1)).
 
         >>> import cplex
@@ -7777,11 +7790,10 @@ class SolutionInterface(BaseInterface):
           Equivalent to [solution.get_indicator_slacks(i) for i in s]
 
         solution.get_indicator_slacks(begin, end)
-          begin and end must be indicator constraint indices with
-          begin <= end or indicator constraint names whose indices
-          respect this order.  Returns the slack values associated
-          with the indicator constraints with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be indicator constraint indices or indicator
+          constraint names. Returns the slack values associated with the
+          indicator constraints with indices between begin and end,
+          inclusive of end. Equivalent to
           solution.get_indicator_slacks(range(begin, end + 1)).
 
         >>> import cplex
@@ -7819,11 +7831,10 @@ class SolutionInterface(BaseInterface):
           Equivalent to [solution.get_quadratic_slacks(i) for i in s]
 
         solution.get_quadratic_slacks(begin, end)
-          begin and end must be quadratic constraint indices with
-          begin <= end or quadratic constraint names whose indices
-          respect this order.  Returns the slack values associated
-          with the quadratic constraints with indices between begin
-          and end, inclusive of end.  Equivalent to
+          begin and end must be quadratic constraint indices or quadratic
+          constraint names. Returns the slack values associated with the
+          quadratic constraints with indices between begin and end,
+          inclusive of end. Equivalent to
           solution.get_quadratic_slacks(range(begin, end + 1)).
 
         >>> import cplex
@@ -7966,11 +7977,10 @@ class SolutionInterface(BaseInterface):
           [solution.get_activity_levels(i) for i in s]
 
         solution.get_activity_levels(begin, end)
-          begin and end must be linear constraint indices with begin
-          <= end or linear constraint names whose indices respect
-          this order.  Returns the activity levels for the linear
-          constraints with indices between begin and end, inclusive
-          of end.  Equivalent to
+          begin and end must be linear constraint indices or linear
+          constraint names. Returns the activity levels for the linear
+          constraints with indices between begin and end, inclusive of
+          end. Equivalent to
           solution.get_activity_levels(range(begin, end + 1)).
 
         >>> import cplex
@@ -8008,11 +8018,10 @@ class SolutionInterface(BaseInterface):
           [solution.get_quadratic_activity_levels(i) for i in s]
 
         solution.get_quadratic_activity_levels(begin, end)
-          begin and end must be quadratic constraint indices with
-          begin <= end or quadratic constraint names whose indices
-          respect this order.  Returns the activity levels for the
-          quadratic constraints with indices between begin and end,
-          inclusive of end.  Equivalent to
+          begin and end must be quadratic constraint indices or quadratic
+          constraint names. Returns the activity levels for the quadratic
+          constraints with indices between begin and end, inclusive of
+          end. Equivalent to
           solution.get_quadratic_activity_levels(range(begin, end + 1)).
 
         >>> import cplex
@@ -8547,32 +8556,8 @@ class FeasoptConstraintType(object):
 class FeasoptInterface(BaseInterface):
     """Finds a minimal relaxation of the problem that is feasible.
 
-    To find a feasible relaxation of a problem, invoke the __call__
-    method of this class as illustrated in the example below.
-
-    The call method of this class can take arbitrarily many arguments.
-    Either the object returned by conflict.all_constraints() or any
-    combination of constraint groups and objects returned by
-    conflict.upper_bound(), conflict.lower_bound(), conflict.linear(),
-    conflict.quadratic(), or conflict.indicator() may be used to
-    specify the constraints to consider.
-
-    Constraint groups are sequences of length two, the first entry of
-    which is the preference for the group (a float), the second of
-    which is a sequence of pairs (type, id), where type is an
-    attribute of self.constraint_type and id is either an index or a
-    valid name for the type.
-
-    >>> import cplex
-    >>> c = cplex.Cplex()
-    >>> out = c.set_results_stream(None)
-    >>> out = c.set_log_stream(None)
-    >>> c.read("infeasible.lp")
-    >>> c.feasopt(c.feasopt.all_constraints())
-    >>> c.solution.get_objective_value()
-    2.0
-    >>> c.solution.get_values()
-    [3.0, 2.0, 3.0, 2.0]
+    This is a callable class. To find a feasible relaxation of a problem,
+    invoke the `__call__` method of this class.
     """
 
     constraint_type = FeasoptConstraintType()
@@ -8584,6 +8569,14 @@ class FeasoptInterface(BaseInterface):
         Calling Cplex.feasopt(Cplex.feasopt.all_constraints()) will
         result in every constraint being relaxed independently with
         equal weight.
+
+        See also the `__call__` method of this class.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> group = c.feasopt.all_constraints()
         """
         gp = self.upper_bound_constraints()._gp
         gp += self.lower_bound_constraints()._gp
@@ -8605,11 +8598,19 @@ class FeasoptInterface(BaseInterface):
         If additional arguments are specified, they determine a subset
         of upper bounds to be relaxed.  If one variable index or name
         is specified, it is the only upper bound that can be relaxed.
-        If two variable indices or names are specified, the upper
+        If two variable indices or names are specified, then upper
         bounds of all variables between the first and the second,
         inclusive, can be relaxed.  If a sequence of variable names or
         indices is passed in, all of their upper bounds can be
         relaxed.
+
+        See also the `__call__` method of this class.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> group = c.feasopt.upper_bound_constraints()
         """
         return self._make_group(self.constraint_type.upper_bound, *args)
 
@@ -8626,11 +8627,19 @@ class FeasoptInterface(BaseInterface):
         If additional arguments are specified, they determine a subset
         of lower bounds to be relaxed.  If one variable index or name
         is specified, it is the only lower bound that can be relaxed.
-        If two variable indices or names are specified, the lower
+        If two variable indices or names are specified, then lower
         bounds of all variables between the first and the second,
         inclusive, can be relaxed.  If a sequence of variable names or
         indices is passed in, all of their lower bounds can be
         relaxed.
+
+        See also the `__call__` method of this class.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> group = c.feasopt.lower_bound_constraints()
         """
         return self._make_group(self.constraint_type.lower_bound, *args)
 
@@ -8648,11 +8657,18 @@ class FeasoptInterface(BaseInterface):
         of linear constraints to be relaxed.  If one linear constraint
         index or name is specified, it is the only linear constraint
         that can be relaxed.  If two linear constraint indices or
-        names are specified, the upper bounds of all linear
-        constraints between the first and the second, inclusive, can
-        be relaxed.  If a sequence of linear constraint names or
-        indices is passed in, all of their linear constraints can be
-        relaxed.
+        names are specified, then all linear constraints between the
+        first and the second, inclusive, can be relaxed.  If a sequence
+        of linear constraint names or indices is passed in, all of their
+        linear constraints can be relaxed.
+
+        See also the `__call__` method of this class.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> group = c.feasopt.linear_constraints()
         """
         return self._make_group(self.constraint_type.linear, *args)
 
@@ -8670,11 +8686,16 @@ class FeasoptInterface(BaseInterface):
         of quadratic constraints to be relaxed.  If one quadratic
         constraint index or name is specified, it is the only
         quadratic constraint that can be relaxed.  If two quadratic
-        constraint indices or names are specified, the upper bounds of
-        all quadratic constraints between the first and the second,
-        inclusive, can be relaxed.  If a sequence of quadratic
-        constraint names or indices is passed in, all of their
-        quadratic constraints can be relaxed.
+        constraint indices or names are specified, then all quadratic
+        constraints between the first and the second, inclusive, can be
+        relaxed.  If a sequence of quadratic constraint names or indices
+        is passed in, all of their quadratic constraints can be relaxed.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> group = c.feasopt.quadratic_constraints()
         """
         return self._make_group(self.constraint_type.quadratic, *args)
 
@@ -8692,30 +8713,52 @@ class FeasoptInterface(BaseInterface):
         of indicator constraints to be relaxed.  If one indicator
         constraint index or name is specified, it is the only
         indicator constraint that can be relaxed.  If two indicator
-        constraint indices or names are specified, the upper bounds of
-        all indicator constraints between the first and the second,
-        inclusive, can be relaxed.  If a sequence of indicator
-        constraint names or indices is passed in, all of their
-        indicator constraints can be relaxed.
+        constraint indices or names are specified, then all indicator
+        constraints between the first and the second, inclusive, can be
+        relaxed.  If a sequence of indicator constraint names or indices
+        is passed in, all of their indicator constraints can be relaxed.
+
+        See also the `__call__` method of this class.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> group = c.feasopt.indicator_constraints()
         """
         return self._make_group(self.constraint_type.indicator, *args)
 
     def __call__(self, *args):
         """Finds a minimal relaxation of the problem that is feasible.
 
-        This method can take arbitrarily many arguments.  Either the
-        object returned by conflict.all_constraints() or any
-        combination of constraint groups and objects returned by
-        conflict.upper_bound(), conflict.lower_bound(),
-        conflict.linear(), conflict.quadratic(), or
-        conflict.indicator() may be used to specify the constraints to
-        consider.
+        This method can take arbitrarily many arguments. Either the
+        object returned by feasopt.all_constraints() or any combination
+        of constraint groups and objects returned by
+        `upper_bound_constraints()`, `lower_bound_constraints()`,
+        `linear_constraints()`, `quadratic_constraints()`, or
+        `indicator_constraints()` may be used to specify the constraints
+        to consider.
 
-        Constraint groups are sequences of length two, the first entry
-        of which is the preference for the group (a float), the second
-        of which is a sequence of pairs (type, id), where type is an
-        attribute of feasopt.constraint_type and id is either an index
-        or a valid name for the type.
+        Constraint groups are sequences of length two, the first entry of
+        which is the preference for the group (a float), the second of
+        which is a sequence of pairs (type, id), where type is an
+        attribute of self.constraint_type and id is either an index or a
+        valid name for the type.
+
+        See CPXfeasoptext in the Callable Library Reference Manual.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> out = c.set_results_stream(None)
+        >>> out = c.set_log_stream(None)
+        >>> c.read("infeasible.lp")
+        >>> c.feasopt(c.feasopt.all_constraints())
+        >>> c.solution.get_objective_value()
+        2.0
+        >>> c.solution.get_values()
+        [3.0, 2.0, 3.0, 2.0]
         """
         if len(args) == 0:
             raise WrongNumberOfArgumentsError(
@@ -8732,6 +8775,7 @@ class FeasoptInterface(BaseInterface):
                 tran = self._getconvfunc(con[0])
                 indt.append(con[0])
                 ind.append(tran(con[1]))
+        self._cplex._setup_callbacks()
         CPX_PROC.feasoptext(self._env._e, self._cplex._lp,
                             gpref, gbeg, ind, indt)
 
@@ -8803,6 +8847,7 @@ class ConflictConstraintType(object):
     quadratic = _constants.CPX_CON_QUADRATIC
     indicator = _constants.CPX_CON_INDICATOR
     SOS = _constants.CPX_CON_SOS
+    pwl = _constants.CPX_CON_PWL
 
     def __getitem__(self, item):
         """Converts a constant to a string.
@@ -8828,6 +8873,8 @@ class ConflictConstraintType(object):
             return 'indicator'
         if item == _constants.CPX_CON_SOS:
             return 'SOS'
+        if item == _constants.CPX_CON_PWL:
+            return 'pwl'
 
 
 class ConflictInterface(BaseInterface):
@@ -8849,13 +8896,20 @@ class ConflictInterface(BaseInterface):
         self.__num_groups = 0
 
     def all_constraints(self):
-        """Returns an object instructing the conflict refiner to include all constraints.
+        """Returns an object instructing the conflict refiner to include
+        all constraints.
 
         Calling
         Cplex.conflict.refine(Cplex.conflict.all_constraints()) or
         Cplex.conflict.refine_MIP_start(Cplex.conflict.all_constraints())
         will result in every constraint being included in the search
         for conflicts with equal preference.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> group = c.conflict.all_constraints()
         """
         gp = self.upper_bound_constraints()._gp
         gp += self.lower_bound_constraints()._gp
@@ -8863,10 +8917,12 @@ class ConflictInterface(BaseInterface):
         gp += self.quadratic_constraints()._gp
         gp += self.SOS_constraints()._gp
         gp += self.indicator_constraints()._gp
+        gp += self.pwl_constraints()._gp
         return _group(gp)
 
     def upper_bound_constraints(self, *args):
-        """Returns an object instructing the conflict refiner to include all upper bounds.
+        """Returns an object instructing the conflict refiner to include
+        all upper bounds.
 
         If called with no arguments, every upper bound is assigned
         weight 1.0.
@@ -8878,16 +8934,23 @@ class ConflictInterface(BaseInterface):
         If additional arguments are specified, they determine a subset
         of upper bounds to be included.  If one variable index or name
         is specified, it is the only upper bound that will be
-        included.  If two variable indices or names are specified, the
+        included.  If two variable indices or names are specified, then
         upper bounds of all variables between the first and the
         second, inclusive, will be included.  If a sequence of
         variable names or indices is passed in, all of their upper
         bounds will be included.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> group = c.conflict.upper_bound_constraints()
         """
         return self._make_group(self.constraint_type.upper_bound, *args)
 
     def lower_bound_constraints(self, *args):
-        """Returns an object instructing the conflict refiner to include all lower bounds.
+        """Returns an object instructing the conflict refiner to include
+        all lower bounds.
 
         If called with no arguments, every lower bound is assigned
         weight 1.0.
@@ -8899,16 +8962,23 @@ class ConflictInterface(BaseInterface):
         If additional arguments are specified, they determine a subset
         of lower bounds to be included.  If one variable index or name
         is specified, it is the only lower bound that will be
-        included.  If two variable indices or names are specified, the
+        included.  If two variable indices or names are specified, then
         lower bounds of all variables between the first and the
         second, inclusive, will be included.  If a sequence of
         variable names or indices is passed in, all of their lower
         bounds will be included.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> group = c.conflict.lower_bound_constraints()
         """
         return self._make_group(self.constraint_type.lower_bound, *args)
 
     def linear_constraints(self, *args):
-        """Returns an object instructing the conflict refiner to include all linear constraints.
+        """Returns an object instructing the conflict refiner to include
+        all linear constraints.
 
         If called with no arguments, every linear constraint is
         assigned weight 1.0.
@@ -8921,15 +8991,22 @@ class ConflictInterface(BaseInterface):
         of linear constraints to be included.  If one linear
         constraint index or name is specified, it is the only linear
         constraint that will be included.  If two linear constraint
-        indices or names are specified, the all linear constraints
+        indices or names are specified, then all linear constraints
         between the first and the second, inclusive, will be included.
         If a sequence of linear constraint names or indices is passed
         in, they will all be included.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> group = c.conflict.linear_constraints()
         """
         return self._make_group(self.constraint_type.linear, *args)
 
     def quadratic_constraints(self, *args):
-        """Returns an object instructing the conflict refiner to include all quadratic constraints.
+        """Returns an object instructing the conflict refiner to include
+        all quadratic constraints.
 
         If called with no arguments, every quadratic constraint is
         assigned weight 1.0.
@@ -8942,15 +9019,22 @@ class ConflictInterface(BaseInterface):
         of quadratic constraints to be included.  If one quadratic
         constraint index or name is specified, it is the only
         quadratic constraint that will be included.  If two quadratic
-        constraint indices or names are specified, the all quadratic
+        constraint indices or names are specified, then all quadratic
         constraints between the first and the second, inclusive, will
         be included.  If a sequence of quadratic constraint names or
         indices is passed in, they will all be included.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> group = c.conflict.quadratic_constraints()
         """
         return self._make_group(self.constraint_type.quadratic, *args)
 
     def indicator_constraints(self, *args):
-        """Returns an object instructing the conflict refiner to include all indicator constraints.
+        """Returns an object instructing the conflict refiner to include
+        all indicator constraints.
 
         If called with no arguments, every indicator constraint is
         assigned weight 1.0.
@@ -8967,11 +9051,45 @@ class ConflictInterface(BaseInterface):
         constraints between the first and the second, inclusive, will
         be included.  If a sequence of indicator constraint names or
         indices is passed in, they will all be included.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> group = c.conflict.indicator_constraints()
         """
         return self._make_group(self.constraint_type.indicator, *args)
 
+    def pwl_constraints(self, *args):
+        """Returns an object instructing the conflict refiner to include
+        all PWL constraints.
+
+        If called with no arguments, every PWL constraint is assigned
+        weight 1.0.
+
+        If called with one or more arguments, every PWL constraint is
+        assigned a weight equal to the float passed in as the first
+        argument.
+
+        If additional arguments are specified, they determine a subset
+        of PWL constraints to be included. If one PWL constraint index or
+        name is specified, it is the only PWL constraint that will be
+        included. If two PWL constraint indices or names are specified,
+        then all PWL constraints between the first and the second,
+        inclusive, will be included. If a sequence of PWL constraint
+        names or indices is passed in, they will all be included.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> group = c.conflict.pwl_constraints()
+        """
+        return self._make_group(self.constraint_type.pwl, *args)
+
     def SOS_constraints(self, *args):
-        """Returns an object instructing the conflict refiner to include all SOS constraints.
+        """Returns an object instructing the conflict refiner to include
+        all SOS constraints.
 
         If called with no arguments, every SOS constraint is assigned
         weight 1.0.
@@ -8984,10 +9102,16 @@ class ConflictInterface(BaseInterface):
         of SOS constraints to be included.  If one SOS constraint
         index or name is specified, it is the only SOS constraint that
         will be included.  If two SOS constraint indices or names are
-        specified, the all SOS constraints between the first and the
+        specified, then all SOS constraints between the first and the
         second, inclusive, will be included.  If a sequence of SOS
         constraint names or indices is passed in, they will all be
         included.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> group = c.conflict.SOS_constraints()
         """
         return self._make_group(self.constraint_type.SOS, *args)
 
@@ -9056,6 +9180,8 @@ class ConflictInterface(BaseInterface):
             return self._cplex.SOS.get_num()
         elif which == contype.indicator:
             return self._cplex.indicator_constraints.get_num()
+        elif which == contype.pwl:
+            return self._cplex.pwl_constraints.get_num()
         else:
             raise ValueError("Unexpected constraint_type!")
 
@@ -9072,20 +9198,24 @@ class ConflictInterface(BaseInterface):
             return self._cplex.SOS._conv
         elif which == contype.indicator:
             return self._cplex.indicator_constraints._conv
+        elif which == contype.pwl:
+            return self._cplex.pwl_constraints._conv
         else:
             raise ValueError("Unexpected constraint_type!")
 
     def refine_MIP_start(self, MIP_start, *args):
-        """Identifies a minimal conflict among a set of constraints for a given MIP start.
+        """Identifies a minimal conflict among a set of constraints for a
+        given MIP start.
 
         This method can take arbitrarily many arguments.  The first
         argument must be either a name or index of a MIP start.
-        Additionally, either the object returned by
-        conflict.all_constraints() or any combination of constraint
-        groups and objects returned by conflict.upper_bound(),
-        conflict.lower_bound(), conflict.linear(),
-        conflict.quadratic(), or conflict.indicator() may be used to
-        specify the constraints to consider.
+        Additionally, either the object returned by `all_constraints()`
+        or any combination of constraint groups and objects returned by
+        `upper_bound_constraints()`, `lower_bound_constraints()`,
+        `linear_constraints()`, `quadratic_constraints()`,
+        `indicator_constraints()`, `pwl_constraints()`, or
+        `SOS_constraints()` may be used to specify the constraints to
+        consider.
 
         Constraint groups are sequences of length two, the first entry
         of which is the preference for the group (a float), the second
@@ -9093,14 +9223,20 @@ class ConflictInterface(BaseInterface):
         attribute of conflict.constraint_type and id is either an index
         or a valid name for the type.
 
+        See CPXrefinemipstartconflictext in the Callable Library Reference
+        Manual.
+
+        Example usage:
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> out = c.set_results_stream(None)
-        >>> indices = c.variables.add([1], [0], [0], c.variables.type.binary);
-        >>> indices = c.variables.add([2], [0], [0], c.variables.type.binary);
-        >>> c.solve();
-        >>> indices = c.linear_constraints.add(lin_expr = [[[0, 1], [1.0, 1.0]]], senses = "E", rhs = [2.0]);
-        >>> c.conflict.refine_MIP_start(0, c.conflict.all_constraints());
+        >>> indices = c.variables.add([1], [0], [0], c.variables.type.binary)
+        >>> indices = c.variables.add([2], [0], [0], c.variables.type.binary)
+        >>> c.solve()
+        >>> indices = c.linear_constraints.add(
+        ...     lin_expr=[[[0, 1], [1.0, 1.0]]], senses="E", rhs=[2.0])
+        >>> c.conflict.refine_MIP_start(0, c.conflict.all_constraints())
         >>> c.conflict.get()
         [-1, -1, -1, -1, 3]
         >>> c.conflict.group_status[3], c.conflict.group_status[-1]
@@ -9114,8 +9250,8 @@ class ConflictInterface(BaseInterface):
             # require that args is non-empty.
             raise WrongNumberOfArgumentsError(
                 "Requires at least two arguments")
-
         gpref, gbeg, ind, indt = self._separate_groups(args)
+        self._cplex._setup_callbacks()
         CPX_PROC.refinemipstartconflictext(self._env._e, self._cplex._lp,
                                            self._cplex.MIP_starts._conv(
                                                MIP_start),
@@ -9125,11 +9261,12 @@ class ConflictInterface(BaseInterface):
         """Identifies a minimal conflict among a set of constraints.
 
         This method can take arbitrarily many arguments.  Either the
-        object returned by conflict.all_constraints() or any
-        combination of constraint groups and objects returned by
-        conflict.upper_bound(), conflict.lower_bound(),
-        conflict.linear(), conflict.quadratic(), or
-        conflict.indicator() may be used to specify the constraints to
+        object returned by `all_constraints()` or any combination of
+        constraint groups and objects returned by
+        `upper_bound_constraints()`, `lower_bound_constraints()`,
+        `linear_constraints()`, `quadratic_constraints()`,
+        `indicator_constraints()`, `pwl_constraints()`, or
+        `SOS_constraints()` may be used to specify the constraints to
         consider.
 
         Constraint groups are sequences of length two, the first entry
@@ -9138,11 +9275,17 @@ class ConflictInterface(BaseInterface):
         attribute of conflict.constraint_type and id is either an index or
         a valid name for the type.
 
+        See CPXrefineconflictext in the Callable Library Reference
+        Manual.
+
+        Example usage:
+
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> out = c.set_results_stream(None)
         >>> c.read("infeasible.lp")
-        >>> c.conflict.refine(c.conflict.linear_constraints(), c.conflict.lower_bound_constraints())
+        >>> c.conflict.refine(c.conflict.linear_constraints(),
+        ...                   c.conflict.lower_bound_constraints())
         >>> c.conflict.get()
         [3, -1, 3, -1, -1, -1]
         >>> c.conflict.group_status[3], c.conflict.group_status[-1]
@@ -9153,8 +9296,8 @@ class ConflictInterface(BaseInterface):
         if len(args) == 0:
             raise WrongNumberOfArgumentsError(
                 "Requires at least one argument")
-
         gpref, gbeg, ind, indt = self._separate_groups(args)
+        self._cplex._setup_callbacks()
         CPX_PROC.refineconflictext(self._env._e, self._cplex._lp,
                                    gpref, gbeg,
                                    ind, indt)
@@ -9180,13 +9323,24 @@ class ConflictInterface(BaseInterface):
         The status codes are attributes of
         Cplex.conflict.group_status.
 
+        See CPXgetconflictext in the Callable Library Reference Manual.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> out = c.set_results_stream(None)
+        >>> c.read("infeasible.lp")
+        >>> c.conflict.refine(c.conflict.all_constraints())
+        >>> confstatus = c.conflict.get()
         """
         def getconflict(a, b=self.__num_groups - 1):
             return CPX_PROC.getconflictext(self._env._e, self._cplex._lp, a, b)
         return apply_freeform_two_args(getconflict, None, args)
 
     def get_groups(self, *args):
-        """Returns the groups of constraints used in the last call to conflict.refine.
+        """Returns the groups of constraints used in the last call to
+        `refine()` or `refine_MIP_start()`.
 
         Can be called by four forms.
 
@@ -9208,13 +9362,33 @@ class ConflictInterface(BaseInterface):
         attribute of conflict.constraint_type and id is either an index
         or a valid name for the type.
 
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> out = c.set_results_stream(None)
+        >>> c.read("infeasible.lp")
+        >>> c.conflict.refine(c.conflict.all_constraints())
+        >>> groups = c.conflict.get_groups()
         """
         def getgroups(a, b=self.__num_groups - 1):
             return self.__groups[a:b + 1]
         return apply_freeform_two_args(getgroups, None, args)
 
     def write(self, filename):
-        """Writes the conflict to a file."""
+        """Writes the conflict to a file.
+
+        See CPXclpwrite in the Callable Library Reference Manual.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> out = c.set_results_stream(None)
+        >>> c.read("infeasible.lp")
+        >>> c.conflict.refine(c.conflict.all_constraints())
+        >>> c.conflict.write("conflict.clp")
+        """
         CPX_PROC.clpwrite(self._env._e, self._cplex._lp, filename,
                           enc=self._env._apienc)
 
@@ -9335,31 +9509,35 @@ class AdvancedCplexInterface(BaseInterface):
     def strong_branching(self, variables, it_limit):
         """Performs strong branching.
 
-        variables is a sequence of names or indices of variables or
-        linear constraints.  Indices of slack variables are specified
-        by negative integers; -i - 1 refers to the slack associated
-        with the ith linear constraint.
-
-        Note
-          If a linear constraint has the same name as a column, it must
-          be specified by -index - 1, not by name.
+        variables is a sequence of names or indices of variables.
 
         it_limit is an integer that specifies the number of iterations
         allowed.
 
-        Returns a pair of lists (down_penalty, up_penalty) with the
+        Returns a list of pairs (down_penalty, up_penalty) with the
         same length as variables containing the penalties for
         branching down or up, respectively, on each variable.
 
+        See CPXstrongbranch in the Callable Library Reference Manual for
+        more detail.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> out = c.set_results_stream(None)
+        >>> out = c.set_log_stream(None)
+        >>> itlim = c.parameters.simplex.limits.iterations.get()
+        >>> c.read("example.mps")
+        >>> c.solve()
+        >>> vars = list(range(c.variables.get_num()))
+        >>> result = c.advanced.strong_branching(vars, itlim)
         """
         def conv(var):
-            try:
-                return self._cplex.variables._conv(var)
-            except:  # name not found
-                return -self._cplex.linear_constraints._conv(var) - 1
-        return list(zip(*CPX_PROC.strongbranch(
-                    self._env._e, self._cplex._lp,
-                    conv(variables), it_limit)))
+            return self._cplex.variables._conv(var)
+        return unzip(CPX_PROC.strongbranch(
+            self._env._e, self._cplex._lp,
+            conv(variables), it_limit))
 
     def complete(self):
         """See CPXcompletelp in the Callable Library Reference Manual."""
@@ -9413,7 +9591,7 @@ class OrderInterface(BaseInterface):
 
     def get(self):
         """Returns a list of triples (variable, priority, direction) representing the priority order for branching."""
-        return list(zip(*CPX_PROC.getorder(self._env._e, self._cplex._lp)))
+        return unzip(CPX_PROC.getorder(self._env._e, self._cplex._lp))
 
     def get_variables(self):
         """Returns the variables for which an order has been set."""
@@ -9430,7 +9608,7 @@ class OrderInterface(BaseInterface):
 
         direction must be an attribute of order.branch_direction.
         """
-        ord = list(zip(*order))
+        ord = unzip(order)
         ord[0] = self._cplex.variables._conv(ord[0])
         CPX_PROC.copyorder(self._env._e, self._cplex._lp, *ord)
 

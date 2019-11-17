@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2017. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2019. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -35,19 +35,23 @@ of these classes.
 
 
 __all__ = ["Cplex", "Aborter", "callbacks", "exceptions", "infinity",
-           "SparsePair", "SparseTriple"]
-__version__ = "12.8.0.0"
+           "ParameterSet", "SparsePair", "SparseTriple", "model_info"]
+__version__ = "12.9.0.1"
 
+from contextlib import closing
 import weakref
 
 from .aborter import Aborter
 from . import _internal
 from . import callbacks
 from . import exceptions
-from ._internal._aux_functions import deprecated
+from . import model_info
+from ._internal._aux_functions import deprecated, init_list_args
 from ._internal._matrices import SparsePair, SparseTriple
 from ._internal import _procedural as _proc
+from .paramset import ParameterSet
 from . import six
+from .six import BytesIO
 
 infinity = _internal._constants.CPX_INFBOUND
 
@@ -62,6 +66,7 @@ class Stats(object):
 
     An instance of this class always has the following integer members:
 
+    num_objectives
     num_variables
     num_nonnegative
     num_fixed
@@ -185,50 +190,53 @@ class Stats(object):
 
         raw_stats = _proc.getprobstats(c._env._e, c._lp)
 
+        # multi-objective stats
+        self.num_objectives = raw_stats.objs
+
         # counts of problem objects
         # variable data
-        self.num_variables = raw_stats[1]
-        self.num_nonnegative = raw_stats[9]
-        self.num_fixed = raw_stats[11]
-        self.num_boxed = raw_stats[12]
-        self.num_free = raw_stats[10]
-        self.num_other = raw_stats[13]
-        self.num_binary = raw_stats[14]
-        self.num_integer = raw_stats[15]
-        self.num_semicontinuous = raw_stats[16]
-        self.num_semiinteger = raw_stats[17]
-        self.num_quadratic_variables = raw_stats[18]
-        self.num_linear_objective_nz = raw_stats[2]
-        self.num_quadratic_objective_nz = raw_stats[19]
+        self.num_variables = raw_stats.cols
+        self.num_nonnegative = raw_stats.ncnt
+        self.num_fixed = raw_stats.xcnt
+        self.num_boxed = raw_stats.bcnt
+        self.num_free = raw_stats.fcnt
+        self.num_other = raw_stats.ocnt
+        self.num_binary = raw_stats.bicnt
+        self.num_integer = raw_stats.icnt
+        self.num_semicontinuous = raw_stats.scnt
+        self.num_semiinteger = raw_stats.sicnt
+        self.num_quadratic_variables = raw_stats.qpcnt
+        self.num_linear_objective_nz = raw_stats.objcnt
+        self.num_quadratic_objective_nz = raw_stats.qpnzcnt
 
         # linear constraint data
-        self.num_linear_constraints = raw_stats[0]
-        self.num_linear_less = raw_stats[7]
-        self.num_linear_equal = raw_stats[5]
-        self.num_linear_greater = raw_stats[6]
-        self.num_linear_range = raw_stats[8]
-        self.num_linear_nz = raw_stats[4]
-        self.num_linear_rhs_nz = raw_stats[3]
+        self.num_linear_constraints = raw_stats.rows
+        self.num_linear_less = raw_stats.lcnt
+        self.num_linear_equal = raw_stats.ecnt
+        self.num_linear_greater = raw_stats.gcnt
+        self.num_linear_range = raw_stats.rngcnt
+        self.num_linear_nz = raw_stats.nzcnt
+        self.num_linear_rhs_nz = raw_stats.rhscnt
 
         # indicator data
-        self.num_indicator_constraints = raw_stats[26]
-        self.num_indicator_less = raw_stats[30]
-        self.num_indicator_equal = raw_stats[31]
-        self.num_indicator_greater = raw_stats[32]
-        self.num_indicator_complemented = raw_stats[29]
-        self.num_indicator_nz = raw_stats[28]
-        self.num_indicator_rhs_nz = raw_stats[27]
+        self.num_indicator_constraints = raw_stats.nindconstr
+        self.num_indicator_less = raw_stats.indlcnt
+        self.num_indicator_equal = raw_stats.indecnt
+        self.num_indicator_greater = raw_stats.indgcnt
+        self.num_indicator_complemented = raw_stats.indcompcnt
+        self.num_indicator_nz = raw_stats.indnzcnt
+        self.num_indicator_rhs_nz = raw_stats.indrhscnt
 
         # quadratic constraints
-        self.num_quadratic_constraints = raw_stats[20]
-        self.num_quadratic_less = raw_stats[22]
-        self.num_quadratic_greater = raw_stats[23]
-        self.num_quadratic_linear_nz = raw_stats[25]
-        self.num_quadratic_nz = raw_stats[24]
-        self.num_quadratic_rhs_nz = raw_stats[21]
+        self.num_quadratic_constraints = raw_stats.nqconstr
+        self.num_quadratic_less = raw_stats.qlcnt
+        self.num_quadratic_greater = raw_stats.qgcnt
+        self.num_quadratic_linear_nz = raw_stats.linnzcnt
+        self.num_quadratic_nz = raw_stats.quadnzcnt
+        self.num_quadratic_rhs_nz = raw_stats.qrhscnt
 
         # SOS data
-        self.num_SOS_constraints = raw_stats[63]
+        self.num_SOS_constraints = raw_stats.nsos
         sos_string_list = ["",
                            "all continuous",
                            "all binary",
@@ -237,81 +245,81 @@ class Stats(object):
                            "continuous and binary",
                            "continuous and integer",
                            "binary and integer", ]
-        self.num_SOS1 = raw_stats[64]
-        self.num_SOS1_members = raw_stats[65]
-        self.type_SOS1 = sos_string_list[raw_stats[66]]
-        self.num_SOS2 = raw_stats[67]
-        self.num_SOS2_members = raw_stats[68]
-        self.type_SOS2 = sos_string_list[raw_stats[69]]
+        self.num_SOS1 = raw_stats.nsos1
+        self.num_SOS1_members = raw_stats.sos1nmem
+        self.type_SOS1 = sos_string_list[raw_stats.sos1type]
+        self.num_SOS2 = raw_stats.nsos2
+        self.num_SOS2_members = raw_stats.sos2nmem
+        self.type_SOS2 = sos_string_list[raw_stats.sos2type]
 
         # lazy constraint data
-        self.num_lazy_constraints = raw_stats[74]
-        self.num_lazy_nnz = raw_stats[75]
-        self.num_lazy_lt = raw_stats[72]
-        self.num_lazy_eq = raw_stats[73]
-        self.num_lazy_gt = raw_stats[71]
-        self.num_lazy_rhs_nnz = raw_stats[70]
+        self.num_lazy_constraints = raw_stats.lazycnt
+        self.num_lazy_nnz = raw_stats.lazynzcnt
+        self.num_lazy_lt = raw_stats.lazylcnt
+        self.num_lazy_eq = raw_stats.lazyecnt
+        self.num_lazy_gt = raw_stats.lazygcnt
+        self.num_lazy_rhs_nnz = raw_stats.lazyrhscnt
 
         # user cut data
-        self.num_user_cuts = raw_stats[80]
-        self.num_user_cuts_nnz = raw_stats[81]
-        self.num_user_cuts_lt = raw_stats[78]
-        self.num_user_cuts_eq = raw_stats[79]
-        self.num_user_cuts_gt = raw_stats[77]
-        self.num_user_cuts_rhs_nnz = raw_stats[76]
+        self.num_user_cuts = raw_stats.ucutcnt
+        self.num_user_cuts_nnz = raw_stats.ucutnzcnt
+        self.num_user_cuts_lt = raw_stats.ucutlcnt
+        self.num_user_cuts_eq = raw_stats.ucutecnt
+        self.num_user_cuts_gt = raw_stats.ucutgcnt
+        self.num_user_cuts_rhs_nnz = raw_stats.ucutrhscnt
 
         # PWL constraints
-        self.num_pwl_constraints = raw_stats[82]
-        self.num_pwl_breaks = raw_stats[83]
+        self.num_pwl_constraints = raw_stats.npwl
+        self.num_pwl_breaks = raw_stats.npwlbreaks
 
         # min and max data
         # variables
-        self.min_lower_bound = raw_stats[41]
-        self.max_upper_bound = raw_stats[42]
-        self.min_linear_objective = raw_stats[39]
-        self.max_linear_objective = raw_stats[40]
+        self.min_lower_bound = raw_stats.minlb
+        self.max_upper_bound = raw_stats.maxub
+        self.min_linear_objective = raw_stats.minobj
+        self.max_linear_objective = raw_stats.maxobj
         if self.num_quadratic_objective_nz > 0:
-            self.min_quadratic_objective = raw_stats[43]
-            self.max_quadratic_objective = raw_stats[44]
+            self.min_quadratic_objective = raw_stats.minqcoef
+            self.max_quadratic_objective = raw_stats.maxqcoef
 
         # linear constraints
-        self.min_linear_constraints = raw_stats[34]
-        self.max_linear_constraints = raw_stats[33]
-        self.min_linear_constraints_rhs = raw_stats[35]
-        self.max_linear_constraints_rhs = raw_stats[36]
+        self.min_linear_constraints = raw_stats.mincoef
+        self.max_linear_constraints = raw_stats.maxcoef
+        self.min_linear_constraints_rhs = raw_stats.minrhs
+        self.max_linear_constraints_rhs = raw_stats.maxrhs
         if self.num_linear_range > 0:
-            self.min_linear_range = raw_stats[37]
-            self.max_linear_range = raw_stats[38]
+            self.min_linear_range = raw_stats.minrng
+            self.max_linear_range = raw_stats.maxrng
 
         # quadratic constraints
         if self.num_quadratic_constraints > 0:
-            self.min_quadratic_linear = raw_stats[47]
-            self.max_quadratic_linear = raw_stats[48]
-            self.min_quadratic = raw_stats[45]
-            self.max_quadratic = raw_stats[46]
-            self.min_quadratic_rhs = raw_stats[49]
-            self.max_quadratic_rhs = raw_stats[50]
+            self.min_quadratic_linear = raw_stats.minqcl
+            self.max_quadratic_linear = raw_stats.maxqcl
+            self.min_quadratic = raw_stats.minqcq
+            self.max_quadratic = raw_stats.maxqcq
+            self.min_quadratic_rhs = raw_stats.minqcr
+            self.max_quadratic_rhs = raw_stats.maxqcr
 
         # indicator constraints
         if self.num_indicator_constraints > 0:
-            self.min_indicator = raw_stats[51]
-            self.max_indicator = raw_stats[52]
-            self.min_indicator_rhs = raw_stats[53]
-            self.max_indicator_rhs = raw_stats[54]
+            self.min_indicator = raw_stats.minind
+            self.max_indicator = raw_stats.maxind
+            self.min_indicator_rhs = raw_stats.minindrhs
+            self.max_indicator_rhs = raw_stats.maxindrhs
 
         # lazy constraints
         if self.num_lazy_constraints > 0:
-            self.min_lazy_constraint = raw_stats[55]
-            self.max_lazy_constraint = raw_stats[56]
-            self.min_lazy_constraint_rhs = raw_stats[57]
-            self.max_lazy_constraint_rhs = raw_stats[58]
+            self.min_lazy_constraint = raw_stats.minlazy
+            self.max_lazy_constraint = raw_stats.maxlazy
+            self.min_lazy_constraint_rhs = raw_stats.minlazyrhs
+            self.max_lazy_constraint_rhs = raw_stats.maxlazyrhs
 
         # user cuts
         if self.num_user_cuts > 0:
-            self.min_user_cut = raw_stats[59]
-            self.max_user_cut = raw_stats[60]
-            self.min_user_cut_rhs = raw_stats[61]
-            self.max_user_cut_rhs = raw_stats[62]
+            self.min_user_cut = raw_stats.minucut
+            self.max_user_cut = raw_stats.maxucut
+            self.min_user_cut_rhs = raw_stats.minucutrhs
+            self.max_user_cut_rhs = raw_stats.maxucutrhs
 
     def __str__(self):
         allinf = "all infinite"
@@ -376,7 +384,11 @@ class Stats(object):
                 sep_ind = 1
             ret = ret + "]"
         ret = ret + "\n"
-        ret = ret + "Objective nonzeros   : %7d" % self.num_linear_objective_nz + "\n"
+        if self.num_objectives > 1:
+            ret = ret + "Objectives           : %7d" % self.num_objectives + "\n"
+            ret = ret + "  Objective nonzeros : %7d" % self.num_linear_objective_nz + "\n"
+        else:
+            ret = ret + "Objective nonzeros   : %7d" % self.num_linear_objective_nz + "\n"
         if self.num_quadratic_objective_nz > 0:
             ret = ret + "Objective Q nonzeros : %7d" % self.num_quadratic_objective_nz + "\n"
         ret = ret + "Linear constraints   : %7d" % self.num_linear_constraints
@@ -701,6 +713,7 @@ class Cplex(object):
         self._aborter = None
         self._env = None
         self._lp = None
+        self._pslst = []
         # Initialize data strucutures associated with CPLEX
         if len(args) > 2:
             raise exceptions.CplexError("Too many arguments to Cplex()")
@@ -750,6 +763,9 @@ class Cplex(object):
 
         self.objective = _internal._subinterfaces.ObjectiveInterface(self)
         """See `_internal._subinterfaces.ObjectiveInterface()` """
+
+        self.multiobj = _internal._multiobj.MultiObjInterface(self)
+        """See `_internal._multiobj.MultiObjInterface()` """
 
         self.MIP_starts = _internal._subinterfaces.MIPStartsInterface(self)
         """See `_internal._subinterfaces.MIPStartsInterface()` """
@@ -807,6 +823,9 @@ class Cplex(object):
         # free aborter if necc.
         if self._aborter:
             self.remove_aborter()
+        # free parameter sets if necc.
+        for ps in self._pslst:
+            ps.end()
         # free env
         if self._env:
             self._env._end()
@@ -886,6 +905,13 @@ class Cplex(object):
 
         For documentation of the file types, see the CPLEX File Format
         Reference Manual.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> indices = c.variables.add(names=['x1', 'x2', 'x3'])
+        >>> c.write("example.lp")
         """
         if self._is_special_filetype(filename, filetype, 'dua'):
             _proc.dualwrite(self._env._e, self._lp, filename,
@@ -915,6 +941,91 @@ class Cplex(object):
             if filetype == ext:
                 return True
         return False
+
+    def write_to_stream(self, stream, filetype='LP', comptype=''):
+        """Writes a problem to a file-like object in the given file format.
+
+        The filetype argument can be any of "sav" (a binary format), "lp"
+        (the default), "mps", "rew", "rlp", or "alp" (see `Cplex.write`
+        for an explanation of these).
+
+        If comptype is "bz2" (for BZip2) or "gz" (for GNU Zip), a
+        compressed file is written.
+
+        See CPXwriteprob in the Callable Library Reference Manual for
+        more detail.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> indices = c.variables.add(names=['x1', 'x2', 'x3'])
+        >>> class NoOpStream(object):
+        ...     def __init__(self):
+        ...         self.was_called = False
+        ...     def write(self, bytes):
+        ...         self.was_called = True
+        ...         pass
+        ...     def flush(self):
+        ...         pass
+        >>> stream = NoOpStream()
+        >>> c.write_to_stream(stream)
+        >>> stream.was_called
+        True
+        """
+        try:
+            callable(stream.write)
+        except AttributeError:
+            raise exceptions.CplexError("stream must have a write method")
+        try:
+            callable(stream.flush)
+        except AttributeError:
+            raise exceptions.CplexError("stream must have a flush method")
+        # Since there is no filename argument, we validate the
+        # compression type.
+        if comptype not in ('', 'bz2', 'gz'):
+            raise ValueError(
+                "invalid compression type specified for comptype: {0}".format(
+                    comptype))
+        # Any base name will do for the filename. Note that the
+        # compression type must be specified in the filename (not the
+        # filetype).
+        filename = "prob.{0}".format(filetype)
+        if comptype:
+            filename += ".{0}".format(comptype)
+        return _proc.writeprobdev(self._env._e, self._lp, stream,
+                                  filename, filetype,
+                                  enc=self._env._apienc)
+
+    def write_as_string(self, filetype='LP', comptype=''):
+        """Writes a problem as a string in the given file format.
+
+        For an explanation of the filetype and comptype arguments, see
+        `Cplex.write_to_stream`.
+
+        Note
+          When SAV format is specified for filetype or a compressed
+          file format is specified for comptype, the return value will be
+          a byte string.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> indices = c.variables.add(names=['x1', 'x2', 'x3'])
+        >>> lp_str = c.write_as_string("lp")
+        >>> len(lp_str) > 0
+        True
+        """
+        fileenc = self.parameters.read.fileencoding.get()
+        with closing(BytesIO()) as output:
+            self.write_to_stream(output, filetype, comptype)
+            result = output.getvalue()
+            # Never decode for SAV format nor compressed files.
+            if not six.PY2 and not (filetype.lower().startswith("sav") or
+                                    comptype):
+                result = result.decode(fileenc)
+            return result
 
     def read_annotations(self, filename):
         """Reads annotations from a file.
@@ -1064,22 +1175,27 @@ class Cplex(object):
 
     def _is_MIP(self):
         """non-public"""
-        if (self.variables.get_num_integer() > 0 or
-                self.variables.get_num_binary() > 0):
-            return True
-        if (self.variables.get_num_semicontinuous() > 0 or
-                self.variables.get_num_semiinteger() > 0):
-            return True
-        if self.SOS.get_num() > 0:
-            return True
-        if self.linear_constraints.advanced.get_num_user_cuts() > 0:
-            return True
-        if self.linear_constraints.advanced.get_num_lazy_constraints() > 0:
-            return True
-        return _proc._hasgeneralconstraints(self._env._e, self._lp)
+        probtype = self.get_problem_type()
+        return probtype in (Cplex.problem_type.MILP,
+                            Cplex.problem_type.MIQP,
+                            Cplex.problem_type.MIQCP)
 
-    def solve(self):
+    def _setup_callbacks(self):
+        """non-public"""
+        for cb in self._env._callbacks:
+            cb._env_lp_ptr = self._env_lp_ptr
+            if hasattr(cb, "_setup"):
+                cb._setup(self._env._e, self._lp)
+
+    def solve(self, paramsets=None):
         """Solves the problem.
+
+        The optional paramsets argument can only be
+        specified when multiple objectives are present (otherwise, a
+        ValueError is raised). paramsets must be a sequence containing
+        ParameterSet objects (see `Cplex.create_parameter_set`) or None.
+        See CPXmultiobjopt in the Callable Library Reference Manual for
+        more detail.
 
         Note
           The solve method returning normally does not necessarily mean
@@ -1087,12 +1203,22 @@ class Cplex(object):
           Cplex.solution.get_status() to query the status of the current
           solution.
         """
-        # Setup the callbacks
-        for cb in self._env._callbacks:
-            cb._env_lp_ptr = self._env_lp_ptr
-            if hasattr(cb, "_setup"):
-                cb._setup(self._env._e, self._lp)
-        if self._is_MIP():
+        (paramsets,) = init_list_args(paramsets)
+        self._setup_callbacks()
+        ismultiobj = _proc.ismultiobj(self._env._e, self._lp)
+        if (not ismultiobj and paramsets):
+            raise ValueError("paramsets argument can only be specified"
+                             " for a multi-objective model")
+        if ismultiobj:
+            nprios = _proc.getnumprios(self._env._e, self._lp)
+            if len(paramsets) > 0 and nprios != len(paramsets):
+                raise ValueError("if specified, len(paramsets) ({0})"
+                                 " must be equal to the number of"
+                                 " priorities ({1})".format(len(paramsets), nprios))
+            _proc.multiobjopt(self._env._e, self._lp,
+                              [None if ps is None else ps._ps
+                               for ps in paramsets])
+        elif self._is_MIP():
             if _proc.hasvmconfig(self._env._e):
                 _proc.distmipopt(self._env._e, self._lp)
             else:
@@ -1106,13 +1232,7 @@ class Cplex(object):
             else:
                 _proc.qpopt(self._env._e, self._lp)
         elif not self.objective.get_num_quadratic_nonzeros() > 0:
-            try:
-                _proc.lpopt(self._env._e, self._lp)
-            except exceptions.CplexSolverError as exc:
-                if exc.args[2] == _internal._pycplex.CPXERR_NOT_FOR_MIP:
-                    _proc.mipopt(self._env._e, self._lp)
-                else:
-                    raise
+            _proc.lpopt(self._env._e, self._lp)
         else:
             _proc.qpopt(self._env._e, self._lp)
 
@@ -1129,6 +1249,7 @@ class Cplex(object):
         A problem must be an MILP, MIQP, or MIQCP and must exist in
         memory.
         """
+        self._setup_callbacks()
         _proc.runseeds(self._env._e, self._lp, cnt)
 
     def populate_solution_pool(self):
@@ -1149,6 +1270,7 @@ class Cplex(object):
         Callable Library Reference Manual and the topic solution pool
         in the CPLEX User's Manual.
         """
+        self._setup_callbacks()
         _proc.populate(self._env._e, self._lp)
 
     def get_problem_name(self):
@@ -1198,8 +1320,8 @@ class Cplex(object):
 
         The first argument must be either a file-like object (i.e., an
         object with a write method and a flush method) or the name of
-        a file to be written to.  Use None as the first argument to
-        suppress output.
+        a file to be written to (the later is deprecated since V12.9.0).
+        Use None as the first argument to suppress output.
 
         The second optional argument is a function that takes a string
         as input and returns a string.  If specified, strings sent to
@@ -1216,8 +1338,8 @@ class Cplex(object):
 
         The first argument must be either a file-like object (i.e., an
         object with a write method and a flush method) or the name of
-        a file to be written to.  Use None as the first argument to
-        suppress output.
+        a file to be written to (the later is deprecated since V12.9.0).
+        Use None as the first argument to suppress output.
 
         The second optional argument is a function that takes a string
         as input and returns a string.  If specified, strings sent to
@@ -1234,8 +1356,8 @@ class Cplex(object):
 
         The first argument must be either a file-like object (i.e., an
         object with a write method and a flush method) or the name of
-        a file to be written to.  Use None as the first argument to
-        suppress output.
+        a file to be written to (the later is deprecated since V12.9.0).
+        Use None as the first argument to suppress output.
 
         The second optional argument is a function that takes a string
         as input and returns a string.  If specified, strings sent to
@@ -1252,8 +1374,8 @@ class Cplex(object):
 
         The first argument must be either a file-like object (i.e., an
         object with a write method and a flush method) or the name of
-        a file to be written to.  Use None as the first argument to
-        suppress output.
+        a file to be written to (the later is deprecated since V12.9.0).
+        Use None as the first argument to suppress output.
 
         The second optional argument is a function that takes a string
         as input and returns a string.  If specified, strings sent to
@@ -1380,8 +1502,8 @@ class Cplex(object):
         effectively cleared from CPLEX.
 
         In all other cases functor must be a reference to an object that has
-        a callable member called 'invoke' (if that does not exist or
-        is not a callable an exception will occur the first time CPLEX attempts
+        a callable member called 'invoke' (if that does not exist, or
+        is not a callable, an exception will occur the first time CPLEX attempts
         to invoke the callback). Whenever CPLEX needs to invoke the callback
         it calls this member with exactly one argument: an instance of
         cplex.callbacks.Context.
@@ -1399,6 +1521,19 @@ class Cplex(object):
         Note about cplex.callbacks.Context.id.thread_down: This is considered
         a "destructor" function and should not raise any exception. Any exception
         raised from the callback in this context will just be ignored.
+
+        See `cplex.callbacks.Context`.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> class GenericCB(object):
+        ...     def invoke(self, context):
+        ...         pass  # Do something here.
+        >>> cb = GenericCB()
+        >>> c.set_modeling_assistance_callback(cb)  # Register callback.
+        >>> c.set_modeling_assistance_callback(None)  # Clear callback.
         """
         # First of all, clear any existing callback
         self._genericcallback = None
@@ -1432,3 +1567,177 @@ class Cplex(object):
                 pass
         else:
             self._genericcallback.invoke(context)
+
+    def set_modeling_assistance_callback(self, functor=None):
+        """Set callback function to use for modeling assistance warnings.
+
+        Sets the callback that CPLEX invokes before and after
+        optimization (once for every modeling issue detected). If functor
+        is None then the callback is effectively cleared from CPLEX. The
+        callback function will only be invoked if the CPLEX parameter
+        Cplex.parameters.read.datacheck is set to
+        Cplex.parameters.read.datacheck.values.assist (2). In addition,
+        the parameter Cplex.parameters.read.warninglimit controls the
+        number of times each type of modeling assistance warning will be
+        reported (the rest will be ignored). See CPX_PARAM_DATACHECK and
+        CPX_PARAM_WARNLIM in the Parameters of CPLEX Reference Manual.
+
+        In all other cases functor must be a reference to an object that
+        has a callable attribute named 'invoke' (if that does not exist,
+        or is not a callable, an exception will occur the first time CPLEX
+        attempts to invoke the callback). Whenever CPLEX needs to invoke
+        the callback it calls this member with two argument: the modeling
+        issue ID and the associated warning message.
+
+        See `model_info`.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> c.parameters.read.datacheck.set(
+        ...     c.parameters.read.datacheck.values.assist)
+        >>> class ModelAsstCB(object):
+        ...     def invoke(self, issueid, message):
+        ...         pass  # Do something here.
+        >>> cb = ModelAsstCB()
+        >>> c.set_modeling_assistance_callback(cb)  # Register callback.
+        >>> c.set_modeling_assistance_callback(None)  # Clear callback.
+        """
+        # First of all, clear any existing callback
+        self._modelasstcb = None
+        _proc.modelasstcallbacksetfunc(self._env._e, self._lp, None)
+        # We could use hasattr() or similar to check whether 'functor'
+        # has a method called 'invoke'. This is never a complete guard
+        # since the attribute may be deleted from the instance later. So,
+        # for now, we just don't check anything.
+        # FIXME: See FIXME in set_callback above.
+        if not functor is None:
+            _proc.modelasstcallbacksetfunc(self._env._e, self._lp, self)
+            self._modelasstcb = functor
+
+    def _invoke_modelasst_callback(self, issueid, message):
+        """non-public"""
+        # This is invoked by the cpxpymodelasstcallbackfuncwrap()
+        # trampoline function in the native code and is responsible for
+        # invoking the user callback.
+        self._modelasstcb.invoke(issueid, message)
+
+    def create_parameter_set(self):
+        """Returns a new CPLEX parameter set object that is associated
+        with this CPLEX problem object.
+
+        In a sense, this a convenience function; it is equivalent to
+        querying what parameters are in the source parameter set,
+        querying their values, and then adding those parameters to the
+        target parameter set.
+
+        Note
+          When this CPLEX problem object is destroyed, the parameter set
+          object returned by this function will also be destoyed.
+
+        See `ParameterSet`.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> ps = c.create_parameter_set()
+        >>> ps.add(c.parameters.advance,
+        ...        c.parameters.advance.values.none)
+        >>> len(ps)
+        1
+        """
+        ps = ParameterSet(self._env)
+        self._pslst.append(ps)
+        return ps
+
+    def copy_parameter_set(self, source):
+        """Returns a deep copy of a parameter set.
+
+        In a sense, this a convenience function; it is equivalent to
+        querying what parameters are in the source parameter set,
+        querying their values, and then adding those parameters to the
+        target parameter set.
+
+        Note
+          The source parameter set must have been created by this CPLEX
+          problem object. Mixing parameter sets from different CPLEX
+          problem objects is not supported.
+
+        Note
+          When this CPLEX problem object is destroyed, the parameter set
+          object returned by this function will also be destoyed.
+
+        See `ParameterSet`.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> source = c.create_parameter_set()
+        >>> source.add(c.parameters.advance,
+        ...            c.parameters.advance.values.none)
+        >>> len(source)
+        1
+        >>> target = c.copy_parameter_set(source)
+        >>> len(target)
+        1
+        """
+        if not isinstance(source, ParameterSet):
+            raise TypeError("source must be a ParameterSet")
+        if source not in self._pslst:
+            raise ValueError("parameter set must have been created"
+                             " by this CPLEX problem object")
+        target = ParameterSet(self._env)
+        self._pslst.append(target)
+        _proc.paramsetcopy(self._env._e, target._ps, source._ps)
+        return target
+
+    def get_parameter_set(self):
+        """Returns a parameter set containing parameters that have been
+        changed from their default values in the environment.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> c.parameters.advance.set(c.parameters.advance.values.none)
+        >>> ps = c.get_parameter_set()
+        >>> val = ps.get(c.parameters.advance)
+        >>> val == c.parameters.advance.values.none
+        True
+        """
+        ps = ParameterSet(self._env)
+        self._pslst.append(ps)
+        for param, value in self.parameters.get_changed():
+            ps.add(param._id, value)
+        return ps
+
+    def set_parameter_set(self, source):
+        """Applies the parameter values in the paramset to the
+        environment.
+
+        Note
+          The source parameter set must have been created by this CPLEX
+          problem object. Mixing parameter sets from different CPLEX
+          problem objects is not supported.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> ps = c.create_parameter_set()
+        >>> ps.add(c.parameters.advance,
+        ...        c.parameters.advance.values.none)
+        >>> c.set_parameter_set(ps)
+        >>> value = c.parameters.advance.get()
+        >>> value == c.parameters.advance.values.none
+        True
+        """
+        if not isinstance(source, ParameterSet):
+            raise TypeError("source must be a ParameterSet")
+        if source not in self._pslst:
+            raise ValueError("parameter set must have been created"
+                             " by this CPLEX problem object")
+        _proc.paramsetapply(self._env._e, source._ps)
