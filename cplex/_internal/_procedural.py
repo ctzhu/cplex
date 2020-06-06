@@ -9,12 +9,9 @@
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 # ------------------------------------------------------------------------
-
-from __future__ import print_function
-
+"""Wrapper functions for the CPLEX C Callable Library"""
 from collections import namedtuple
 from contextlib import contextmanager
-from random import randrange
 import signal
 
 from . import _constants as _const
@@ -23,72 +20,7 @@ from . import _pycplex as CR
 
 from ..exceptions import CplexSolverError, CplexError, ErrorChannelMessage
 
-from .. import six
-from ..six.moves import map, zip
-
-default_encoding = "UTF-8"
-cpx_default_encoding = "UTF-8"
-
-
-def cpx_decode(my_str, enc):
-    if my_str is None:
-        return my_str
-    elif isinstance(my_str, six.binary_type):
-        if enc == cpx_default_encoding:
-            return my_str
-        else:
-            return six.text_type(my_str, enc).encode(cpx_default_encoding)
-    else:
-        assert isinstance(my_str, six.text_type)
-        return my_str.encode(cpx_default_encoding)
-
-
-def cpx_decode_noop3(my_str, enc):
-    if six.PY2:
-        return cpx_decode(my_str, enc)
-    else:
-        return my_str
-
-
-def _cpx_encode_py2(my_str, enc):
-    assert six.PY2
-    if enc == cpx_default_encoding:
-        return my_str
-    else:
-        return six.text_type(my_str, cpx_default_encoding).encode(enc)
-
-
-def _cpx_encode_py3(my_str, enc):
-    assert not six.PY2
-    if isinstance(my_str, six.binary_type):
-        return my_str.decode(enc)
-    else:
-        assert isinstance(my_str, six.text_type)
-        if enc == cpx_default_encoding:
-            return my_str
-        else:
-            return my_str.encode(cpx_default_encoding).decode(enc)
-
-
-def cpx_encode_noop3(my_str, enc):
-    if six.PY2:
-        return cpx_encode(my_str, enc)
-    else:
-        return my_str
-
-
-def cpx_encode(my_str, enc):
-    if six.PY2:
-        return _cpx_encode_py2(my_str, enc)
-    else:
-        return _cpx_encode_py3(my_str, enc)
-
-
-def cpx_transcode(name, enc):
-    if isinstance(name, six.text_type):
-        return name.encode("utf-8")
-    else:
-        return six.text_type(name, enc).encode("utf-8")
+# pylint: disable=missing-docstring
 
 
 def _safeDoubleArray(arraylen):
@@ -132,10 +64,10 @@ def _rangelen(begin, end):
     return result
 
 
-def getstatstring(env, statind, enc=default_encoding):
+def getstatstring(env, statind):
     output = []
     CR.CPXXgetstatstring(env, statind, output)
-    return cpx_encode(output[0], enc)
+    return output[0]
 
 
 def geterrorstring(env, errcode):
@@ -181,7 +113,7 @@ def setterminate(env, env_lp_ptr, p):
     check_status(env, status)
 
 
-class SigIntHandler(object):
+class SigIntHandler():
     """Handle Ctrl-C events during long running processes.
 
     :undocumented
@@ -191,7 +123,7 @@ class SigIntHandler(object):
         self.orig_handler = signal.getsignal(signal.SIGINT)
         self.was_triggered = False
 
-        def sigint_handler(signum, frame):
+        def sigint_handler(_signum, _frame):
             set_py_terminator()
             self.was_triggered = True
         # Make sure that we always start out with an "unset" terminator.
@@ -218,9 +150,9 @@ def pack_env_lp_ptr(env, lp):
 
 
 @contextmanager
-def chbmatrix(lolmat, env_lp, r_c, enc):
+def chbmatrix(lolmat, env_lp_ptr, r_c):
     """See matrix_conversion.c:Pylolmat_to_CHBmat()."""
-    mat = Pylolmat_to_CHBmat(lolmat, env_lp, r_c, enc)
+    mat = Pylolmat_to_CHBmat(lolmat, env_lp_ptr, r_c)
     try:
         # yields ([matbeg, matind, matval], nnz)
         yield mat[:-1], mat[-1]
@@ -228,53 +160,54 @@ def chbmatrix(lolmat, env_lp, r_c, enc):
         free_CHBmat(mat)
 
 
-def Pylolmat_to_CHBmat(lolmat, get_indices, r_c, enc):
-    return CR.Pylolmat_to_CHBmat(lolmat, get_indices, r_c, cpx_transcode, enc)
+def Pylolmat_to_CHBmat(lolmat, env_lp_ptr, r_c):
+    return CR.Pylolmat_to_CHBmat(lolmat, env_lp_ptr, r_c)
 
 
 def free_CHBmat(lolmat):
     CR.free_CHBmat(lolmat)
 
 
-class StatusChecker(object):
+def _handle_cb_error(env, cberror):
+    """Handle the callback exception.
+
+    These can be triggered either in the SWIG Python C API layer
+    (e.g., SWIG_callback.c) or in _ostream.py.
+    """
+    if isinstance(cberror, Exception):
+        # If cberror is already an exception, then just throw it as is.
+        # We can only get here from: _ostream.py:_write_wrap.
+        raise cberror
+    if isinstance(cberror[1], Exception):
+        # In this case the first item is the type of exception and
+        # the second item is the exception.  This is raised from the
+        # SWIG C layer (e.g., SWIG_callback.c:).
+        cberror = cberror[1]
+    elif isinstance(cberror[1], tuple):
+        # The second item is a tuple containing the error string and
+        # the error number.  We can get this from, for example:
+        # SWIG_callback.c:fast_getcallbackinfo.
+        assert len(cberror[1]) == 2
+        cberror = cberror[0](cberror[1][0], env, cberror[1][1])
+    else:
+        # The second item is the error string or perhaps None.
+        # See code in SWIG_callback.c where the _callback_exception
+        # attribute is set.
+        cberror = cberror[0](cberror[1])
+    raise cberror
+
+
+class StatusChecker():
     """A callable object used for checking status codes.
 
     :undocumented
     """
 
     def __init__(self):
-        class NoOp(object):
+        class NoOp():
             pass
         self._pyenv = NoOp()
         self._pyenv._callback_exception = None
-
-    def _handle_cb_error(self, env, cberror):
-        """Handle the callback exception.
-
-        These can be triggered either in the SWIG Python C API layer
-        (e.g., SWIG_callback.c) or in _ostream.py.
-        """
-        if isinstance(cberror, Exception):
-            # If cberror is already an exception, then just throw it as is.
-            # We can only get here from: _ostream.py:_write_wrap.
-            raise cberror
-        if isinstance(cberror[1], Exception):
-            # In this case the first item is the type of exception and
-            # the second item is the exception.  This is raised from the
-            # SWIG C layer (e.g., SWIG_callback.c:).
-            cberror = cberror[1]
-        elif isinstance(cberror[1], tuple):
-            # The second item is a tuple containing the error string and
-            # the error number.  We can get this from, for example:
-            # SWIG_callback.c:fast_getcallbackinfo.
-            assert len(cberror[1]) == 2
-            cberror = cberror[0](cberror[1][0], env, cberror[1][1])
-        else:
-            # The second item is the error string or perhaps None.
-            # See code in SWIG_callback.c where the _callback_exception
-            # attribute is set.
-            cberror = cberror[0](cberror[1])
-        raise cberror
 
     def __call__(self, env, status, from_cb=False):
         error_string = None
@@ -289,7 +222,7 @@ class StatusChecker(object):
                     # than calling CPXXgeterrorstring).
                     error_string = callback_exception.args[0]
                 else:
-                    self._handle_cb_error(env, callback_exception)
+                    _handle_cb_error(env, callback_exception)
         except ReferenceError:
             pass
         if status == CR.CPXERR_NO_ENVIRONMENT:
@@ -319,6 +252,7 @@ def version(env):
 def versionnumber(env):
     ver = CR.intPtr()
     status = CR.CPXXversionnumber(env, ver)
+    check_status(env, status)
     return ver.value()
 
 
@@ -422,6 +356,10 @@ def setmipcallbackfunc(env, cbhandle):
 
 # Parameters
 
+def setdefaults(env):
+    status = CR.CPXXsetdefaults(env)
+    check_status(env, status)
+
 
 def setintparam(env, whichparam, newvalue):
     status = CR.CPXXsetintparam(env, whichparam, newvalue)
@@ -512,13 +450,13 @@ def getparamtype(env, param_name):
     return output.value()
 
 
-def readcopyparam(env, filename, enc=default_encoding):
-    status = CR.CPXXreadcopyparam(env, cpx_decode_noop3(filename, enc))
+def readcopyparam(env, filename):
+    status = CR.CPXXreadcopyparam(env, filename)
     check_status(env, status)
 
 
-def writeparam(env, filename, enc=default_encoding):
-    status = CR.CPXXwriteparam(env, cpx_decode_noop3(filename, enc))
+def writeparam(env, filename):
+    status = CR.CPXXwriteparam(env, filename)
     check_status(env, status)
 
 
@@ -543,7 +481,7 @@ def tuneparam(env, lp, int_param_values, dbl_param_values, str_param_values):
             LAU.double_list_to_array(dblval),
             strcnt,
             LAU.int_list_to_array(strnum),
-            [cpx_decode(x, default_encoding) for x in strval],
+            strval,
             tuning_status)
     check_status(env, status)
     return tuning_status.value()
@@ -564,14 +502,14 @@ def tuneparamprobset(env, filenames, filetypes, int_param_values,
     with SigIntHandler():
         status = CR.CPXXtuneparamprobset(
             env, len(filenames),
-            [cpx_decode(x, default_encoding) for x in filenames],
-            [cpx_decode(x, default_encoding) for x in filetypes],
+            filenames,
+            filetypes,
             intcnt, LAU.int_list_to_array(intnum),
             LAU.int_list_to_array_trunc_int32(intval),
             dblcnt, LAU.int_list_to_array(dblnum),
             LAU.double_list_to_array(dblval),
             strcnt, LAU.int_list_to_array(strnum),
-            [cpx_decode(x, default_encoding) for x in strval],
+            strval,
             tuning_status)
     check_status(env, status)
     return tuning_status.value()
@@ -593,7 +531,7 @@ def paramsetadd(env, ps, whichparam, newvalue, paramtype=None):
             newvalue = int(newvalue)  # will upconvert to long, if necc.
         paramsetaddint(env, ps, whichparam, newvalue)
     elif paramtype == _const.CPX_PARAMTYPE_DOUBLE:
-        if isinstance(newvalue, six.integer_types):
+        if isinstance(newvalue, int):
             newvalue = float(newvalue)
         paramsetadddbl(env, ps, whichparam, newvalue)
     elif paramtype == _const.CPX_PARAMTYPE_STRING:
@@ -648,15 +586,14 @@ def paramsetfree(env, ps):
 def paramsetget(env, ps, whichparam, paramtype=None):
     if paramtype is None:
         paramtype = getparamtype(env, whichparam)
-    if paramtype == _const.CPX_PARAMTYPE_INT:
-        return paramsetgetint(env, ps, whichparam)
-    elif paramtype == _const.CPX_PARAMTYPE_DOUBLE:
-        return paramsetgetdbl(env, ps, whichparam)
-    elif paramtype == _const.CPX_PARAMTYPE_STRING:
-        return paramsetgetstr(env, ps, whichparam)
-    else:
-        assert paramtype == _const.CPX_PARAMTYPE_LONG
-        return paramsetgetlong(env, ps, whichparam)
+    switcher = {
+        _const.CPX_PARAMTYPE_INT: paramsetgetint,
+        _const.CPX_PARAMTYPE_DOUBLE: paramsetgetdbl,
+        _const.CPX_PARAMTYPE_STRING: paramsetgetstr,
+        _const.CPX_PARAMTYPE_LONG: paramsetgetlong
+    }
+    func = switcher[paramtype]
+    return func(env, ps, whichparam)
 
 def paramsetgetdbl(env, ps, whichparam):
     value = CR.doublePtr()
@@ -693,14 +630,12 @@ def paramsetgetids(env, ps):
     assert len(inout_list) == 1
     return inout_list[0]
 
-def paramsetreadcopy(env, ps, filename, enc=default_encoding):
-    status = CR.CPXXparamsetreadcopy(env, ps,
-                                     cpx_decode_noop3(filename, enc))
+def paramsetreadcopy(env, ps, filename):
+    status = CR.CPXXparamsetreadcopy(env, ps, filename)
     check_status(env, status)
 
-def paramsetwrite(env, ps, filename, enc=default_encoding):
-    status = CR.CPXXparamsetwrite(env, ps,
-                                  cpx_decode_noop3(filename, enc))
+def paramsetwrite(env, ps, filename):
+    status = CR.CPXXparamsetwrite(env, ps, filename)
     check_status(env, status)
 
 def paramsetgetnum(env, ps):
@@ -722,21 +657,18 @@ def runseeds(env, lp, cnt):
 # Cplex
 
 
-def createprob(env, probname, enc=default_encoding):
+def createprob(env, probname):
     status = CR.intPtr()
-    lp = CR.CPXXcreateprob(env, status, cpx_decode_noop3(probname, enc))
+    lp = CR.CPXXcreateprob(env, status, probname)
     check_status(env, status.value())
     return lp
 
 
-def readcopyprob(env, lp, filename, filetype="", enc=default_encoding):
+def readcopyprob(env, lp, filename, filetype=""):
     if filetype == "":
-        status = CR.CPXXreadcopyprob(env, lp,
-                                     cpx_decode_noop3(filename, enc))
+        status = CR.CPXXreadcopyprob(env, lp, filename)
     else:
-        status = CR.CPXXreadcopyprob(env, lp,
-                                     cpx_decode_noop3(filename, enc),
-                                     cpx_decode_noop3(filetype, enc))
+        status = CR.CPXXreadcopyprob(env, lp, filename, filetype)
     check_status(env, status)
 
 
@@ -771,8 +703,8 @@ def copyvmconfig(env, xmlstring):
     check_status(env, status)
 
 
-def readcopyvmconfig(env, filename, enc=default_encoding):
-    status = CR.CPXXreadcopyvmconfig(env, cpx_decode_noop3(filename, enc))
+def readcopyvmconfig(env, filename):
+    status = CR.CPXXreadcopyvmconfig(env, filename)
     check_status(env, status)
 
 
@@ -838,7 +770,7 @@ def feasoptext(env, lp, grppref, grpbeg, grpind, grptype):
     concnt = len(grpind)
     with SigIntHandler(), \
             LAU.double_c_array(grppref) as c_grppref, \
-            LAU.int_c_array(grpbeg) as c_grpbeg, \
+            LAU.long_c_array(grpbeg) as c_grpbeg, \
             LAU.int_c_array(grpind) as c_grpind:
         status = CR.CPXXfeasoptext(env, lp, grpcnt, concnt,
                                    c_grppref, c_grpbeg,
@@ -851,54 +783,45 @@ def delnames(env, lp):
     check_status(env, status)
 
 
-def writeprob(env, lp, filename, filetype="", enc=default_encoding):
+def writeprob(env, lp, filename, filetype=""):
     if filetype == "":
-        status = CR.CPXXwriteprob(env, lp,
-                                  cpx_decode_noop3(filename, enc))
+        status = CR.CPXXwriteprob(env, lp, filename)
     else:
-        status = CR.CPXXwriteprob(env, lp,
-                                  cpx_decode_noop3(filename, enc),
-                                  cpx_decode_noop3(filetype, enc))
+        status = CR.CPXXwriteprob(env, lp, filename, filetype)
     check_status(env, status)
 
 
-def writeprobdev(env, lp, stream, filename, filetype,
-                 enc=default_encoding):
-    arg_list = [stream, cpx_decode_noop3(filename, enc),
-                cpx_decode_noop3(filetype, enc)]
+def writeprobdev(env, lp, stream, filename, filetype):
+    arg_list = [stream, filename, filetype]
     status = CR.CPXEwriteprobdev(env, lp, arg_list)
     check_status(env, status)
 
 
-def embwrite(env, lp, filename, enc=default_encoding):
-    status = CR.CPXXembwrite(env, lp, cpx_decode_noop3(filename, enc))
+def embwrite(env, lp, filename):
+    status = CR.CPXXembwrite(env, lp, filename)
     check_status(env, status)
 
 
-def dperwrite(env, lp, filename, epsilon, enc=default_encoding):
-    status = CR.CPXXdperwrite(env, lp, cpx_decode_noop3(filename, enc),
-                              epsilon)
+def dperwrite(env, lp, filename, epsilon):
+    status = CR.CPXXdperwrite(env, lp, filename, epsilon)
     check_status(env, status)
 
 
-def pperwrite(env, lp, filename, epsilon, enc=default_encoding):
-    status = CR.CPXXpperwrite(env, lp, cpx_decode_noop3(filename, enc),
-                              epsilon)
+def pperwrite(env, lp, filename, epsilon):
+    status = CR.CPXXpperwrite(env, lp, filename, epsilon)
     check_status(env, status)
 
 
-def preslvwrite(env, lp, filename, enc=default_encoding):
+def preslvwrite(env, lp, filename):
     objoff = CR.doublePtr()
-    status = CR.CPXXpreslvwrite(env, lp, cpx_decode_noop3(filename, enc),
-                                objoff)
+    status = CR.CPXXpreslvwrite(env, lp, filename, objoff)
     check_status(env, status)
     return objoff.value()
 
 
-def dualwrite(env, lp, filename, enc=default_encoding):
+def dualwrite(env, lp, filename):
     objshift = CR.doublePtr()
-    status = CR.CPXXdualwrite(env, lp, cpx_decode_noop3(filename, enc),
-                              objshift)
+    status = CR.CPXXdualwrite(env, lp, filename, objshift)
     check_status(env, status)
     return objshift.value()
 
@@ -917,14 +840,14 @@ def getprobtype(env, lp):
     return CR.CPXXgetprobtype(env, lp)
 
 
-def chgprobname(env, lp, probname, enc=default_encoding):
-    status = CR.CPXXchgprobname(env, lp, cpx_decode_noop3(probname, enc))
+def chgprobname(env, lp, probname):
+    status = CR.CPXXchgprobname(env, lp, probname)
     check_status(env, status)
 
 
-def getprobname(env, lp, enc=default_encoding):
+def getprobname(env, lp):
     namefn = CR.CPXXgetprobname
-    return _getnamesingle(env, lp, enc, namefn)
+    return _getnamesingle(env, lp, namefn)
 
 
 def getnumcols(env, lp):
@@ -1034,27 +957,24 @@ def completelp(env, lp):
 # Variables
 
 
-def newcols(env, lp, obj, lb, ub, xctype, colname, enc=default_encoding):
+def newcols(env, lp, obj, lb, ub, xctype, colname):
     ccnt = max(len(obj), len(lb), len(ub), len(xctype), len(colname))
     with LAU.double_c_array(obj) as c_obj, \
             LAU.double_c_array(lb) as c_lb, \
             LAU.double_c_array(ub) as c_ub:
         status = CR.CPXXnewcols(
             env, lp, ccnt, c_obj, c_lb, c_ub,
-            cpx_decode(xctype, enc),
-            [cpx_decode(x, enc) for x in colname])
+            xctype, colname)
     check_status(env, status)
 
 
-def addcols(env, lp, ccnt, nzcnt, obj, cmat, lb, ub, colname,
-            enc=default_encoding):
+def addcols(env, lp, ccnt, nzcnt, obj, cmat, lb, ub, colname):
     with LAU.double_c_array(obj) as c_obj, \
             LAU.double_c_array(lb) as c_lb, \
             LAU.double_c_array(ub) as c_ub:
         status = CR.CPXXaddcols(
             env, lp, ccnt, nzcnt,
-            c_obj, cmat, c_lb, c_ub,
-            [cpx_decode(x, enc) for x in colname])
+            c_obj, cmat, c_lb, c_ub, colname)
     check_status(env, status)
 
 
@@ -1071,33 +991,30 @@ def chgbds(env, lp, indices, lu, bd):
     check_status(env, status)
 
 
-def chgcolname(env, lp, indices, newnames, enc=default_encoding):
+def chgcolname(env, lp, indices, newnames):
     with LAU.int_c_array(indices) as c_indices:
         status = CR.CPXXchgcolname(env, lp, len(indices),
-                                   c_indices,
-                                   [cpx_decode(x, enc) for x in newnames])
+                                   c_indices, newnames)
     check_status(env, status)
 
 
 def chgctype(env, lp, indices, xctype):
     with LAU.int_c_array(indices) as c_indices:
         status = CR.CPXXchgctype(env, lp, len(indices),
-                                 c_indices,
-                                 cpx_decode(xctype, default_encoding))
+                                 c_indices, xctype)
     check_status(env, status)
 
 
-def getcolindex(env, lp, colname, enc=default_encoding):
+def getcolindex(env, lp, colname):
     index = CR.intPtr()
-    status = CR.CPXXgetcolindex(env, lp, cpx_decode_noop3(colname, enc),
-                                index)
+    status = CR.CPXXgetcolindex(env, lp, colname, index)
     check_status(env, status)
     return index.value()
 
 
-def getcolname(env, lp, begin, end, enc=default_encoding):
+def getcolname(env, lp, begin, end):
     namefn = CR.CPXXgetcolname
-    return _getnamebyrange(env, lp, begin, end, enc, namefn)
+    return _getnamebyrange(env, lp, begin, end, namefn)
 
 
 def getctype(env, lp, begin, end):
@@ -1106,7 +1023,7 @@ def getctype(env, lp, begin, end):
     check_status(env, status)
     # We expect to get [sense]
     assert len(inout_list) == 1
-    return cpx_encode(inout_list[0], default_encoding)
+    return inout_list[0]
 
 
 def getlb(env, lp, begin, end):
@@ -1170,25 +1087,20 @@ def tightenbds(env, lp, indices, lu, bd):
 # Linear Constraints
 
 
-def newrows(env, lp, rhs, sense, rngval, rowname, enc=default_encoding):
+def newrows(env, lp, rhs, sense, rngval, rowname):
     rcnt = max(len(rhs), len(sense), len(rngval), len(rowname))
     with LAU.double_c_array(rhs) as c_rhs, \
             LAU.double_c_array(rngval) as c_rng:
-        status = CR.CPXXnewrows(
-            env, lp, rcnt, c_rhs,
-            cpx_decode(sense, enc),
-            c_rng,
-            [cpx_decode(x, enc) for x in rowname])
+        status = CR.CPXXnewrows(env, lp, rcnt, c_rhs, sense,
+                                c_rng, rowname)
     check_status(env, status)
 
 
-def addrows(env, lp, ccnt, rcnt, nzcnt, rhs, sense, rmat, colname, rowname,
-            enc=default_encoding):
+def addrows(env, lp, ccnt, rcnt, nzcnt, rhs, sense, rmat, colname, rowname):
     with LAU.double_c_array(rhs) as c_rhs:
         status = CR.CPXXaddrows(
             env, lp, ccnt, rcnt, nzcnt, c_rhs,
-            cpx_decode(sense, enc), rmat, colname,
-            [cpx_decode(x, enc) for x in rowname])
+            sense, rmat, colname, rowname)
     check_status(env, status)
 
 
@@ -1197,10 +1109,10 @@ def delrows(env, lp, begin, end):
     _delbyrange(delfn, env, lp, begin, end)
 
 
-def chgrowname(env, lp, indices, newnames, enc=default_encoding):
+def chgrowname(env, lp, indices, newnames):
     with LAU.int_c_array(indices) as c_indices:
         status = CR.CPXXchgrowname(env, lp, len(indices), c_indices,
-                                   [cpx_decode(x, enc) for x in newnames])
+                                   newnames)
     check_status(env, status)
 
 
@@ -1230,7 +1142,7 @@ def chgrngval(env, lp, indices, values):
 def chgsense(env, lp, indices, senses):
     with LAU.int_c_array(indices) as c_indices:
         status = CR.CPXXchgsense(env, lp, len(indices), c_indices,
-                                 cpx_decode(senses, default_encoding))
+                                 senses)
     check_status(env, status)
 
 
@@ -1248,7 +1160,7 @@ def getsense(env, lp, begin, end):
     check_status(env, status)
     # We expect to get [sense]
     assert len(inout_list) == 1
-    return cpx_encode(inout_list[0], default_encoding)
+    return inout_list[0]
 
 
 def getrngval(env, lp, begin, end):
@@ -1259,9 +1171,9 @@ def getrngval(env, lp, begin, end):
     return LAU.array_to_list(rngval, rngvallen)
 
 
-def getrowname(env, lp, begin, end, enc=default_encoding):
+def getrowname(env, lp, begin, end):
     namefn = CR.CPXXgetrowname
-    return _getnamebyrange(env, lp, begin, end, enc, namefn)
+    return _getnamebyrange(env, lp, begin, end, namefn)
 
 
 def getcoef(env, lp, i, j):
@@ -1271,9 +1183,9 @@ def getcoef(env, lp, i, j):
     return coef.value()
 
 
-def getrowindex(env, lp, rowname, enc=default_encoding):
+def getrowindex(env, lp, rowname):
     index = CR.intPtr()
-    status = CR.CPXXgetrowindex(env, lp, cpx_decode_noop3(rowname, enc), index)
+    status = CR.CPXXgetrowindex(env, lp, rowname, index)
     check_status(env, status)
     return index.value()
 
@@ -1295,31 +1207,29 @@ def getnumnz(env, lp):
     return CR.CPXXgetnumnz(env, lp)
 
 
-def addlazyconstraints(env, lp, rhs, sense, lin_expr, names,
-                       enc=default_encoding):
+def addlazyconstraints(env, lp, rhs, sense, lin_expr, names):
     env_lp_ptr = pack_env_lp_ptr(env, lp)
-    with chbmatrix(lin_expr, env_lp_ptr, 0, enc) as (rmat, nnz), \
+    with chbmatrix(lin_expr, env_lp_ptr, 0) as (rmat, nnz), \
             LAU.double_c_array(rhs) as c_rhs:
         rmatbeg, rmatind, rmatval = rmat
         status = CR.CPXXaddlazyconstraints(
             env, lp, len(rhs), nnz,
-            c_rhs, cpx_decode(sense, enc),
+            c_rhs, sense,
             rmatbeg, rmatind, rmatval,
-            [cpx_decode(x, enc) for x in names])
+            names)
     check_status(env, status)
 
 
-def addusercuts(env, lp, rhs, sense, lin_expr, names,
-                enc=default_encoding):
+def addusercuts(env, lp, rhs, sense, lin_expr, names):
     env_lp_ptr = pack_env_lp_ptr(env, lp)
-    with chbmatrix(lin_expr, env_lp_ptr, 0, enc) as (rmat, nnz), \
+    with chbmatrix(lin_expr, env_lp_ptr, 0) as (rmat, nnz), \
             LAU.double_c_array(rhs) as c_rhs:
         rmatbeg, rmatind, rmatval = rmat
         status = CR.CPXXaddusercuts(
             env, lp, len(rhs), nnz,
-            c_rhs, cpx_decode(sense, enc),
+            c_rhs, sense,
             rmatbeg, rmatind, rmatval,
-            [cpx_decode(x, enc) for x in names])
+            names)
     check_status(env, status)
 
 
@@ -1332,19 +1242,57 @@ def freeusercuts(env, lp):
     status = CR.CPXXfreeusercuts(env, lp)
     check_status(env, status)
 
+
+# CPXLIBAPI int CPXPUBLIC
+# CPXXcopylpwnames (CPXCENVptr env,
+#                   CPXLPptr lp,
+#                   CPXDIM numcols,
+#                   CPXDIM numrows,
+#                   int objsense,
+#                   const double *objective,
+#                   const double *rhs,
+#                   const char *sense,
+#                   CPXNNZ int *matbeg,
+#                   CPXDIM int *matcnt,
+#                   CPXDIM int *matind,
+#                   const double *matval,
+#                   const double *lb,
+#                   const double *ub,
+#                   const double *rngval,
+#                   char const *const *colname,
+#                   char const *const *rowname);
+def copylpwnames(env, lp, numcols, numrows, objsense, obj, rhs, sense,
+                 matbeg, matcnt, matind, matval, lb, ub, rngval, colname,
+                 rowname):
+    with LAU.long_c_array(matbeg) as c_matbeg, \
+         LAU.int_c_array(matcnt) as c_matcnt, \
+         LAU.int_c_array(matind) as c_matind, \
+         LAU.double_c_array(matval) as c_matval, \
+         LAU.double_c_array(obj) as c_obj, \
+         LAU.double_c_array(rhs) as c_rhs, \
+         LAU.double_c_array(lb) as c_lb, \
+         LAU.double_c_array(ub) as c_ub, \
+         LAU.double_c_array(rngval) as c_rngval:  # noqa: E126
+        status = CR.CPXXcopylpwnames(env, lp, numcols, numrows, objsense,
+                                     c_obj, c_rhs, sense,
+                                     c_matbeg, c_matcnt, c_matind, c_matval,
+                                     c_lb, c_ub, c_rngval,
+                                     colname, rowname)
+        check_status(env, status)
+
+
 ########################################################################
 # SOS API
 ########################################################################
 
 
-def addsos(env, lp, sostype, sosbeg, sosind, soswt, sosnames,
-           enc=default_encoding):
-    with LAU.int_c_array(sosbeg) as c_sosbeg, \
+def addsos(env, lp, sostype, sosbeg, sosind, soswt, sosnames):
+    with LAU.long_c_array(sosbeg) as c_sosbeg, \
             LAU.int_c_array(sosind) as c_sosind, \
             LAU.double_c_array(soswt) as c_soswt:
         status = CR.CPXXaddsos(env, lp, len(sosbeg), len(sosind), sostype,
                                c_sosbeg, c_sosind, c_soswt,
-                               [cpx_decode(x, enc) for x in sosnames])
+                               sosnames)
     check_status(env, status)
 
 
@@ -1360,7 +1308,6 @@ def getsos_info(env, lp, begin, end):
         check_status(env, status)
     # We expect to get [sostype, surplus]
     assert len(inout_list) == 2
-    inout_list[0] = cpx_encode(inout_list[0], default_encoding)
     return tuple(inout_list)
 
 
@@ -1377,14 +1324,14 @@ def getsos(env, lp, begin, end):
     return tuple(inout_list)
 
 
-def getsosindex(env, lp, name, enc=default_encoding):
+def getsosindex(env, lp, name):
     indexfn = CR.CPXXgetsosindex
-    return _getindex(env, lp, name, enc, indexfn)
+    return _getindex(env, lp, name, indexfn)
 
 
-def getsosname(env, lp, begin, end, enc=default_encoding):
+def getsosname(env, lp, begin, end):
     namefn = CR.CPXXgetsosname
-    return _getnamebyrange(env, lp, begin, end, enc, namefn)
+    return _getnamebyrange(env, lp, begin, end, namefn)
 
 ########################################################################
 # Indicator Constraint API
@@ -1392,7 +1339,7 @@ def getsosname(env, lp, begin, end, enc=default_encoding):
 
 
 def addindconstr(env, lp, indcnt, indvar, complemented, rhs, sense, linmat,
-                 indtype, name, nzcnt, enc=default_encoding):
+                 indtype, name, nzcnt):
     with LAU.int_c_array(indtype) as c_indtype, \
             LAU.int_c_array(indvar) as c_indvar, \
             LAU.int_c_array(complemented) as c_complemented, \
@@ -1400,8 +1347,8 @@ def addindconstr(env, lp, indcnt, indvar, complemented, rhs, sense, linmat,
         status = CR.CPXXaddindconstraints(
             env, lp, indcnt, c_indtype, c_indvar,
             c_complemented, nzcnt, c_rhs,
-            cpx_decode(sense, enc), linmat,
-            [cpx_decode(x, enc) for x in name])
+            sense, linmat,
+            name)
     check_status(env, status)
 
 
@@ -1429,13 +1376,12 @@ def getindconstr_constant(env, lp, begin, end):
     # We expect to get:
     # [type, indvar, complemented, rhs, sense, surplus]
     assert len(inout_list) == 6
-    inout_list[4] = cpx_encode(inout_list[4], default_encoding)
     return tuple(inout_list)
 
 
-def getindconstrindex(env, lp, name, enc=default_encoding):
+def getindconstrindex(env, lp, name):
     indexfn = CR.CPXXgetindconstrindex
-    return _getindex(env, lp, name, enc, indexfn)
+    return _getindex(env, lp, name, indexfn)
 
 
 def delindconstrs(env, lp, begin, end):
@@ -1451,9 +1397,9 @@ def getindconstrslack(env, lp, begin, end):
     return LAU.array_to_list(slacks, slacklen)
 
 
-def getindconstrname(env, lp, which, enc=default_encoding):
+def getindconstrname(env, lp, which):
     namefn = CR.CPXXgetindconstrname
-    return _getname(env, lp, which, enc, namefn, index_first=False)
+    return _getname(env, lp, which, namefn, index_first=False)
 
 ########################################################################
 # Quadratic Constraints
@@ -1461,17 +1407,17 @@ def getindconstrname(env, lp, which, enc=default_encoding):
 
 
 def addqconstr(env, lp, rhs, sense, linind, linval, quadrow, quadcol,
-               quadval, name, enc=default_encoding):
+               quadval, name):
     with LAU.int_c_array(linind) as c_linind, \
             LAU.double_c_array(linval) as c_linval, \
             LAU.int_c_array(quadrow) as c_quadrow, \
             LAU.int_c_array(quadcol) as c_quadcol, \
             LAU.double_c_array(quadval) as c_quadval:
         status = CR.CPXXaddqconstr(env, lp, len(linind), len(quadrow),
-                                   rhs, cpx_decode(sense, enc),
+                                   rhs, sense,
                                    c_linind, c_linval,
                                    c_quadrow, c_quadcol, c_quadval,
-                                   cpx_decode_noop3(name, enc))
+                                   name)
     check_status(env, status)
 
 
@@ -1483,7 +1429,6 @@ def getqconstr_info(env, lp, which):
     # We expect to get [rhs, sense, linsurplus, quadsurplus]
     assert len(inout_list) == 4
     assert len(inout_list[1]) == 1  # sense string should be one char
-    inout_list[1] = cpx_encode(inout_list[1], default_encoding)
     return tuple(inout_list)
 
 
@@ -1518,9 +1463,9 @@ def delqconstrs(env, lp, begin, end):
     _delbyrange(delfn, env, lp, begin, end)
 
 
-def getqconstrindex(env, lp, name, enc=default_encoding):
+def getqconstrindex(env, lp, name):
     indexfn = CR.CPXXgetqconstrindex
-    return _getindex(env, lp, name, enc, indexfn)
+    return _getindex(env, lp, name, indexfn)
 
 
 def getqconstrslack(env, lp, begin, end):
@@ -1531,9 +1476,9 @@ def getqconstrslack(env, lp, begin, end):
     return LAU.array_to_list(slacks, slacklen)
 
 
-def getqconstrname(env, lp, which, enc=default_encoding):
+def getqconstrname(env, lp, which):
     namefn = CR.CPXXgetqconstrname
-    return _getname(env, lp, which, enc, namefn, index_first=False)
+    return _getname(env, lp, which, namefn, index_first=False)
 
 ########################################################################
 # Generic helper methods
@@ -1547,22 +1492,21 @@ def _delbyrange(delfn, env, lp, begin, end=None):
     check_status(env, status)
 
 
-def _getindex(env, lp, name, enc, indexfn):
+def _getindex(env, lp, name, indexfn):
     idx = CR.intPtr()
-    status = indexfn(env, lp, cpx_decode_noop3(name, enc), idx)
+    status = indexfn(env, lp, name, idx)
     check_status(env, status)
     return idx.value()
 
 
-def _getname(env, lp, idx, enc, namefn, index_first=True):
+def _getname(env, lp, idx, namefn, index_first=True):
     # Some name functions have the index argument first and some have it
     # last.  Thus, we do this little dance, so things are called in the
     # right way depending on index_first.
     def _namefn(env, lp, idx, inoutlist):
         if index_first:
             return namefn(env, lp, idx, inoutlist)
-        else:
-            return namefn(env, lp, inoutlist, idx)
+        return namefn(env, lp, inoutlist, idx)
     inoutlist = [0]
     # NB: inoutlist will be modified as a side effect
     status = _namefn(env, lp, idx, inoutlist)
@@ -1572,10 +1516,10 @@ def _getname(env, lp, idx, enc, namefn, index_first=True):
         return None
     status = _namefn(env, lp, idx, inoutlist)
     check_status(env, status)
-    return cpx_encode_noop3(inoutlist[0], enc)
+    return inoutlist[0]
 
 
-def _getnamebyrange(env, lp, begin, end, enc, namefn):
+def _getnamebyrange(env, lp, begin, end, namefn):
     inout_list = [0, begin, end]
     status = namefn(env, lp, inout_list)
     if status != CR.CPXERR_NEGATIVE_SURPLUS:
@@ -1585,10 +1529,10 @@ def _getnamebyrange(env, lp, begin, end, enc, namefn):
     inout_list.extend([begin, end])
     status = namefn(env, lp, inout_list)
     check_status(env, status)
-    return [cpx_encode_noop3(x, enc) for x in inout_list]
+    return inout_list
 
 
-def _getnamesingle(env, lp, enc, namefn):
+def _getnamesingle(env, lp, namefn):
     inoutlist = [0]
     status = namefn(env, lp, inoutlist)
     if status != CR.CPXERR_NEGATIVE_SURPLUS:
@@ -1597,7 +1541,7 @@ def _getnamesingle(env, lp, enc, namefn):
         return None
     status = namefn(env, lp, inoutlist)
     check_status(env, status)
-    return cpx_encode_noop3(inoutlist[0], enc)
+    return inoutlist[0]
 
 ########################################################################
 # Annotation API
@@ -1609,14 +1553,14 @@ def _newanno(env, lp, name, defval, newfn):
     check_status(env, status)
 
 
-def newlonganno(env, lp, name, defval, enc=default_encoding):
+def newlonganno(env, lp, name, defval):
     newfn = CR.CPXXnewlongannotation
-    _newanno(env, lp, cpx_decode_noop3(name, enc), defval, newfn)
+    _newanno(env, lp, name, defval, newfn)
 
 
-def newdblanno(env, lp, name, defval, enc=default_encoding):
+def newdblanno(env, lp, name, defval):
     newfn = CR.CPXXnewdblannotation
-    _newanno(env, lp, cpx_decode_noop3(name, enc), defval, newfn)
+    _newanno(env, lp, name, defval, newfn)
 
 
 def dellonganno(env, lp, begin, end):
@@ -1629,24 +1573,24 @@ def deldblanno(env, lp, begin, end):
     _delbyrange(delfn, env, lp, begin, end)
 
 
-def getlongannoindex(env, lp, name, enc=default_encoding):
+def getlongannoindex(env, lp, name):
     indexfn = CR.CPXXgetlongannotationindex
-    return _getindex(env, lp, name, enc, indexfn)
+    return _getindex(env, lp, name, indexfn)
 
 
-def getdblannoindex(env, lp, name, enc=default_encoding):
+def getdblannoindex(env, lp, name):
     indexfn = CR.CPXXgetdblannotationindex
-    return _getindex(env, lp, name, enc, indexfn)
+    return _getindex(env, lp, name, indexfn)
 
 
-def getlongannoname(env, lp, idx, enc=default_encoding):
+def getlongannoname(env, lp, idx):
     namefn = CR.CPXXgetlongannotationname
-    return _getname(env, lp, idx, enc, namefn)
+    return _getname(env, lp, idx, namefn)
 
 
-def getdblannoname(env, lp, idx, enc=default_encoding):
+def getdblannoname(env, lp, idx):
     namefn = CR.CPXXgetdblannotationname
-    return _getname(env, lp, idx, enc, namefn)
+    return _getname(env, lp, idx, namefn)
 
 
 def getnumlonganno(env, lp):
@@ -1707,21 +1651,18 @@ def getdblanno(env, lp, idx, objtype, begin, end):
     return LAU.array_to_list(val, annolen)
 
 
-def readcopyanno(env, lp, filename, enc=default_encoding):
-    status = CR.CPXXreadcopyannotations(env, lp,
-                                        cpx_decode_noop3(filename, enc))
+def readcopyanno(env, lp, filename):
+    status = CR.CPXXreadcopyannotations(env, lp, filename)
     check_status(env, status)
 
 
-def writeanno(env, lp, filename, enc=default_encoding):
-    status = CR.CPXXwriteannotations(env, lp,
-                                     cpx_decode_noop3(filename, enc))
+def writeanno(env, lp, filename):
+    status = CR.CPXXwriteannotations(env, lp, filename)
     check_status(env, status)
 
 
-def writebendersanno(env, lp, filename, enc=default_encoding):
-    status = CR.CPXXwritebendersannotation(env, lp,
-                                           cpx_decode_noop3(filename, enc))
+def writebendersanno(env, lp, filename):
+    status = CR.CPXXwritebendersannotation(env, lp, filename)
     check_status(env, status)
 
 ########################################################################
@@ -1730,14 +1671,13 @@ def writebendersanno(env, lp, filename, enc=default_encoding):
 
 
 def addpwl(env, lp, vary, varx, preslope, postslope, nbreaks,
-           breakx, breaky, name, enc=default_encoding):
+           breakx, breaky, name):
     assert len(breakx) == nbreaks
     assert len(breaky) == nbreaks
     with LAU.double_c_array(breakx) as c_breakx, \
             LAU.double_c_array(breaky) as c_breaky:
         status = CR.CPXXaddpwl(env, lp, vary, varx, preslope, postslope,
-                               nbreaks, c_breakx, c_breaky,
-                               cpx_decode_noop3(name, enc))
+                               nbreaks, c_breakx, c_breaky, name)
     check_status(env, status)
 
 
@@ -1771,21 +1711,21 @@ def getpwl(env, lp, idx):
     return [vary, varx, preslope, postslope, breakx, breaky]
 
 
-def getpwlindex(env, lp, name, enc=default_encoding):
+def getpwlindex(env, lp, name):
     indexfn = CR.CPXXgetpwlindex
-    return _getindex(env, lp, name, enc, indexfn)
+    return _getindex(env, lp, name, indexfn)
 
 
-def getpwlname(env, lp, idx, enc=default_encoding):
+def getpwlname(env, lp, idx):
     namefn = CR.CPXXgetpwlname
-    return _getname(env, lp, idx, enc, namefn, index_first=False)
+    return _getname(env, lp, idx, namefn, index_first=False)
 
 ########################################################################
 # Objective API
 ########################################################################
 
 
-def copyobjname(env, lp, objname, enc=default_encoding):
+def copyobjname(env, lp, objname):
     status = CR.CPXXcopyobjname(env, lp, objname)
     check_status(env, status)
 
@@ -1826,19 +1766,20 @@ def getobj(env, lp, begin, end):
     return LAU.array_to_list(obj, objlen)
 
 
-def getobjname(env, lp, enc=default_encoding):
+def getobjname(env, lp):
     namefn = CR.CPXXgetobjname
-    return _getnamesingle(env, lp, enc, namefn)
+    return _getnamesingle(env, lp, namefn)
 
 
 def copyquad(env, lp, qmatbeg, qmatind, qmatval):
-    if len(qmatbeg) > 0:
+    nqmatbeg = len(qmatbeg)
+    if nqmatbeg > 0:
         qmatcnt = [qmatbeg[i + 1] - qmatbeg[i]
-                   for i in range(len(qmatbeg) - 1)]
+                   for i in range(nqmatbeg - 1)]
         qmatcnt.append(len(qmatind) - qmatbeg[-1])
     else:
         qmatcnt = []
-    with LAU.int_c_array(qmatbeg) as c_qmatbeg, \
+    with LAU.long_c_array(qmatbeg) as c_qmatbeg, \
             LAU.int_c_array(qmatcnt) as c_qmatcnt, \
             LAU.int_c_array(qmatind) as c_qmatind, \
             LAU.double_c_array(qmatval) as c_qmatval:
@@ -1859,13 +1800,13 @@ def chgqpcoef(env, lp, row, col, value):
 
 
 def getquad(env, lp, begin, end):
-    nzcnt = CR.intPtr()
+    nzcnt = CR.cpxlongPtr()
     ncols = _rangelen(begin, end)
-    qmatbeg = _safeIntArray(ncols)
+    qmatbeg = _safeLongArray(ncols)
     qmatind = LAU.int_list_to_array([])
     qmatval = LAU.double_list_to_array([])
     space = 0
-    surplus = CR.intPtr()
+    surplus = CR.cpxlongPtr()
     status = CR.CPXXgetquad(env, lp, nzcnt, qmatbeg, qmatind, qmatval,
                             space, surplus, begin, end)
     if status != CR.CPXERR_NEGATIVE_SURPLUS:
@@ -1910,19 +1851,19 @@ def multiobjchgattribs(env, lp, objidx,
                        priority=_const.CPX_NO_PRIORITY_CHANGE,
                        abstol=_const.CPX_NO_ABSTOL_CHANGE,
                        reltol=_const.CPX_NO_RELTOL_CHANGE,
-                       name=None, enc=default_encoding):
+                       name=None):
     status = CR.CPXXmultiobjchgattribs(env, lp, objidx, offset, weight,
                                        priority, abstol, reltol,
-                                       cpx_decode_noop3(name, enc))
+                                       name)
     check_status(env, status)
 
-def multiobjgetindex(env, lp, name, enc=default_encoding):
+def multiobjgetindex(env, lp, name):
     indexfn = CR.CPXXmultiobjgetindex
-    return _getindex(env, lp, name, enc, indexfn)
+    return _getindex(env, lp, name, indexfn)
 
-def multiobjgetname(env, lp, objidx, enc=default_encoding):
+def multiobjgetname(env, lp, objidx):
     namefn = CR.CPXXmultiobjgetname
-    return _getname(env, lp, objidx, enc, namefn, index_first=True)
+    return _getname(env, lp, objidx, namefn, index_first=True)
 
 def multiobjgetobj(env, lp, objidx, begin, end):
     coeffslen = _rangelen(begin, end)
@@ -1945,16 +1886,15 @@ def multiobjsetobj(env, lp, objidx, objind, objval,
                    priority=_const.CPX_NO_PRIORITY_CHANGE,
                    abstol=_const.CPX_NO_ABSTOL_CHANGE,
                    reltol=_const.CPX_NO_RELTOL_CHANGE,
-                   objname=None,
-                   enc=default_encoding):
+                   objname=None):
     objnz = len(objind)
     assert len(objval) == objnz
     with LAU.int_c_array(objind) as c_objind, \
-         LAU.double_c_array(objval) as c_objval:
+         LAU.double_c_array(objval) as c_objval:  # noqa: E127
         status = CR.CPXXmultiobjsetobj(env, lp, objidx, objnz, c_objind,
                                        c_objval, offset, weight,
                                        priority, abstol, reltol,
-                                       cpx_decode_noop3(objname, enc))
+                                       objname)
     check_status(env, status)
 
 def setnumobjs(env, lp, n):
@@ -2174,21 +2114,21 @@ def getbhead(env, lp):
             LAU.array_to_list(x, headlen))
 
 
-def mbasewrite(env, lp, filename, enc=default_encoding):
-    status = CR.CPXXmbasewrite(env, lp, cpx_decode_noop3(filename, enc))
+def mbasewrite(env, lp, filename):
+    status = CR.CPXXmbasewrite(env, lp, filename)
     check_status(env, status)
 
 
-def getijrow(env, lp, i, row_or_column):
+def getijrow(env, lp, idx, is_row_index):
     row = CR.intPtr()
-    if row_or_column == 'r' or row_or_column == 'R':
-        status = CR.CPXXgetijrow(env, lp, i, -1, row)
-    elif row_or_column == 'c' or row_or_column == 'C':
-        status = CR.CPXXgetijrow(env, lp, -1, i, row)
+    if is_row_index:
+        i, j = (idx, -1)  # Seek a basic row.
+    else:
+        i, j = (-1, idx)  # Seek a basic column.
+    status = CR.CPXXgetijrow(env, lp, i, j, row)
     if status == CR.CPXERR_INDEX_NOT_BASIC:
         return -1
-    else:
-        check_status(env, status)
+    check_status(env, status)
     return row.value()
 
 
@@ -2321,7 +2261,7 @@ def refinemipstartconflictext(env, lp, mipstartindex, grppref, grpbeg,
     concnt = len(grpind)
     with SigIntHandler(), \
             LAU.double_c_array(grppref) as c_grppref, \
-            LAU.int_c_array(grpbeg) as c_grpbeg, \
+            LAU.long_c_array(grpbeg) as c_grpbeg, \
             LAU.int_c_array(grpind) as c_grpind:
         status = CR.CPXXrefinemipstartconflictext(
             env, lp, mipstartindex, grpcnt, concnt,
@@ -2334,7 +2274,7 @@ def refineconflictext(env, lp, grppref, grpbeg, grpind, grptype):
     concnt = len(grpind)
     with SigIntHandler(), \
             LAU.double_c_array(grppref) as c_grppref, \
-            LAU.int_c_array(grpbeg) as c_grpbeg, \
+            LAU.long_c_array(grpbeg) as c_grpbeg, \
             LAU.int_c_array(grpind) as c_grpind:
         status = CR.CPXXrefineconflictext(
             env, lp, grpcnt, concnt,
@@ -2350,8 +2290,8 @@ def getconflictext(env, lp, begin, end):
     return LAU.array_to_list(grpstat, grpstatlen)
 
 
-def clpwrite(env, lp, filename, enc=default_encoding):
-    status = CR.CPXXclpwrite(env, lp, cpx_decode_noop3(filename, enc))
+def clpwrite(env, lp, filename):
+    status = CR.CPXXclpwrite(env, lp, filename)
     check_status(env, status)
 
 # Problem Modification Routines
@@ -2361,8 +2301,8 @@ def clpwrite(env, lp, filename, enc=default_encoding):
 # File Writing Routines
 
 
-def solwrite(env, lp, filename, enc=default_encoding):
-    status = CR.CPXXsolwrite(env, lp, cpx_decode_noop3(filename, enc))
+def solwrite(env, lp, filename):
+    status = CR.CPXXsolwrite(env, lp, filename)
     check_status(env, status)
 
 # Message Handling Routines
@@ -2433,7 +2373,7 @@ def slackfromx(env, lp, x):
     slack = _safeDoubleArray(numrows)
     status = CR.CPXXslackfromx(env, lp, LAU.double_list_to_array(x), slack)
     check_status(env, status)
-    return (LAU.array_to_list(slack, numrows))
+    return LAU.array_to_list(slack, numrows)
 
 
 def qconstrslackfromx(env, lp, x):
@@ -2442,7 +2382,7 @@ def qconstrslackfromx(env, lp, x):
     status = CR.CPXXqconstrslackfromx(env, lp,
                                       LAU.double_list_to_array(x), slack)
     check_status(env, status)
-    return (LAU.array_to_list(slack, numqcon))
+    return LAU.array_to_list(slack, numqcon)
 
 
 def djfrompi(env, lp, pi):
@@ -2450,7 +2390,7 @@ def djfrompi(env, lp, pi):
     dj = _safeDoubleArray(numcols)
     status = CR.CPXXdjfrompi(env, lp, LAU.double_list_to_array(pi), dj)
     check_status(env, status)
-    return (LAU.array_to_list(dj, numcols))
+    return LAU.array_to_list(dj, numcols)
 
 
 def qpdjfrompi(env, lp, pi, x):
@@ -2459,7 +2399,7 @@ def qpdjfrompi(env, lp, pi, x):
     status = CR.CPXXqpdjfrompi(env, lp, LAU.double_list_to_array(pi),
                                LAU.double_list_to_array(x), dj)
     check_status(env, status)
-    return (LAU.array_to_list(dj, numcols))
+    return LAU.array_to_list(dj, numcols)
 
 
 def mdleave(env, lp, goodlist):
@@ -2497,10 +2437,10 @@ def getijdiv(env, lp):
     check_status(env, status)
     if idiv.value() != -1:
         return idiv.value() + getnumcols(env, lp)
-    elif jdiv.value() != -1:
+    if jdiv.value() != -1:
         return jdiv.value()
-    else:  # problem is not diverging
-        return -1
+    # problem is not diverging
+    return -1
 
 
 def getray(env, lp):
@@ -2696,15 +2636,18 @@ def prechgobj(env, lp, ind, val):
     check_status(env, status)
 
 
-def preaddrows(env, lp, rhs, sense, rmatbeg, rmatind, rmatval, names,
-               enc=default_encoding):
-    status = CR.CPXXpreaddrows(env, lp, len(rmatbeg), len(rmatind),
-                               LAU.double_list_to_array(rhs),
-                               cpx_decode(sense, enc),
-                               LAU.int_list_to_array(rmatbeg),
-                               LAU.int_list_to_array(rmatind),
-                               LAU.double_list_to_array(rmatval),
-                               [cpx_decode(x, enc) for x in names])
+def preaddrows(env, lp, rhs, sense, rmatbeg, rmatind, rmatval, names):
+    with LAU.double_c_array(rhs) as c_rhs, \
+         LAU.long_c_array(rmatbeg) as c_rmatbeg, \
+         LAU.int_c_array(rmatind) as c_rmatind, \
+         LAU.double_c_array(rmatval) as c_rmatval:  # noqa: E126
+        status = CR.CPXXpreaddrows(env, lp, len(rmatbeg), len(rmatind),
+                                   c_rhs,
+                                   sense,
+                                   c_rmatbeg,
+                                   c_rmatind,
+                                   c_rmatval,
+                                   names)
     check_status(env, status)
 
 ########################################################################
@@ -2719,7 +2662,7 @@ def getnummipstarts(env, lp):
 def chgmipstarts(env, lp, mipstartindices, beg, varindices, values,
                  effortlevel):
     with LAU.int_c_array(mipstartindices) as c_mipstartindices, \
-            LAU.int_c_array(beg) as c_beg, \
+            LAU.long_c_array(beg) as c_beg, \
             LAU.int_c_array(varindices) as c_varindices, \
             LAU.double_c_array(values) as c_values, \
             LAU.int_c_array(effortlevel) as c_effortlevel:
@@ -2735,15 +2678,15 @@ def chgmipstarts(env, lp, mipstartindices, beg, varindices, values,
 
 
 def addmipstarts(env, lp, beg, varindices, values, effortlevel,
-                 mipstartname, enc=default_encoding):
-    with LAU.int_c_array(beg) as c_beg, \
+                 mipstartname):
+    with LAU.long_c_array(beg) as c_beg, \
             LAU.int_c_array(varindices) as c_varindices, \
             LAU.double_c_array(values) as c_values, \
             LAU.int_c_array(effortlevel) as c_effortlevel:
         status = CR.CPXXaddmipstarts(
             env, lp, len(beg), len(varindices),
             c_beg, c_varindices, c_values, c_effortlevel,
-            [cpx_decode(x, enc) for x in mipstartname])
+            mipstartname)
     check_status(env, status)
 
 
@@ -2754,10 +2697,10 @@ def delmipstarts(env, lp, begin, end):
 
 def getmipstarts_size(env, lp, begin, end):
     beglen = _rangelen(begin, end)
-    beg = LAU.int_list_to_array([])
+    beg = LAU.long_list_to_array([])
     effortlevel = _safeIntArray(beglen)
-    nzcnt = CR.intPtr()
-    surplus = CR.intPtr()
+    nzcnt = CR.cpxlongPtr()
+    surplus = CR.cpxlongPtr()
     varindices = LAU.int_list_to_array([])
     values = LAU.double_list_to_array([])
     startspace = 0
@@ -2771,10 +2714,10 @@ def getmipstarts_size(env, lp, begin, end):
 
 def getmipstarts_effort(env, lp, begin, end):
     beglen = _rangelen(begin, end)
-    beg = LAU.int_list_to_array([])
+    beg = LAU.long_list_to_array([])
     effortlevel = _safeIntArray(beglen)
-    nzcnt = CR.intPtr()
-    surplus = CR.intPtr()
+    nzcnt = CR.cpxlongPtr()
+    surplus = CR.cpxlongPtr()
     varindices = LAU.int_list_to_array([])
     values = LAU.double_list_to_array([])
     startspace = 0
@@ -2787,7 +2730,7 @@ def getmipstarts_effort(env, lp, begin, end):
         return ([0] * _rangelen(begin, end), [], [],
                 [0] * _rangelen(begin, end))
     startspace = -surplus.value()
-    beg = _safeIntArray(beglen)
+    beg = _safeLongArray(beglen)
     varindices = _safeIntArray(startspace)
     values = _safeDoubleArray(startspace)
     status = CR.CPXXgetmipstarts(env, lp, nzcnt, beg, varindices, values,
@@ -2799,10 +2742,10 @@ def getmipstarts_effort(env, lp, begin, end):
 
 def getmipstarts(env, lp, begin, end):
     beglen = _rangelen(begin, end)
-    beg = LAU.int_list_to_array([])
+    beg = LAU.long_list_to_array([])
     effortlevel = _safeIntArray(beglen)
-    nzcnt = CR.intPtr()
-    surplus = CR.intPtr()
+    nzcnt = CR.cpxlongPtr()
+    surplus = CR.cpxlongPtr()
     varindices = LAU.int_list_to_array([])
     values = LAU.double_list_to_array([])
     startspace = 0
@@ -2814,7 +2757,7 @@ def getmipstarts(env, lp, begin, end):
     if surplus.value() == 0:
         return ([0] * _rangelen(begin, end), [], [],
                 [0] * _rangelen(begin, end))
-    beg = _safeIntArray(beglen)
+    beg = _safeLongArray(beglen)
     startspace = -surplus.value()
     varindices = _safeIntArray(startspace)
     values = _safeDoubleArray(startspace)
@@ -2828,30 +2771,26 @@ def getmipstarts(env, lp, begin, end):
             LAU.array_to_list(effortlevel, beglen))
 
 
-def getmipstartname(env, lp, begin, end, enc=default_encoding):
+def getmipstartname(env, lp, begin, end):
     namefn = CR.CPXXgetmipstartname
-    return _getnamebyrange(env, lp, begin, end, enc, namefn)
+    return _getnamebyrange(env, lp, begin, end, namefn)
 
 
-def getmipstartindex(env, lp, mipstartname, enc=default_encoding):
+def getmipstartindex(env, lp, mipstartname):
     index = CR.intPtr()
-    status = CR.CPXXgetmipstartindex(env, lp,
-                                     cpx_decode_noop3(mipstartname, enc),
-                                     index)
+    status = CR.CPXXgetmipstartindex(env, lp, mipstartname, index)
     check_status(env, status)
     return index.value()
 
 
-def readcopymipstarts(env, lp, filename, enc=default_encoding):
+def readcopymipstarts(env, lp, filename):
     status = CR.CPXXreadcopymipstarts(env, lp,
-                                      cpx_decode_noop3(filename, enc))
+                                      filename)
     check_status(env, status)
 
 
-def writemipstarts(env, lp, filename, begin, end, enc=default_encoding):
-    status = CR.CPXXwritemipstarts(env, lp,
-                                   cpx_decode_noop3(filename, enc),
-                                   begin, end)
+def writemipstarts(env, lp, filename, begin, end):
+    status = CR.CPXXwritemipstarts(env, lp, filename, begin, end)
     check_status(env, status)
 
 # Optimizing Problems
@@ -3062,10 +3001,12 @@ def getcallbacknodeinfo(cbstruct, node, which):
             "invalid value for which in _internal._procedural.getcallbacknodeinfo")
     status = CR.CPXXgetcallbacknodeinfo(cbstruct, [node, which, data])
     check_status(None, status)
-    if which in int_callback_node_info or which in double_callback_node_info or which in cpxlong_callback_node_info:
+    if (which in int_callback_node_info or
+            which in double_callback_node_info or
+            which in cpxlong_callback_node_info):
         return data.value()
-    elif which in user_handle_callback_node_info:
-        return data[0]
+    assert which in user_handle_callback_node_info
+    return data[0]
 
 
 def callbacksetuserhandle(cbstruct, userhandle):
@@ -3097,10 +3038,12 @@ def getcallbackseqinfo(cbstruct, node, which):
             "invalid value for which in _internal._procedural.getcallbackseqinfo")
     status = CR.CPXXgetcallbackseqinfo(cbstruct, [node, which, data])
     check_status(None, status)
-    if which in int_callback_node_info or which in double_callback_node_info or which in cpxlong_callback_node_info:
+    if (which in int_callback_node_info or
+            which in double_callback_node_info or
+            which in cpxlong_callback_node_info):
         return data.value()
-    elif which in user_handle_callback_node_info:
-        return data[0]
+    assert which in user_handle_callback_node_info
+    return data[0]
 
 
 int_sos_info = [
@@ -3132,7 +3075,7 @@ def getcallbacksosinfo(cbstruct, sosindex, member, which):
 
 def cutcallbackadd(cbstruct, rhs, sense, ind, val, purgeable):
     status = CR.CPXXcutcallbackadd(cbstruct, len(ind), rhs,
-                                   cpx_decode(sense, default_encoding),
+                                   sense,
                                    LAU.int_list_to_array(ind),
                                    LAU.double_list_to_array(val),
                                    purgeable)
@@ -3141,7 +3084,7 @@ def cutcallbackadd(cbstruct, rhs, sense, ind, val, purgeable):
 
 def cutcallbackaddlocal(cbstruct, rhs, sense, ind, val):
     status = CR.CPXXcutcallbackaddlocal(cbstruct, len(ind), rhs,
-                                        cpx_decode(sense, default_encoding),
+                                        sense,
                                         LAU.int_list_to_array(ind),
                                         LAU.double_list_to_array(val))
     check_status(None, status)
@@ -3157,8 +3100,8 @@ def branchcallbackbranchgeneral(cbstruct, ind, lu, bd, rhs, sense, matbeg,
         LAU.double_list_to_array(bd),
         len(matbeg), len(matind),
         LAU.double_list_to_array(rhs),
-        cpx_decode(sense, default_encoding),
-        LAU.int_list_to_array(matbeg),
+        sense,
+        LAU.long_list_to_array(matbeg),
         LAU.int_list_to_array(matind),
         LAU.double_list_to_array(matval),
         nodeest, userhandle, seqnum)
@@ -3186,22 +3129,20 @@ def delpydel(env):
 # Solution pool
 
 
-def addsolnpooldivfilter(env, lp, lb, ub, ind, wts, ref, name,
-                         enc=default_encoding):
+def addsolnpooldivfilter(env, lp, lb, ub, ind, wts, ref, name):
     status = CR.CPXXaddsolnpooldivfilter(env, lp, lb, ub, len(ind),
                                          LAU.int_list_to_array(ind),
                                          LAU.double_list_to_array(wts),
                                          LAU.double_list_to_array(ref),
-                                         cpx_decode_noop3(name, enc))
+                                         name)
     check_status(env, status)
 
 
-def addsolnpoolrngfilter(env, lp, lb, ub, ind, val, name,
-                         enc=default_encoding):
+def addsolnpoolrngfilter(env, lp, lb, ub, ind, val, name):
     status = CR.CPXXaddsolnpoolrngfilter(env, lp, lb, ub, len(ind),
                                          LAU.int_list_to_array(ind),
                                          LAU.double_list_to_array(val),
-                                         cpx_decode_noop3(name, enc))
+                                         name)
     check_status(env, status)
 
 
@@ -3290,31 +3231,29 @@ def delsolnpoolfilters(env, lp, begin, end):
     _delbyrange(delfn, env, lp, begin, end)
 
 
-def getsolnpoolfiltername(env, lp, which, enc=default_encoding):
+def getsolnpoolfiltername(env, lp, which):
     namefn = CR.CPXXgetsolnpoolfiltername
-    return _getname(env, lp, which, enc, namefn, index_first=False)
+    return _getname(env, lp, which, namefn, index_first=False)
 
 
 def getsolnpoolnumfilters(env, lp):
     return CR.CPXXgetsolnpoolnumfilters(env, lp)
 
 
-def fltwrite(env, lp, filename, enc=default_encoding):
-    status = CR.CPXXfltwrite(env, lp, cpx_decode_noop3(filename, enc))
+def fltwrite(env, lp, filename):
+    status = CR.CPXXfltwrite(env, lp, filename)
     check_status(env, status)
 
 
-def readcopysolnpoolfilters(env, lp, filename, enc=default_encoding):
+def readcopysolnpoolfilters(env, lp, filename):
     status = CR.CPXXreadcopysolnpoolfilters(env, lp,
-                                            cpx_decode_noop3(filename, enc))
+                                            filename)
     check_status(env, status)
 
 
-def getsolnpoolfilterindex(env, lp, colname, enc=default_encoding):
+def getsolnpoolfilterindex(env, lp, colname):
     index = CR.intPtr()
-    status = CR.CPXXgetsolnpoolfilterindex(env, lp,
-                                           cpx_decode_noop3(colname, enc),
-                                           index)
+    status = CR.CPXXgetsolnpoolfilterindex(env, lp, colname, index)
     check_status(env, status)
     return index.value()
 
@@ -3339,11 +3278,9 @@ def getsolnpoolnumreplaced(env, lp):
     return CR.CPXXgetsolnpoolnumreplaced(env, lp)
 
 
-def getsolnpoolsolnindex(env, lp, colname, enc=default_encoding):
+def getsolnpoolsolnindex(env, lp, colname):
     index = CR.intPtr()
-    status = CR.CPXXgetsolnpoolsolnindex(env, lp,
-                                         cpx_decode_noop3(colname, enc),
-                                         index)
+    status = CR.CPXXgetsolnpoolsolnindex(env, lp, colname, index)
     check_status(env, status)
     return index.value()
 
@@ -3355,20 +3292,18 @@ def getsolnpoolmeanobjval(env, lp):
     return objval.value()
 
 
-def getsolnpoolsolnname(env, lp, which, enc=default_encoding):
+def getsolnpoolsolnname(env, lp, which):
     namefn = CR.CPXXgetsolnpoolsolnname
-    return _getname(env, lp, which, enc, namefn, index_first=False)
+    return _getname(env, lp, which, namefn, index_first=False)
 
 
-def solwritesolnpool(env, lp, soln, filename, enc=default_encoding):
-    status = CR.CPXXsolwritesolnpool(env, lp, soln,
-                                     cpx_decode_noop3(filename, enc))
+def solwritesolnpool(env, lp, soln, filename):
+    status = CR.CPXXsolwritesolnpool(env, lp, soln, filename)
     check_status(env, status)
 
 
-def solwritesolnpoolall(env, lp, filename, enc=default_encoding):
-    status = CR.CPXXsolwritesolnpoolall(env, lp,
-                                        cpx_decode_noop3(filename, enc))
+def solwritesolnpoolall(env, lp, filename):
+    status = CR.CPXXsolwritesolnpoolall(env, lp, filename)
     check_status(env, status)
 
 
@@ -3431,8 +3366,8 @@ def copystart(env, lp, cstat, rstat, cprim, rprim, cdual, rdual):
     check_status(env, status)
 
 
-def readcopybase(env, lp, filename, enc=default_encoding):
-    status = CR.CPXXreadcopybase(env, lp, cpx_decode_noop3(filename, enc))
+def readcopybase(env, lp, filename):
+    status = CR.CPXXreadcopybase(env, lp, filename)
     check_status(env, status)
 
 
@@ -3464,19 +3399,18 @@ def copyorder(env, lp, indices, priority, direction):
     check_status(env, status)
 
 
-def readcopyorder(env, lp, filename, enc=default_encoding):
-    status = CR.CPXXreadcopyorder(env, lp,
-                                  cpx_decode_noop3(filename, enc))
+def readcopyorder(env, lp, filename):
+    status = CR.CPXXreadcopyorder(env, lp, filename)
     check_status(env, status)
 
 
-def ordwrite(env, lp, filename, enc=default_encoding):
-    status = CR.CPXXordwrite(env, lp, cpx_decode_noop3(filename, enc))
+def ordwrite(env, lp, filename):
+    status = CR.CPXXordwrite(env, lp, filename)
     check_status(env, status)
 
 
-def readcopysol(env, lp, filename, enc=default_encoding):
-    status = CR.CPXXreadcopysol(env, lp, cpx_decode_noop3(filename, enc))
+def readcopysol(env, lp, filename):
+    status = CR.CPXXreadcopysol(env, lp, filename)
     check_status(env, status)
 
 # handle the lock for parallel callbacks
@@ -3850,7 +3784,7 @@ def gethist(env, lp, key):
         key = 'c'
         space = CR.CPXXgetnumrows(env, lp) + 1
     hist = _safeIntArray(space)
-    status = CR.CPXEgethist(env, lp, cpx_decode(key, default_encoding), hist)
+    status = CR.CPXEgethist(env, lp, key, hist)
     check_status(env, status)
     return LAU.array_to_list(hist, space)
 
@@ -3954,13 +3888,43 @@ def callbackgetrelaxationpoint(contextptr, begin, end):
     check_status(None, status)
     return LAU.array_to_list(x, xlen)
 
-
 def callbackgetrelaxationpointobj(contextptr):
     obj_p = CR.doublePtr()
     status = CR.CPXXcallbackgetrelaxationpoint(contextptr, None, 0, -1, obj_p)
     check_status(None, status)
     return obj_p.value()
 
+def callbackgetrelaxationstatus(contextptr, flags):
+    nodelpstat = CR.intPtr()
+    status = CR.CPXXcallbackgetrelaxationstatus(contextptr, nodelpstat, flags)
+    check_status(None, status)
+    return nodelpstat.value()
+
+def callbackmakebranch(contextptr, ind, lu, bd, rhs, sense, matbeg,
+                       matind, matval, nodeest):
+    seqnum = CR.cpxlongPtr()
+    with LAU.int_c_array(ind) as c_ind,\
+            LAU.double_c_array(bd) as c_bd, \
+            LAU.double_c_array(rhs) as c_rhs, \
+            LAU.long_c_array(matbeg) as c_matbeg, \
+            LAU.int_c_array(matind) as c_matind, \
+            LAU.double_c_array(matval) as c_matval:
+        status = CR.CPXXcallbackmakebranch(contextptr, len(ind),
+                                           c_ind, lu, c_bd,
+                                           len(matbeg), len(matind),
+                                           c_rhs, sense,
+                                           c_matbeg, c_matind, c_matval,
+                                           nodeest, seqnum)
+    check_status(None, status)
+    return seqnum.value()
+
+def callbackprunenode(contextptr):
+    status = CR.CPXXcallbackprunenode(contextptr)
+    check_status(None, status)
+
+def callbackexitcutloop(contextptr):
+    status = CR.CPXXcallbackexitcutloop(contextptr)
+    check_status(None, status)
 
 def callbackgetincumbent(contextptr, begin, end):
     xlen = _rangelen(begin, end)
@@ -4015,22 +3979,21 @@ def callbackpostheursoln(contextptr, cnt, ind, val, obj, strategy):
     check_status(None, status)
 
 
-def callbackaddusercuts(contextptr, rcnt, nzcnt, rhs, sense, rmat, cutmanagement, local,
-                        enc=default_encoding):
+def callbackaddusercuts(contextptr, rcnt, nzcnt, rhs, sense, rmat,
+                        cutmanagement, local):
     with LAU.double_c_array(rhs) as c_rhs, \
             LAU.int_c_array(cutmanagement) as c_cutmanagement, \
             LAU.int_c_array(local) as c_local:
         status = CR.CPXXcallbackaddusercuts(contextptr, rcnt, nzcnt, c_rhs,
-                                            cpx_decode(sense, enc), rmat,
+                                            sense, rmat,
                                             c_cutmanagement, c_local)
     check_status(None, status)
 
 
-def callbackrejectcandidate(contextptr, rcnt, nzcnt, rhs, sense, rmat,
-                            enc=default_encoding):
+def callbackrejectcandidate(contextptr, rcnt, nzcnt, rhs, sense, rmat):
     with LAU.double_c_array(rhs) as c_rhs:
         status = CR.CPXXcallbackrejectcandidate(contextptr, rcnt, nzcnt, c_rhs,
-                                                cpx_decode(sense, enc), rmat)
+                                                sense, rmat)
     check_status(None, status)
 
 # ########## Expert Callback END ##########################################

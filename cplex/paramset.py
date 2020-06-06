@@ -41,7 +41,7 @@ def _get_type(env, param):
         return _proc.getparamtype(env, param)
 
 
-class ParameterSet(object):
+class ParameterSet():
     """A parameter set object for use with multi-objective optimization.
 
     A parameter set consists of key-value pairs where the key is a CPLEX
@@ -100,7 +100,13 @@ class ParameterSet(object):
         if self._disposed:
             return
         self._disposed = True
-        _proc.paramsetfree(self._env._e, self._ps)
+        try:
+            _proc.paramsetfree(self._env._e, self._ps)
+        except ReferenceError:
+            # Ignore error raised if the reference env of our weakref
+            # has been garbage collected. If the env has already been
+            # closed, then the paramset has already been freed.
+            pass
         self._ps = None
 
     def __del__(self):
@@ -276,8 +282,7 @@ class ParameterSet(object):
         True
         """
         self._throw_if_disposed()
-        _proc.paramsetreadcopy(self._env._e, self._ps, filename,
-                              self._env._apienc)
+        _proc.paramsetreadcopy(self._env._e, self._ps, filename)
 
     def write(self, filename):
         """Writes a parameter file that contains the parameters in the
@@ -303,5 +308,4 @@ class ParameterSet(object):
         True
         """
         self._throw_if_disposed()
-        _proc.paramsetwrite(self._env._e, self._ps, filename,
-                            self._env._apienc)
+        _proc.paramsetwrite(self._env._e, self._ps, filename)

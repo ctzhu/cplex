@@ -1,379 +1,439 @@
 # --------------------------------------------------------------------------
-# Version 12.9.0
+# Version 12.10.0
 # --------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
 # Copyright IBM Corporation 2000, 2019. All Rights Reserved.
-# 
+#
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 # --------------------------------------------------------------------------
+# pylint: disable=line-too-long
+"""Parameter hierarchy for the CPLEX Python API.
+
 """
+from . import _parameters_auto as _auto
+from . import _parameter_classes as _cls
 
-
-"""
-
-from ._parameters_auto import *
-from ._parameter_classes import *
 
 def barrier_limits_members(env, parent):
-    return dict(_name = "limits",
-                help = lambda : "Limits for barrier optimization.",
-                corrections = NumParameter(env, BarrierLimitsCorrections, parent, 'corrections'),
-                growth = NumParameter(env, BarrierLimitsGrowth, parent, 'growth'),
-                iteration = NumParameter(env, BarrierLimitsIteration, parent, 'iteration'),
-                objrange = NumParameter(env, BarrierLimitsObjRange, parent, 'objrange'),
-                )
+    """Limits for barrier optimization."""
+    return dict(
+        _name="limits",
+        help=lambda: "Limits for barrier optimization.",
+        corrections=_cls.NumParameter(env, _auto.BarrierLimitsCorrections, parent, 'corrections'),
+        growth=_cls.NumParameter(env, _auto.BarrierLimitsGrowth, parent, 'growth'),
+        iteration=_cls.NumParameter(env, _auto.BarrierLimitsIteration, parent, 'iteration'),
+        objrange=_cls.NumParameter(env, _auto.BarrierLimitsObjRange, parent, 'objrange'),
+    )
 
 def barrier_members(env, parent):
-    return dict(_name = "barrier",
-                help = lambda : "Parameters for barrier optimization.",
-                algorithm = NumParameter(env, BarrierAlgorithm, parent, 'algorithm', bar_alg_constants),
-                colnonzeros = NumParameter(env, BarrierColNonzeros, parent, 'colnonzeros'),
-                convergetol = NumParameter(env, BarrierConvergeTol, parent, 'convergetol'),
-                crossover = NumParameter(env, BarrierCrossover, parent, 'crossover', crossover_constants),
-                display = NumParameter(env, BarrierDisplay, parent, 'display', display_constants),
-                limits = ParameterGroup(env, barrier_limits_members, parent),
-                ordering = NumParameter(env, BarrierOrdering, parent, 'ordering', bar_order_constants),
-                qcpconvergetol = NumParameter(env, BarrierQCPConvergeTol, parent, 'qcpconvergetol'),
-                startalg = NumParameter(env, BarrierStartAlg, parent, 'startalg', bar_start_alg_constants),
-                )
+    """Parameters for barrier optimization."""
+    return dict(
+        _name="barrier",
+        help=lambda: "Parameters for barrier optimization.",
+        algorithm=_cls.NumParameter(env, _auto.BarrierAlgorithm, parent, 'algorithm', _cls.bar_alg_constants),
+        colnonzeros=_cls.NumParameter(env, _auto.BarrierColNonzeros, parent, 'colnonzeros'),
+        convergetol=_cls.NumParameter(env, _auto.BarrierConvergeTol, parent, 'convergetol'),
+        crossover=_cls.NumParameter(env, _auto.BarrierCrossover, parent, 'crossover', _cls.crossover_constants),
+        display=_cls.NumParameter(env, _auto.BarrierDisplay, parent, 'display', _cls.display_constants),
+        limits=_cls.ParameterGroup(env, barrier_limits_members, parent),
+        ordering=_cls.NumParameter(env, _auto.BarrierOrdering, parent, 'ordering', _cls.bar_order_constants),
+        qcpconvergetol=_cls.NumParameter(env, _auto.BarrierQCPConvergeTol, parent, 'qcpconvergetol'),
+        startalg=_cls.NumParameter(env, _auto.BarrierStartAlg, parent, 'startalg', _cls.bar_start_alg_constants),
+    )
 
 def benders_tolerances_members(env, parent):
-    return dict(_name = "tolerances",
-                help = lambda : "Numerical tolerances for Benders cuts.",
-                feasibilitycut = NumParameter(env, BendersTolerancesfeasibilitycut, parent, 'feasibilitycut'),
-                optimalitycut = NumParameter(env, BendersTolerancesoptimalitycut, parent, 'optimalitycut'),
-                )
+    """Numerical tolerances for Benders cuts."""
+    return dict(
+        _name="tolerances",
+        help=lambda: "Numerical tolerances for Benders cuts.",
+        feasibilitycut=_cls.NumParameter(env, _auto.BendersTolerancesfeasibilitycut, parent, 'feasibilitycut'),
+        optimalitycut=_cls.NumParameter(env, _auto.BendersTolerancesoptimalitycut, parent, 'optimalitycut'),
+    )
 
 def benders_members(env, parent):
-    return dict(_name = "benders",
-                help = lambda : "Parameters for benders optimization.",
-                strategy = NumParameter(env, BendersStrategy, parent, 'strategy', benders_strategy_constants),
-                tolerances = ParameterGroup(env, benders_tolerances_members, parent),
-                workeralgorithm = NumParameter(env, BendersWorkerAlgorithm, parent, 'workeralgorithm', subalg_constants),
-                )
+    """Parameters for benders optimization."""
+    return dict(
+        _name="benders",
+        help=lambda: "Parameters for benders optimization.",
+        strategy=_cls.NumParameter(env, _auto.BendersStrategy, parent, 'strategy', _cls.benders_strategy_constants),
+        tolerances=_cls.ParameterGroup(env, benders_tolerances_members, parent),
+        workeralgorithm=_cls.NumParameter(env, _auto.BendersWorkerAlgorithm, parent, 'workeralgorithm', _cls.subalg_constants),
+    )
 
 def conflict_members(env, parent):
-    return dict(_name = "conflict",
-                help = lambda : "Parameters for finding conflicts.",
-                algorithm = NumParameter(env, ConflictAlgorithm, parent, 'algorithm', conflict_algorithm_constants),
-                display = NumParameter(env, ConflictDisplay, parent, 'display', display_constants),
-                )
+    """Parameters for finding conflicts."""
+    return dict(
+        _name="conflict",
+        help=lambda: "Parameters for finding conflicts.",
+        algorithm=_cls.NumParameter(env, _auto.ConflictAlgorithm, parent, 'algorithm', _cls.conflict_algorithm_constants),
+        display=_cls.NumParameter(env, _auto.ConflictDisplay, parent, 'display', _cls.display_constants),
+    )
 
 def distmip_rampup_members(env, parent):
-    return dict(_name = "rampup",
-                help = lambda : "Rampup related parameters in distributed MIP.",
-                dettimelimit = NumParameter(env, DistMIPRampupDetTimeLimit, parent, 'dettimelimit'),
-                duration = NumParameter(env, DistMIPRampupDuration, parent, 'duration', rampup_duration_constants),
-                timelimit = NumParameter(env, DistMIPRampupTimeLimit, parent, 'timelimit'),
-                )
+    """Rampup related parameters in distributed MIP."""
+    return dict(
+        _name="rampup",
+        help=lambda: "Rampup related parameters in distributed MIP.",
+        dettimelimit=_cls.NumParameter(env, _auto.DistMIPRampupDetTimeLimit, parent, 'dettimelimit'),
+        duration=_cls.NumParameter(env, _auto.DistMIPRampupDuration, parent, 'duration', _cls.rampup_duration_constants),
+        timelimit=_cls.NumParameter(env, _auto.DistMIPRampupTimeLimit, parent, 'timelimit'),
+    )
 
 def distmip_members(env, parent):
-    return dict(_name = "distmip",
-                help = lambda : "Distributed parallel mixed integer optimization.",
-                rampup = ParameterGroup(env, distmip_rampup_members, parent),
-                )
+    """Distributed parallel mixed integer optimization."""
+    return dict(
+        _name="distmip",
+        help=lambda: "Distributed parallel mixed integer optimization.",
+        rampup=_cls.ParameterGroup(env, distmip_rampup_members, parent),
+    )
 
 def emphasis_members(env, parent):
-    return dict(_name = "emphasis",
-                help = lambda : "Optimization emphasis.",
-                memory = NumParameter(env, EmphasisMemory, parent, 'memory', off_on_constants),
-                mip = NumParameter(env, EmphasisMIP, parent, 'mip', mip_emph_constants),
-                numerical = NumParameter(env, EmphasisNumerical, parent, 'numerical', off_on_constants),
-                )
+    """Optimization emphasis."""
+    return dict(
+        _name="emphasis",
+        help=lambda: "Optimization emphasis.",
+        memory=_cls.NumParameter(env, _auto.EmphasisMemory, parent, 'memory', _cls.off_on_constants),
+        mip=_cls.NumParameter(env, _auto.EmphasisMIP, parent, 'mip', _cls.mip_emph_constants),
+        numerical=_cls.NumParameter(env, _auto.EmphasisNumerical, parent, 'numerical', _cls.off_on_constants),
+    )
 
 def feasopt_members(env, parent):
-    return dict(_name = "feasopt",
-                help = lambda : "Parameters for feasopt.",
-                mode = NumParameter(env, FeasoptMode, parent, 'mode', feasopt_mode_constants),
-                tolerance = NumParameter(env, FeasoptTolerance, parent, 'tolerance'),
-                )
+    """Parameters for feasopt."""
+    return dict(
+        _name="feasopt",
+        help=lambda: "Parameters for feasopt.",
+        mode=_cls.NumParameter(env, _auto.FeasoptMode, parent, 'mode', _cls.feasopt_mode_constants),
+        tolerance=_cls.NumParameter(env, _auto.FeasoptTolerance, parent, 'tolerance'),
+    )
 
 def mip_cuts_members(env, parent):
-    return dict(_name = "cuts",
-                help = lambda : "Types of cuts used during mixed integer optimization.",
-                bqp = NumParameter(env, MIPCutsBQP, parent, 'bqp', v_agg_constants),
-                cliques = NumParameter(env, MIPCutsCliques, parent, 'cliques', v_agg_constants),
-                covers = NumParameter(env, MIPCutsCovers, parent, 'covers', v_agg_constants),
-                disjunctive = NumParameter(env, MIPCutsDisjunctive, parent, 'disjunctive', v_agg_constants),
-                flowcovers = NumParameter(env, MIPCutsFlowCovers, parent, 'flowcovers', agg_constants),
-                gomory = NumParameter(env, MIPCutsGomory, parent, 'gomory', agg_constants),
-                gubcovers = NumParameter(env, MIPCutsGUBCovers, parent, 'gubcovers', agg_constants),
-                implied = NumParameter(env, MIPCutsImplied, parent, 'implied', agg_constants),
-                liftproj = NumParameter(env, MIPCutsLiftProj, parent, 'liftproj', v_agg_constants),
-                localimplied = NumParameter(env, MIPCutsLocalImplied, parent, 'localimplied', v_agg_constants),
-                mcfcut = NumParameter(env, MIPCutsMCFCut, parent, 'mcfcut', agg_constants),
-                mircut = NumParameter(env, MIPCutsMIRCut, parent, 'mircut', agg_constants),
-                pathcut = NumParameter(env, MIPCutsPathCut, parent, 'pathcut', agg_constants),
-                rlt = NumParameter(env, MIPCutsRLT, parent, 'rlt', v_agg_constants),
-                zerohalfcut = NumParameter(env, MIPCutsZeroHalfCut, parent, 'zerohalfcut', agg_constants),
-                )
+    """Types of cuts used during mixed integer optimization."""
+    return dict(
+        _name="cuts",
+        help=lambda: "Types of cuts used during mixed integer optimization.",
+        bqp=_cls.NumParameter(env, _auto.MIPCutsBQP, parent, 'bqp', _cls.v_agg_constants),
+        cliques=_cls.NumParameter(env, _auto.MIPCutsCliques, parent, 'cliques', _cls.v_agg_constants),
+        covers=_cls.NumParameter(env, _auto.MIPCutsCovers, parent, 'covers', _cls.v_agg_constants),
+        disjunctive=_cls.NumParameter(env, _auto.MIPCutsDisjunctive, parent, 'disjunctive', _cls.v_agg_constants),
+        flowcovers=_cls.NumParameter(env, _auto.MIPCutsFlowCovers, parent, 'flowcovers', _cls.agg_constants),
+        gomory=_cls.NumParameter(env, _auto.MIPCutsGomory, parent, 'gomory', _cls.agg_constants),
+        gubcovers=_cls.NumParameter(env, _auto.MIPCutsGUBCovers, parent, 'gubcovers', _cls.agg_constants),
+        implied=_cls.NumParameter(env, _auto.MIPCutsImplied, parent, 'implied', _cls.agg_constants),
+        liftproj=_cls.NumParameter(env, _auto.MIPCutsLiftProj, parent, 'liftproj', _cls.v_agg_constants),
+        localimplied=_cls.NumParameter(env, _auto.MIPCutsLocalImplied, parent, 'localimplied', _cls.v_agg_constants),
+        mcfcut=_cls.NumParameter(env, _auto.MIPCutsMCFCut, parent, 'mcfcut', _cls.agg_constants),
+        mircut=_cls.NumParameter(env, _auto.MIPCutsMIRCut, parent, 'mircut', _cls.agg_constants),
+        pathcut=_cls.NumParameter(env, _auto.MIPCutsPathCut, parent, 'pathcut', _cls.agg_constants),
+        rlt=_cls.NumParameter(env, _auto.MIPCutsRLT, parent, 'rlt', _cls.v_agg_constants),
+        zerohalfcut=_cls.NumParameter(env, _auto.MIPCutsZeroHalfCut, parent, 'zerohalfcut', _cls.agg_constants),
+    )
 
 def mip_limits_members(env, parent):
-    return dict(_name = "limits",
-                help = lambda : "Limits for mixed integer optimization.",
-                aggforcut = NumParameter(env, MIPLimitsAggForCut, parent, 'aggforcut'),
-                auxrootthreads = NumParameter(env, MIPLimitsAuxRootThreads, parent, 'auxrootthreads'),
-                cutpasses = NumParameter(env, MIPLimitsCutPasses, parent, 'cutpasses'),
-                cutsfactor = NumParameter(env, MIPLimitsCutsFactor, parent, 'cutsfactor'),
-                eachcutlimit = NumParameter(env, MIPLimitsEachCutLimit, parent, 'eachcutlimit'),
-                gomorycand = NumParameter(env, MIPLimitsGomoryCand, parent, 'gomorycand'),
-                gomorypass = NumParameter(env, MIPLimitsGomoryPass, parent, 'gomorypass'),
-                nodes = NumParameter(env, MIPLimitsNodes, parent, 'nodes'),
-                polishtime = NumParameter(env, MIPLimitsPolishTime, parent, 'polishtime'),
-                populate = NumParameter(env, MIPLimitsPopulate, parent, 'populate'),
-                probedettime = NumParameter(env, MIPLimitsProbeDetTime, parent, 'probedettime'),
-                probetime = NumParameter(env, MIPLimitsProbeTime, parent, 'probetime'),
-                repairtries = NumParameter(env, MIPLimitsRepairTries, parent, 'repairtries'),
-                solutions = NumParameter(env, MIPLimitsSolutions, parent, 'solutions'),
-                strongcand = NumParameter(env, MIPLimitsStrongCand, parent, 'strongcand'),
-                strongit = NumParameter(env, MIPLimitsStrongIt, parent, 'strongit'),
-                treememory = NumParameter(env, MIPLimitsTreeMemory, parent, 'treememory'),
-                )
+    """Limits for mixed integer optimization."""
+    return dict(
+        _name="limits",
+        help=lambda: "Limits for mixed integer optimization.",
+        aggforcut=_cls.NumParameter(env, _auto.MIPLimitsAggForCut, parent, 'aggforcut'),
+        auxrootthreads=_cls.NumParameter(env, _auto.MIPLimitsAuxRootThreads, parent, 'auxrootthreads'),
+        cutpasses=_cls.NumParameter(env, _auto.MIPLimitsCutPasses, parent, 'cutpasses'),
+        cutsfactor=_cls.NumParameter(env, _auto.MIPLimitsCutsFactor, parent, 'cutsfactor'),
+        eachcutlimit=_cls.NumParameter(env, _auto.MIPLimitsEachCutLimit, parent, 'eachcutlimit'),
+        gomorycand=_cls.NumParameter(env, _auto.MIPLimitsGomoryCand, parent, 'gomorycand'),
+        gomorypass=_cls.NumParameter(env, _auto.MIPLimitsGomoryPass, parent, 'gomorypass'),
+        nodes=_cls.NumParameter(env, _auto.MIPLimitsNodes, parent, 'nodes'),
+        polishtime=_cls.NumParameter(env, _auto.MIPLimitsPolishTime, parent, 'polishtime'),
+        populate=_cls.NumParameter(env, _auto.MIPLimitsPopulate, parent, 'populate'),
+        probedettime=_cls.NumParameter(env, _auto.MIPLimitsProbeDetTime, parent, 'probedettime'),
+        probetime=_cls.NumParameter(env, _auto.MIPLimitsProbeTime, parent, 'probetime'),
+        repairtries=_cls.NumParameter(env, _auto.MIPLimitsRepairTries, parent, 'repairtries'),
+        solutions=_cls.NumParameter(env, _auto.MIPLimitsSolutions, parent, 'solutions'),
+        strongcand=_cls.NumParameter(env, _auto.MIPLimitsStrongCand, parent, 'strongcand'),
+        strongit=_cls.NumParameter(env, _auto.MIPLimitsStrongIt, parent, 'strongit'),
+        treememory=_cls.NumParameter(env, _auto.MIPLimitsTreeMemory, parent, 'treememory'),
+    )
 
 def mip_polishafter_members(env, parent):
-    return dict(_name = "polishafter",
-                help = lambda : "Starting conditions for solution polishing.",
-                absmipgap = NumParameter(env, MIPPolishAfterAbsMIPGap, parent, 'absmipgap'),
-                dettime = NumParameter(env, MIPPolishAfterDetTime, parent, 'dettime'),
-                mipgap = NumParameter(env, MIPPolishAfterMIPGap, parent, 'mipgap'),
-                nodes = NumParameter(env, MIPPolishAfterNodes, parent, 'nodes'),
-                solutions = NumParameter(env, MIPPolishAfterSolutions, parent, 'solutions'),
-                time = NumParameter(env, MIPPolishAfterTime, parent, 'time'),
-                )
+    """Starting conditions for solution polishing."""
+    return dict(
+        _name="polishafter",
+        help=lambda: "Starting conditions for solution polishing.",
+        absmipgap=_cls.NumParameter(env, _auto.MIPPolishAfterAbsMIPGap, parent, 'absmipgap'),
+        dettime=_cls.NumParameter(env, _auto.MIPPolishAfterDetTime, parent, 'dettime'),
+        mipgap=_cls.NumParameter(env, _auto.MIPPolishAfterMIPGap, parent, 'mipgap'),
+        nodes=_cls.NumParameter(env, _auto.MIPPolishAfterNodes, parent, 'nodes'),
+        solutions=_cls.NumParameter(env, _auto.MIPPolishAfterSolutions, parent, 'solutions'),
+        time=_cls.NumParameter(env, _auto.MIPPolishAfterTime, parent, 'time'),
+    )
 
 def mip_pool_members(env, parent):
-    return dict(_name = "pool",
-                help = lambda : "Solution pool characteristics.",
-                absgap = NumParameter(env, MIPPoolAbsGap, parent, 'absgap'),
-                capacity = NumParameter(env, MIPPoolCapacity, parent, 'capacity'),
-                intensity = NumParameter(env, MIPPoolIntensity, parent, 'intensity', v_agg_constants),
-                relgap = NumParameter(env, MIPPoolRelGap, parent, 'relgap'),
-                replace = NumParameter(env, MIPPoolReplace, parent, 'replace', replace_constants),
-                )
+    """Solution pool characteristics."""
+    return dict(
+        _name="pool",
+        help=lambda: "Solution pool characteristics.",
+        absgap=_cls.NumParameter(env, _auto.MIPPoolAbsGap, parent, 'absgap'),
+        capacity=_cls.NumParameter(env, _auto.MIPPoolCapacity, parent, 'capacity'),
+        intensity=_cls.NumParameter(env, _auto.MIPPoolIntensity, parent, 'intensity', _cls.v_agg_constants),
+        relgap=_cls.NumParameter(env, _auto.MIPPoolRelGap, parent, 'relgap'),
+        replace=_cls.NumParameter(env, _auto.MIPPoolReplace, parent, 'replace', _cls.replace_constants),
+    )
 
 def mip_strategy_members(env, parent):
-    return dict(_name = "strategy",
-                help = lambda : "Strategy for mixed integer optimization.",
-                backtrack = NumParameter(env, MIPStrategyBacktrack, parent, 'backtrack'),
-                bbinterval = NumParameter(env, MIPStrategyBBInterval, parent, 'bbinterval'),
-                branch = NumParameter(env, MIPStrategyBranch, parent, 'branch', brdir_constants),
-                dive = NumParameter(env, MIPStrategyDive, parent, 'dive', dive_constants),
-                file = NumParameter(env, MIPStrategyFile, parent, 'file', file_constants),
-                fpheur = NumParameter(env, MIPStrategyFPHeur, parent, 'fpheur', fpheur_constants),
-                heuristicfreq = NumParameter(env, MIPStrategyHeuristicFreq, parent, 'heuristicfreq'),
-                kappastats = NumParameter(env, MIPStrategyKappaStats, parent, 'kappastats', kappastats_constants),
-                lbheur = NumParameter(env, MIPStrategyLBHeur, parent, 'lbheur', off_on_constants),
-                miqcpstrat = NumParameter(env, MIPStrategyMIQCPStrat, parent, 'miqcpstrat', miqcp_constants),
-                nodeselect = NumParameter(env, MIPStrategyNodeSelect, parent, 'nodeselect', nodesel_constants),
-                order = NumParameter(env, MIPStrategyOrder, parent, 'order', off_on_constants),
-                presolvenode = NumParameter(env, MIPStrategyPresolveNode, parent, 'presolvenode', presolve_constants),
-                probe = NumParameter(env, MIPStrategyProbe, parent, 'probe', v_agg_constants),
-                rinsheur = NumParameter(env, MIPStrategyRINSHeur, parent, 'rinsheur'),
-                search = NumParameter(env, MIPStrategySearch, parent, 'search', search_constants),
-                startalgorithm = NumParameter(env, MIPStrategyStartAlgorithm, parent, 'startalgorithm', alg_constants),
-                subalgorithm = NumParameter(env, MIPStrategySubAlgorithm, parent, 'subalgorithm', subalg_constants),
-                variableselect = NumParameter(env, MIPStrategyVariableSelect, parent, 'variableselect', varsel_constants),
-                )
+    """Strategy for mixed integer optimization."""
+    return dict(
+        _name="strategy",
+        help=lambda: "Strategy for mixed integer optimization.",
+        backtrack=_cls.NumParameter(env, _auto.MIPStrategyBacktrack, parent, 'backtrack'),
+        bbinterval=_cls.NumParameter(env, _auto.MIPStrategyBBInterval, parent, 'bbinterval'),
+        branch=_cls.NumParameter(env, _auto.MIPStrategyBranch, parent, 'branch', _cls.brdir_constants),
+        dive=_cls.NumParameter(env, _auto.MIPStrategyDive, parent, 'dive', _cls.dive_constants),
+        file=_cls.NumParameter(env, _auto.MIPStrategyFile, parent, 'file', _cls.file_constants),
+        fpheur=_cls.NumParameter(env, _auto.MIPStrategyFPHeur, parent, 'fpheur', _cls.fpheur_constants),
+        heuristiceffort=_cls.NumParameter(env, _auto.MIPStrategyHeuristicEffort, parent, 'heuristiceffort'),
+        heuristicfreq=_cls.NumParameter(env, _auto.MIPStrategyHeuristicFreq, parent, 'heuristicfreq'),
+        kappastats=_cls.NumParameter(env, _auto.MIPStrategyKappaStats, parent, 'kappastats', _cls.kappastats_constants),
+        lbheur=_cls.NumParameter(env, _auto.MIPStrategyLBHeur, parent, 'lbheur', _cls.off_on_constants),
+        miqcpstrat=_cls.NumParameter(env, _auto.MIPStrategyMIQCPStrat, parent, 'miqcpstrat', _cls.miqcp_constants),
+        nodeselect=_cls.NumParameter(env, _auto.MIPStrategyNodeSelect, parent, 'nodeselect', _cls.nodesel_constants),
+        order=_cls.NumParameter(env, _auto.MIPStrategyOrder, parent, 'order', _cls.off_on_constants),
+        presolvenode=_cls.NumParameter(env, _auto.MIPStrategyPresolveNode, parent, 'presolvenode', _cls.presolve_constants),
+        probe=_cls.NumParameter(env, _auto.MIPStrategyProbe, parent, 'probe', _cls.v_agg_constants),
+        rinsheur=_cls.NumParameter(env, _auto.MIPStrategyRINSHeur, parent, 'rinsheur'),
+        search=_cls.NumParameter(env, _auto.MIPStrategySearch, parent, 'search', _cls.search_constants),
+        startalgorithm=_cls.NumParameter(env, _auto.MIPStrategyStartAlgorithm, parent, 'startalgorithm', _cls.alg_constants),
+        subalgorithm=_cls.NumParameter(env, _auto.MIPStrategySubAlgorithm, parent, 'subalgorithm', _cls.subalg_constants),
+        variableselect=_cls.NumParameter(env, _auto.MIPStrategyVariableSelect, parent, 'variableselect', _cls.varsel_constants),
+    )
 
 def mip_submip_members(env, parent):
-    return dict(_name = "submip",
-                help = lambda : "Parameters used when solving sub-MIPs.",
-                startalg = NumParameter(env, MIPSubMIPStartAlg, parent, 'startalg', subalg_constants),
-                subalg = NumParameter(env, MIPSubMIPSubAlg, parent, 'subalg', subalg_constants),
-                nodelimit = NumParameter(env, MIPSubMIPNodeLimit, parent, 'nodelimit'),
-                scale = NumParameter(env, MIPSubMIPScale, parent, 'scale', scale_constants),
-                )
+    """Parameters used when solving sub-MIPs."""
+    return dict(
+        _name="submip",
+        help=lambda: "Parameters used when solving sub-MIPs.",
+        startalg=_cls.NumParameter(env, _auto.MIPSubMIPStartAlg, parent, 'startalg', _cls.subalg_constants),
+        subalg=_cls.NumParameter(env, _auto.MIPSubMIPSubAlg, parent, 'subalg', _cls.subalg_constants),
+        nodelimit=_cls.NumParameter(env, _auto.MIPSubMIPNodeLimit, parent, 'nodelimit'),
+        scale=_cls.NumParameter(env, _auto.MIPSubMIPScale, parent, 'scale', _cls.scale_constants),
+    )
 
 def mip_tolerances_members(env, parent):
-    return dict(_name = "tolerances",
-                help = lambda : "Tolerances for mixed integer optimization.",
-                absmipgap = NumParameter(env, MIPTolerancesAbsMIPGap, parent, 'absmipgap'),
-                integrality = NumParameter(env, MIPTolerancesIntegrality, parent, 'integrality'),
-                lowercutoff = NumParameter(env, MIPTolerancesLowerCutoff, parent, 'lowercutoff'),
-                mipgap = NumParameter(env, MIPTolerancesMIPGap, parent, 'mipgap'),
-                objdifference = NumParameter(env, MIPTolerancesObjDifference, parent, 'objdifference'),
-                relobjdifference = NumParameter(env, MIPTolerancesRelObjDifference, parent, 'relobjdifference'),
-                uppercutoff = NumParameter(env, MIPTolerancesUpperCutoff, parent, 'uppercutoff'),
-                )
+    """Tolerances for mixed integer optimization."""
+    return dict(
+        _name="tolerances",
+        help=lambda: "Tolerances for mixed integer optimization.",
+        absmipgap=_cls.NumParameter(env, _auto.MIPTolerancesAbsMIPGap, parent, 'absmipgap'),
+        linearization=_cls.NumParameter(env, _auto.MIPTolerancesLinearization, parent, 'linearization'),
+        integrality=_cls.NumParameter(env, _auto.MIPTolerancesIntegrality, parent, 'integrality'),
+        lowercutoff=_cls.NumParameter(env, _auto.MIPTolerancesLowerCutoff, parent, 'lowercutoff'),
+        mipgap=_cls.NumParameter(env, _auto.MIPTolerancesMIPGap, parent, 'mipgap'),
+        objdifference=_cls.NumParameter(env, _auto.MIPTolerancesObjDifference, parent, 'objdifference'),
+        relobjdifference=_cls.NumParameter(env, _auto.MIPTolerancesRelObjDifference, parent, 'relobjdifference'),
+        uppercutoff=_cls.NumParameter(env, _auto.MIPTolerancesUpperCutoff, parent, 'uppercutoff'),
+    )
 
 def mip_members(env, parent):
-    return dict(_name = "mip",
-                help = lambda : "Parameters for mixed integer optimization.",
-                cuts = ParameterGroup(env, mip_cuts_members, parent),
-                display = NumParameter(env, MIPDisplay, parent, 'display', mip_display_constants),
-                interval = NumParameter(env, MIPInterval, parent, 'interval'),
-                limits = ParameterGroup(env, mip_limits_members, parent),
-                ordertype = NumParameter(env, MIPOrderType, parent, 'ordertype', ordertype_constants),
-                polishafter = ParameterGroup(env, mip_polishafter_members, parent),
-                pool = ParameterGroup(env, mip_pool_members, parent),
-                strategy = ParameterGroup(env, mip_strategy_members, parent),
-                submip = ParameterGroup(env, mip_submip_members, parent),
-                tolerances = ParameterGroup(env, mip_tolerances_members, parent),
-                )
+    """Parameters for mixed integer optimization."""
+    return dict(
+        _name="mip",
+        help=lambda: "Parameters for mixed integer optimization.",
+        cuts=_cls.ParameterGroup(env, mip_cuts_members, parent),
+        display=_cls.NumParameter(env, _auto.MIPDisplay, parent, 'display', _cls.mip_display_constants),
+        interval=_cls.NumParameter(env, _auto.MIPInterval, parent, 'interval'),
+        limits=_cls.ParameterGroup(env, mip_limits_members, parent),
+        ordertype=_cls.NumParameter(env, _auto.MIPOrderType, parent, 'ordertype', _cls.ordertype_constants),
+        polishafter=_cls.ParameterGroup(env, mip_polishafter_members, parent),
+        pool=_cls.ParameterGroup(env, mip_pool_members, parent),
+        strategy=_cls.ParameterGroup(env, mip_strategy_members, parent),
+        submip=_cls.ParameterGroup(env, mip_submip_members, parent),
+        tolerances=_cls.ParameterGroup(env, mip_tolerances_members, parent),
+    )
 
 def multiobjective_members(env, parent):
-    return dict(_name = "multiobjective",
-                help = lambda : "Parameters for multi-objective optimization.",
-                display = NumParameter(env, MultiObjectiveDisplay, parent, 'display', display_constants),
-                )
+    """Parameters for multi-objective optimization."""
+    return dict(
+        _name="multiobjective",
+        help=lambda: "Parameters for multi-objective optimization.",
+        display=_cls.NumParameter(env, _auto.MultiObjectiveDisplay, parent, 'display', _cls.display_constants),
+    )
 
 def network_tolerances_members(env, parent):
-    return dict(_name = "tolerances",
-                help = lambda : "Numerical tolerances for network simplex optimization.",
-                feasibility = NumParameter(env, NetworkTolerancesFeasibility, parent, 'feasibility'),
-                optimality = NumParameter(env, NetworkTolerancesOptimality, parent, 'optimality'),
-                )
+    """Numerical tolerances for network simplex optimization."""
+    return dict(
+        _name="tolerances",
+        help=lambda: "Numerical tolerances for network simplex optimization.",
+        feasibility=_cls.NumParameter(env, _auto.NetworkTolerancesFeasibility, parent, 'feasibility'),
+        optimality=_cls.NumParameter(env, _auto.NetworkTolerancesOptimality, parent, 'optimality'),
+    )
 
 def network_members(env, parent):
-    return dict(_name = "network",
-                help = lambda : "Parameters for network optimizations.",
-                display = NumParameter(env, NetworkDisplay, parent, 'display', network_display_constants),
-                iterations = NumParameter(env, NetworkIterations, parent, 'iterations'),
-                netfind = NumParameter(env, NetworkNetFind, parent, 'netfind', network_netfind_constants),
-                pricing = NumParameter(env, NetworkPricing, parent, 'pricing', network_pricing_constants),
-                tolerances = ParameterGroup(env, network_tolerances_members, parent),
-                )
+    """Parameters for network optimizations."""
+    return dict(
+        _name="network",
+        help=lambda: "Parameters for network optimizations.",
+        display=_cls.NumParameter(env, _auto.NetworkDisplay, parent, 'display', _cls.network_display_constants),
+        iterations=_cls.NumParameter(env, _auto.NetworkIterations, parent, 'iterations'),
+        netfind=_cls.NumParameter(env, _auto.NetworkNetFind, parent, 'netfind', _cls.network_netfind_constants),
+        pricing=_cls.NumParameter(env, _auto.NetworkPricing, parent, 'pricing', _cls.network_pricing_constants),
+        tolerances=_cls.ParameterGroup(env, network_tolerances_members, parent),
+    )
 
 def output_members(env, parent):
-    return dict(_name = "output",
-                help = lambda : "Extent and destinations of outputs.",
-                clonelog = NumParameter(env, OutputCloneLog, parent, 'clonelog', off_on_constants),
-                intsolfileprefix = StrParameter(env, OutputIntSolFilePrefix, parent, 'intsolfileprefix'),
-                mpslong = NumParameter(env, OutputMPSLong, parent, 'mpslong', off_on_constants),
-                writelevel = NumParameter(env, OutputWriteLevel, parent, 'writelevel', writelevel_constants),
-                )
+    """Extent and destinations of outputs."""
+    return dict(
+        _name="output",
+        help=lambda: "Extent and destinations of outputs.",
+        clonelog=_cls.NumParameter(env, _auto.OutputCloneLog, parent, 'clonelog', _cls.off_on_constants),
+        intsolfileprefix=_cls.StrParameter(env, _auto.OutputIntSolFilePrefix, parent, 'intsolfileprefix'),
+        mpslong=_cls.NumParameter(env, _auto.OutputMPSLong, parent, 'mpslong', _cls.off_on_constants),
+        writelevel=_cls.NumParameter(env, _auto.OutputWriteLevel, parent, 'writelevel', _cls.writelevel_constants),
+    )
 
 def preprocessing_members(env, parent):
-    return dict(_name = "preprocessing",
-                help = lambda : "Parameters for preprocessing.",
-                aggregator = NumParameter(env, PreprocessingAggregator, parent, 'aggregator'),
-                boundstrength = NumParameter(env, PreprocessingBoundStrength, parent, 'boundstrength', auto_off_on_constants),
-                coeffreduce = NumParameter(env, PreprocessingCoeffReduce, parent, 'coeffreduce', coeffreduce_constants),
-                dependency = NumParameter(env, PreprocessingDependency, parent, 'dependency', dependency_constants),
-                dual = NumParameter(env, PreprocessingDual, parent, 'dual', dual_constants),
-                fill = NumParameter(env, PreprocessingFill, parent, 'fill'),
-                folding = NumParameter(env, PreprocessingFolding, parent, 'folding'),
-                linear = NumParameter(env, PreprocessingLinear, parent, 'linear', linear_constants),
-                numpass = NumParameter(env, PreprocessingNumPass, parent, 'numpass'),
-                presolve = NumParameter(env, PreprocessingPresolve, parent, 'presolve', off_on_constants),
-                qcpduals = NumParameter(env, PreprocessingQCPDuals, parent, 'qcpduals', qcpduals_constants),
-                qpmakepsd = NumParameter(env, PreprocessingQPMakePSD, parent, 'qpmakepsd', off_on_constants),
-                qtolin = NumParameter(env, PreprocessingQToLin, parent, 'qtolin', auto_off_on_constants),
-                reduce = NumParameter(env, PreprocessingReduce, parent, 'reduce', prered_constants),
-                relax = NumParameter(env, PreprocessingRelax, parent, 'relax', auto_off_on_constants),
-                repeatpresolve = NumParameter(env, PreprocessingRepeatPresolve, parent, 'repeatpresolve', repeatpre_constants),
-                symmetry = NumParameter(env, PreprocessingSymmetry, parent, 'symmetry', sym_constants),
-                )
+    """Parameters for preprocessing."""
+    return dict(
+        _name="preprocessing",
+        help=lambda: "Parameters for preprocessing.",
+        aggregator=_cls.NumParameter(env, _auto.PreprocessingAggregator, parent, 'aggregator'),
+        boundstrength=_cls.NumParameter(env, _auto.PreprocessingBoundStrength, parent, 'boundstrength', _cls.auto_off_on_constants),
+        coeffreduce=_cls.NumParameter(env, _auto.PreprocessingCoeffReduce, parent, 'coeffreduce', _cls.coeffreduce_constants),
+        dependency=_cls.NumParameter(env, _auto.PreprocessingDependency, parent, 'dependency', _cls.dependency_constants),
+        dual=_cls.NumParameter(env, _auto.PreprocessingDual, parent, 'dual', _cls.dual_constants),
+        fill=_cls.NumParameter(env, _auto.PreprocessingFill, parent, 'fill'),
+        folding=_cls.NumParameter(env, _auto.PreprocessingFolding, parent, 'folding'),
+        linear=_cls.NumParameter(env, _auto.PreprocessingLinear, parent, 'linear', _cls.linear_constants),
+        numpass=_cls.NumParameter(env, _auto.PreprocessingNumPass, parent, 'numpass'),
+        presolve=_cls.NumParameter(env, _auto.PreprocessingPresolve, parent, 'presolve', _cls.off_on_constants),
+        qcpduals=_cls.NumParameter(env, _auto.PreprocessingQCPDuals, parent, 'qcpduals', _cls.qcpduals_constants),
+        qpmakepsd=_cls.NumParameter(env, _auto.PreprocessingQPMakePSD, parent, 'qpmakepsd', _cls.off_on_constants),
+        qtolin=_cls.NumParameter(env, _auto.PreprocessingQToLin, parent, 'qtolin', _cls.auto_off_on_constants),
+        reduce=_cls.NumParameter(env, _auto.PreprocessingReduce, parent, 'reduce', _cls.prered_constants),
+        relax=_cls.NumParameter(env, _auto.PreprocessingRelax, parent, 'relax', _cls.auto_off_on_constants),
+        repeatpresolve=_cls.NumParameter(env, _auto.PreprocessingRepeatPresolve, parent, 'repeatpresolve', _cls.repeatpre_constants),
+        symmetry=_cls.NumParameter(env, _auto.PreprocessingSymmetry, parent, 'symmetry', _cls.sym_constants),
+    )
 
 def read_members(env, parent):
-    return dict(_name = "read",
-                help = lambda : "Problem read parameters.",
-                apiencoding = StrParameter(env, ReadAPIEncoding, parent, 'apiencoding'),
-                constraints = NumParameter(env, ReadConstraints, parent, 'constraints'),
-                datacheck = NumParameter(env, ReadDataCheck, parent, 'datacheck', datacheck_constants),
-                fileencoding = StrParameter(env, ReadFileEncoding, parent, 'fileencoding'),
-                nonzeros = NumParameter(env, ReadNonzeros, parent, 'nonzeros'),
-                qpnonzeros = NumParameter(env, ReadQPNonzeros, parent, 'qpnonzeros'),
-                scale = NumParameter(env, ReadScale, parent, 'scale', scale_constants),
-                variables = NumParameter(env, ReadVariables, parent, 'variables'),
-                warninglimit = NumParameter(env, ReadWarningLimit, parent, 'warninglimit'),
-                )
+    """Problem read parameters."""
+    return dict(
+        _name="read",
+        help=lambda: "Problem read parameters.",
+        constraints=_cls.NumParameter(env, _auto.ReadConstraints, parent, 'constraints'),
+        datacheck=_cls.NumParameter(env, _auto.ReadDataCheck, parent, 'datacheck', _cls.datacheck_constants),
+        fileencoding=_cls.StrParameter(env, _auto.ReadFileEncoding, parent, 'fileencoding'),
+        nonzeros=_cls.NumParameter(env, _auto.ReadNonzeros, parent, 'nonzeros'),
+        qpnonzeros=_cls.NumParameter(env, _auto.ReadQPNonzeros, parent, 'qpnonzeros'),
+        scale=_cls.NumParameter(env, _auto.ReadScale, parent, 'scale', _cls.scale_constants),
+        variables=_cls.NumParameter(env, _auto.ReadVariables, parent, 'variables'),
+        warninglimit=_cls.NumParameter(env, _auto.ReadWarningLimit, parent, 'warninglimit'),
+    )
 
 def sifting_members(env, parent):
-    return dict(_name = "sifting",
-                help = lambda : "Parameters for sifting optimization.",
-                algorithm = NumParameter(env, SiftingAlgorithm, parent, 'algorithm', sift_alg_constants),
-                simplex = NumParameter(env, SiftingSimplex, parent, 'simplex', off_on_constants),
-                display = NumParameter(env, SiftingDisplay, parent, 'display', display_constants),
-                iterations = NumParameter(env, SiftingIterations, parent, 'iterations'),
-                )
+    """Parameters for sifting optimization."""
+    return dict(
+        _name="sifting",
+        help=lambda: "Parameters for sifting optimization.",
+        algorithm=_cls.NumParameter(env, _auto.SiftingAlgorithm, parent, 'algorithm', _cls.sift_alg_constants),
+        simplex=_cls.NumParameter(env, _auto.SiftingSimplex, parent, 'simplex', _cls.off_on_constants),
+        display=_cls.NumParameter(env, _auto.SiftingDisplay, parent, 'display', _cls.display_constants),
+        iterations=_cls.NumParameter(env, _auto.SiftingIterations, parent, 'iterations'),
+    )
 
 def simplex_limits_members(env, parent):
-    return dict(_name = "limits",
-                help = lambda : "Limits for simplex optimization.",
-                iterations = NumParameter(env, SimplexLimitsIterations, parent, 'iterations'),
-                lowerobj = NumParameter(env, SimplexLimitsLowerObj, parent, 'lowerobj'),
-                perturbation = NumParameter(env, SimplexLimitsPerturbation, parent, 'perturbation'),
-                singularity = NumParameter(env, SimplexLimitsSingularity, parent, 'singularity'),
-                upperobj = NumParameter(env, SimplexLimitsUpperObj, parent, 'upperobj'),
-                )
+    """Limits for simplex optimization."""
+    return dict(
+        _name="limits",
+        help=lambda: "Limits for simplex optimization.",
+        iterations=_cls.NumParameter(env, _auto.SimplexLimitsIterations, parent, 'iterations'),
+        lowerobj=_cls.NumParameter(env, _auto.SimplexLimitsLowerObj, parent, 'lowerobj'),
+        perturbation=_cls.NumParameter(env, _auto.SimplexLimitsPerturbation, parent, 'perturbation'),
+        singularity=_cls.NumParameter(env, _auto.SimplexLimitsSingularity, parent, 'singularity'),
+        upperobj=_cls.NumParameter(env, _auto.SimplexLimitsUpperObj, parent, 'upperobj'),
+    )
 
 def simplex_perturbation_members(env, parent):
-    return dict(_name = "perturbation",
-                help = lambda : "Perturbation controls.",
-                constant = NumParameter(env, SimplexPerturbationConstant, parent, 'constant'),
-                indicator = NumParameter(env, SimplexPerturbationIndicator, parent, 'indicator', off_on_constants),
-                )
+    """Perturbation controls."""
+    return dict(
+        _name="perturbation",
+        help=lambda: "Perturbation controls.",
+        constant=_cls.NumParameter(env, _auto.SimplexPerturbationConstant, parent, 'constant'),
+        indicator=_cls.NumParameter(env, _auto.SimplexPerturbationIndicator, parent, 'indicator', _cls.off_on_constants),
+    )
 
 def simplex_tolerances_members(env, parent):
-    return dict(_name = "tolerances",
-                help = lambda : "Numerical tolerances for simplex optimization.",
-                feasibility = NumParameter(env, SimplexTolerancesFeasibility, parent, 'feasibility'),
-                markowitz = NumParameter(env, SimplexTolerancesMarkowitz, parent, 'markowitz'),
-                optimality = NumParameter(env, SimplexTolerancesOptimality, parent, 'optimality'),
-                )
+    """Numerical tolerances for simplex optimization."""
+    return dict(
+        _name="tolerances",
+        help=lambda: "Numerical tolerances for simplex optimization.",
+        feasibility=_cls.NumParameter(env, _auto.SimplexTolerancesFeasibility, parent, 'feasibility'),
+        markowitz=_cls.NumParameter(env, _auto.SimplexTolerancesMarkowitz, parent, 'markowitz'),
+        optimality=_cls.NumParameter(env, _auto.SimplexTolerancesOptimality, parent, 'optimality'),
+    )
 
 def simplex_members(env, parent):
-    return dict(_name = "simplex",
-                help = lambda : "Parameters for primal and dual simplex optimizations.",
-                crash = NumParameter(env, SimplexCrash, parent, 'crash'),
-                dgradient = NumParameter(env, SimplexDGradient, parent, 'dgradient', dual_pricing_constants),
-                display = NumParameter(env, SimplexDisplay, parent, 'display', display_constants),
-                dynamicrows = NumParameter(env, SimplexDynamicRows, parent, 'dynamicrows'),
-                limits = ParameterGroup(env, simplex_limits_members, parent),
-                perturbation = ParameterGroup(env, simplex_perturbation_members, parent),
-                pgradient = NumParameter(env, SimplexPGradient, parent, 'pgradient', primal_pricing_constants),
-                pricing = NumParameter(env, SimplexPricing, parent, 'pricing'),
-                refactor = NumParameter(env, SimplexRefactor, parent, 'refactor'),
-                tolerances = ParameterGroup(env, simplex_tolerances_members, parent),
-                )
+    """Parameters for primal and dual simplex optimizations."""
+    return dict(
+        _name="simplex",
+        help=lambda: "Parameters for primal and dual simplex optimizations.",
+        crash=_cls.NumParameter(env, _auto.SimplexCrash, parent, 'crash'),
+        dgradient=_cls.NumParameter(env, _auto.SimplexDGradient, parent, 'dgradient', _cls.dual_pricing_constants),
+        display=_cls.NumParameter(env, _auto.SimplexDisplay, parent, 'display', _cls.display_constants),
+        dynamicrows=_cls.NumParameter(env, _auto.SimplexDynamicRows, parent, 'dynamicrows'),
+        limits=_cls.ParameterGroup(env, simplex_limits_members, parent),
+        perturbation=_cls.ParameterGroup(env, simplex_perturbation_members, parent),
+        pgradient=_cls.NumParameter(env, _auto.SimplexPGradient, parent, 'pgradient', _cls.primal_pricing_constants),
+        pricing=_cls.NumParameter(env, _auto.SimplexPricing, parent, 'pricing'),
+        refactor=_cls.NumParameter(env, _auto.SimplexRefactor, parent, 'refactor'),
+        tolerances=_cls.ParameterGroup(env, simplex_tolerances_members, parent),
+    )
 
 def tune_members(env, parent):
-    return dict(_name = "tune",
-                help = lambda : "Parameters for parameter tuning.",
-                dettimelimit = NumParameter(env, TuneDetTimeLimit, parent, 'dettimelimit'),
-                display = NumParameter(env, TuneDisplay, parent, 'display', tune_display_constants),
-                measure = NumParameter(env, TuneMeasure, parent, 'measure', measure_constants),
-                repeat = NumParameter(env, TuneRepeat, parent, 'repeat'),
-                timelimit = NumParameter(env, TuneTimeLimit, parent, 'timelimit'),
-                )
+    """Parameters for parameter tuning."""
+    return dict(
+        _name="tune",
+        help=lambda: "Parameters for parameter tuning.",
+        dettimelimit=_cls.NumParameter(env, _auto.TuneDetTimeLimit, parent, 'dettimelimit'),
+        display=_cls.NumParameter(env, _auto.TuneDisplay, parent, 'display', _cls.tune_display_constants),
+        measure=_cls.NumParameter(env, _auto.TuneMeasure, parent, 'measure', _cls.measure_constants),
+        repeat=_cls.NumParameter(env, _auto.TuneRepeat, parent, 'repeat'),
+        timelimit=_cls.NumParameter(env, _auto.TuneTimeLimit, parent, 'timelimit'),
+    )
 
 def root_members(env, parent):
-    return dict(_name = "parameters",
-                help = lambda : "CPLEX parameter hierarchy.",
-                advance = NumParameter(env, setAdvance, parent, 'advance', advance_constants),
-                barrier = ParameterGroup(env, barrier_members, parent),
-                benders = ParameterGroup(env, benders_members, parent),
-                clocktype = NumParameter(env, setClockType, parent, 'clocktype', clocktype_constants),
-                conflict = ParameterGroup(env, conflict_members, parent),
-                cpumask = StrParameter(env, setCPUmask, parent, 'cpumask'),
-                dettimelimit = NumParameter(env, setDetTimeLimit, parent, 'dettimelimit'),
-                distmip = ParameterGroup(env, distmip_members, parent),
-                emphasis = ParameterGroup(env, emphasis_members, parent),
-                feasopt = ParameterGroup(env, feasopt_members, parent),
-                lpmethod = NumParameter(env, setLPMethod, parent, 'lpmethod', alg_constants),
-                mip = ParameterGroup(env, mip_members, parent),
-                multiobjective = ParameterGroup(env, multiobjective_members, parent),
-                network = ParameterGroup(env, network_members, parent),
-                optimalitytarget = NumParameter(env, setOptimalityTarget, parent, 'optimalitytarget', optimalitytarget_constants),
-                output = ParameterGroup(env, output_members, parent),
-                parallel = NumParameter(env, setParallel, parent, 'parallel', par_constants),
-                paramdisplay = NumParameter(env, setParamDisplay, parent, 'paramdisplay', off_on_constants),
-                preprocessing = ParameterGroup(env, preprocessing_members, parent),
-                qpmethod = NumParameter(env, setQPMethod, parent, 'qpmethod', qp_alg_constants),
-                randomseed = NumParameter(env, setRandomSeed, parent, 'randomseed'),
-                read = ParameterGroup(env, read_members, parent),
-                record = NumParameter(env, setRecord, parent, 'record', off_on_constants),
-                sifting = ParameterGroup(env, sifting_members, parent),
-                simplex = ParameterGroup(env, simplex_members, parent),
-                solutiontype = NumParameter(env, setSolutionType, parent, 'solutiontype', solutiontype_constants),
-                threads = NumParameter(env, setThreads, parent, 'threads'),
-                timelimit = NumParameter(env, setTimeLimit, parent, 'timelimit'),
-                tune = ParameterGroup(env, tune_members, parent),
-                workdir = StrParameter(env, setWorkDir, parent, 'workdir'),
-                workmem = NumParameter(env, setWorkMem, parent, 'workmem'),
-                )
-
+    """CPLEX parameter hierarchy."""
+    return dict(
+        _name="parameters",
+        help=lambda: "CPLEX parameter hierarchy.",
+        advance=_cls.NumParameter(env, _auto.setAdvance, parent, 'advance', _cls.advance_constants),
+        barrier=_cls.ParameterGroup(env, barrier_members, parent),
+        benders=_cls.ParameterGroup(env, benders_members, parent),
+        clocktype=_cls.NumParameter(env, _auto.setClockType, parent, 'clocktype', _cls.clocktype_constants),
+        conflict=_cls.ParameterGroup(env, conflict_members, parent),
+        cpumask=_cls.StrParameter(env, _auto.setCPUmask, parent, 'cpumask'),
+        dettimelimit=_cls.NumParameter(env, _auto.setDetTimeLimit, parent, 'dettimelimit'),
+        distmip=_cls.ParameterGroup(env, distmip_members, parent),
+        emphasis=_cls.ParameterGroup(env, emphasis_members, parent),
+        feasopt=_cls.ParameterGroup(env, feasopt_members, parent),
+        lpmethod=_cls.NumParameter(env, _auto.setLPMethod, parent, 'lpmethod', _cls.alg_constants),
+        mip=_cls.ParameterGroup(env, mip_members, parent),
+        multiobjective=_cls.ParameterGroup(env, multiobjective_members, parent),
+        network=_cls.ParameterGroup(env, network_members, parent),
+        optimalitytarget=_cls.NumParameter(env, _auto.setOptimalityTarget, parent, 'optimalitytarget', _cls.optimalitytarget_constants),
+        output=_cls.ParameterGroup(env, output_members, parent),
+        parallel=_cls.NumParameter(env, _auto.setParallel, parent, 'parallel', _cls.par_constants),
+        paramdisplay=_cls.NumParameter(env, _auto.setParamDisplay, parent, 'paramdisplay', _cls.off_on_constants),
+        preprocessing=_cls.ParameterGroup(env, preprocessing_members, parent),
+        qpmethod=_cls.NumParameter(env, _auto.setQPMethod, parent, 'qpmethod', _cls.qp_alg_constants),
+        randomseed=_cls.NumParameter(env, _auto.setRandomSeed, parent, 'randomseed'),
+        read=_cls.ParameterGroup(env, read_members, parent),
+        record=_cls.NumParameter(env, _auto.setRecord, parent, 'record', _cls.off_on_constants),
+        sifting=_cls.ParameterGroup(env, sifting_members, parent),
+        simplex=_cls.ParameterGroup(env, simplex_members, parent),
+        solutiontype=_cls.NumParameter(env, _auto.setSolutionType, parent, 'solutiontype', _cls.solutiontype_constants),
+        threads=_cls.NumParameter(env, _auto.setThreads, parent, 'threads'),
+        timelimit=_cls.NumParameter(env, _auto.setTimeLimit, parent, 'timelimit'),
+        tune=_cls.ParameterGroup(env, tune_members, parent),
+        workdir=_cls.StrParameter(env, _auto.setWorkDir, parent, 'workdir'),
+        workmem=_cls.NumParameter(env, _auto.setWorkMem, parent, 'workmem'),
+    )

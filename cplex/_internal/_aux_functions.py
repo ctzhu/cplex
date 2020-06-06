@@ -9,25 +9,23 @@
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 # ------------------------------------------------------------------------
-"""
-
-
-"""
+"""Internal auxiliary functions."""
 try:
-    import collections.abc as collections_abc # For Python >= 3.3
+    import collections.abc as collections_abc  # For Python >= 3.3
 except ImportError:
     import collections as collections_abc
 import functools
 import inspect
 import itertools
+import os
 import warnings
 
 from ..exceptions import CplexError, WrongNumberOfArgumentsError
-from .. import six
-from ..six.moves import (map, zip, range)
+
+CPLEX_PY_DISABLE_NAME_CONV = os.getenv("CPLEX_PY_DISABLE_NAME_CONV")
 
 
-class deprecated(object):
+class deprecated():
     """A decorator that marks methods/functions as deprecated."""
 
     def __init__(self, version):
@@ -83,7 +81,7 @@ if __debug__:
 
     # With non-optimzied bytecode, validate_arg_lengths actually does
     # something.
-    def validate_arg_lengths(arg_list, allow_empty=True):
+    def validate_arg_lengths(arg_list, allow_empty=True, extra_msg=""):
         """Checks for equivalent argument lengths.
 
         If allow_empty is True (the default), then empty arguments are not
@@ -93,18 +91,25 @@ if __debug__:
         arg_lengths = [len(x) for x in arg_list]
         if allow_empty:
             arg_lengths = [x for x in arg_lengths if x > 0]
-        if len(arg_lengths) == 0:
+        if not arg_lengths:
             return
         max_length = max(arg_lengths)
         for arg_length in arg_lengths:
-            if (arg_length != max_length):
-                raise CplexError("inconsistent arguments")
+            if arg_length != max_length:
+                raise CplexError("inconsistent arguments" + extra_msg)
 
 else:
 
-    # A no-op if using python -O or the PYTHONOPTIMIZE environment
-    # variable is defined as a non-empty string.
-    def validate_arg_lengths(arg_list, allow_empty=True):
+    def validate_arg_lengths(
+            arg_list,
+            allow_empty=True,
+            extra_msg=""
+    ):  # pylint: disable=unused-argument
+        """A no-op.
+
+        A no-op if using python -O or the PYTHONOPTIMIZE environment
+        variable is defined as a non-empty string.
+        """
         pass
 
 
@@ -120,91 +125,96 @@ def make_ranges(indices):
         j = i
 
 
-def apply_freeform_two_args(fn, convert, args, unpack_single=True):
+def identity(x):
+    """Simple identity function."""
+    return x
+
+
+def apply_freeform_two_args(fn, conv, args, unpack_single=True):
     """non-public"""
-    if convert is None:
-        def convert(x): return x
-    if len(args) == 2:
-        conarg0, conarg1 = (convert(args[0]), convert(args[1]))
-        if (isinstance(conarg0, six.integer_types) and
-                isinstance(conarg1, six.integer_types)):
+    if conv is None:
+        conv = identity
+    nargs = len(args)
+    if nargs == 2:
+        conarg0, conarg1 = (conv(args[0]), conv(args[1]))
+        if (isinstance(conarg0, int) and isinstance(conarg1, int)):
             return fn(conarg0, conarg1)
-        else:
-            raise TypeError("expecting names or indices")
-    elif len(args) == 1:
+        raise TypeError("expecting names or indices")
+    elif nargs == 1:
         if isinstance(args[0], (list, tuple)):
             return list(itertools.chain.from_iterable(
-                fn(i, j) for i, j in make_ranges(convert(args[0]))))
-        conarg0 = convert(args[0])
-        if isinstance(conarg0, six.integer_types):
+                fn(i, j) for i, j in make_ranges(conv(args[0]))))
+        conarg0 = conv(args[0])
+        if isinstance(conarg0, int):
             result = fn(conarg0, conarg0)
             if unpack_single:
                 return result[0]
-            else:
-                return result
-        else:
-            raise TypeError("expecting name or index")
-    elif len(args) == 0:
+            return result
+        raise TypeError("expecting name or index")
+    elif nargs == 0:
         return fn(0)
-    else:
-        raise WrongNumberOfArgumentsError()
+    raise WrongNumberOfArgumentsError()
 
 
-def apply_freeform_one_arg(fn, convert, maxval, args):
+def apply_freeform_one_arg(fn, conv, maxval, args):
     """non-public"""
-    if convert is None:
-        def convert(x): return x
-    if len(args) == 2:
-        conarg0, conarg1 = (convert(args[0]), convert(args[1]))
-        if (isinstance(conarg0, six.integer_types) and
-                isinstance(conarg1, six.integer_types)):
+    if conv is None:
+        conv = identity
+    nargs = len(args)
+    if nargs == 2:
+        conarg0, conarg1 = (conv(args[0]), conv(args[1]))
+        if (isinstance(conarg0, int) and isinstance(conarg1, int)):
             return [fn(x) for x in range(conarg0, conarg1 + 1)]
-        else:
-            raise TypeError("expecting names or indices")
-    elif len(args) == 1:
+        raise TypeError("expecting names or indices")
+    elif nargs == 1:
         if isinstance(args[0], (list, tuple)):
-            return [fn(x) for x in convert(args[0])]
-        conarg0 = convert(args[0])
-        if isinstance(conarg0, six.integer_types):
+            return [fn(x) for x in conv(args[0])]
+        conarg0 = conv(args[0])
+        if isinstance(conarg0, int):
             return fn(conarg0)
-        else:
-            raise TypeError("expecting name or index")
-    elif len(args) == 0:
-        return apply_freeform_one_arg(fn, convert, 0,
+        raise TypeError("expecting name or index")
+    elif nargs == 0:
+        return apply_freeform_one_arg(fn, conv, 0,
                                       (list(range(maxval)),))
-    else:
-        raise WrongNumberOfArgumentsError()
+    raise WrongNumberOfArgumentsError()
 
 
-def apply_pairs(fn, convert, *args):
+def apply_pairs(fn, conv, *args):
     """non-public"""
-    if len(args) == 2:
-        fn([convert(args[0])], [args[1]])
-    else:
-        a1, a2 = unzip(args[0])
-        fn(convert(a1), list(a2))
+    nargs = len(args)
+    if nargs == 2:
+        fn([conv(args[0])], [args[1]])
+        return
+    if nargs == 1:
+        pair = unzip(args[0])
+        # NB: If pair is empty, then we do nothing.
+        if pair:
+            fn(conv(pair[0]), list(pair[1]))
+        return
+    raise WrongNumberOfArgumentsError(nargs)
 
 
-def delete_set_by_range(fn, convert, max_num, *args):
+def delete_set_by_range(fn, conv, max_num, *args):
     """non-public"""
-    if len(args) == 0:
+    nargs = len(args)
+    if nargs == 0:
         # Delete All:
         if max_num > 0:
             fn(0, max_num - 1)
-    elif len(args) == 1:
+    elif nargs == 1:
         # Delete all items from a possibly unordered list of mixed types:
-        args = listify(convert(args[0]))
+        args = listify(conv(args[0]))
         ranges = make_ranges(list(sorted(args)))
         for i, j in reversed(list(ranges)):
             fn(i, j)
-    elif len(args) == 2:
+    elif nargs == 2:
         # Delete range from arg[0] to arg[1]:
-        fn(convert(args[0]), convert(args[1]))
+        fn(conv(args[0]), conv(args[1]))
     else:
         raise WrongNumberOfArgumentsError()
 
 
-class _group(object):
+class _group():
     """Object to contain constraint groups"""
 
     def __init__(self, gp):
@@ -245,16 +255,17 @@ def make_group(conv, max_num, c_type, *args):
 
     See example usage in _subinterfaces.ConflictInterface.
     """
-    if len(args) <= 1:
+    nargs = len(args)
+    if nargs <= 1:
         cons = list(range(max_num))
-    if len(args) == 0:
+    if nargs == 0:
         weight = 1.0
     else:
         weight = args[0]
-    if len(args) == 2:
+    if nargs == 2:
         weight = args[0]
         cons = listify(conv(args[1]))
-    elif len(args) == 3:
+    elif nargs == 3:
         cons = list(range(conv(args[1]), conv(args[2]) + 1))
     return _group([(weight, ((c_type, i),)) for i in cons])
 
@@ -270,7 +281,7 @@ def listify(x):
     This is used to wrap arguments for functions that require lists.
     """
     # Assumes name to index conversions already done.
-    assert not isinstance(x, six.string_types)
+    assert not isinstance(x, str)
     try:
         iter(x)
         return x
@@ -287,45 +298,86 @@ def _cachelookup(item, getindexfunc, cache):
     return idx
 
 
-def _convert_sequence(seq, getindexfunc, cache):
-    results = []
-    for item in seq:
-        if isinstance(item, six.string_types):
-            idx = _cachelookup(item, getindexfunc, cache)
-            results.append(idx)
-        else:
-            results.append(item)
-    return results
+# If the CPLEX_PY_DISABLE_NAME_CONV environment variable is defined,
+# we will skip name-to-index conversion (i.e., these functions become
+# no-ops), which can improve performance.
+if CPLEX_PY_DISABLE_NAME_CONV:
 
+    def convert_sequence(
+            seq,
+            getindexfunc,
+            cache=None
+    ):  # pylint: disable=unused-argument
+        """Returns seq immediately.
 
-def convert(name, getindexfunc, cache=None):
-    """Converts from names to indices as necessary.
+        See comments about CPLEX_PY_DISABLE_NAME_CONV.
+        """
+        return seq
 
-    If name is a string, an index is returned.
+    def convert(
+            name,
+            getindexfunc,
+            cache=None
+    ):  # pylint: disable=unused-argument
+        """Returns name immediately.
 
-    If name is a sequence, a sequence of indices is returned.
-
-    If name is neither (i.e., it's an integer), then that is returned
-    as is.
-
-    getindexfunc is a function that takes a name and returns an index.
-
-    The optional cache argument allows for further localized
-    caching (e.g., within a loop).
-    """
-    # In some cases, it can be benficial to cache lookups.
-    if cache is None:
-        cache = {}
-    if isinstance(name, six.string_types):
-        return _cachelookup(name, getindexfunc, cache)
-    elif isinstance(name, collections_abc.Sequence):
-        # It's tempting to use a recursive solution here, but that kills
-        # performance for the case where all indices are passed in (i.e.,
-        # no names). This is due to the fact that we end up doing the
-        # extra check for sequence types over and over (above).
-        return _convert_sequence(name, getindexfunc, cache)
-    else:
+        See comments about CPLEX_PY_DISABLE_NAME_CONV.
+        """
         return name
+
+else:
+
+    # By default (i.e., if the CPLEX_PY_DISABLE_NAME_CONV environment
+    # variable is not defined), these functions perform name-to-index
+    # conversion, which can hurt performance.
+
+    def convert_sequence(seq, getindexfunc, cache=None):
+        """Converts a sequence of names to indices as necessary.
+
+        If you are calling `convert` (see below) in a tight loop, but you
+        know that you are always working with a sequence, then it can be
+        more efficient to call this method directly (there is no overhead
+        checking if it is a sequence).
+        """
+        if cache is None:
+            cache = {}
+        results = []
+        for item in seq:
+            if isinstance(item, str):
+                idx = _cachelookup(item, getindexfunc, cache)
+                results.append(idx)
+            else:
+                results.append(item)
+        return results
+
+    def convert(name, getindexfunc, cache=None):
+        """Converts from names to indices as necessary.
+
+        If name is a string, an index is returned.
+
+        If name is a sequence, a sequence of indices is returned.
+
+        If name is neither (i.e., it's an integer), then that is returned
+        as is.
+
+        getindexfunc is a function that takes a name and returns an index.
+
+        The optional cache argument allows for further localized
+        caching (e.g., within a loop).
+        """
+        # In some cases, it can be benficial to cache lookups.
+        if cache is None:
+            cache = {}
+        if isinstance(name, str):
+            return _cachelookup(name, getindexfunc, cache)
+        if isinstance(name, collections_abc.Sequence):
+            # It's tempting to use a recursive solution here, but that kills
+            # performance for the case where all indices are passed in (i.e.,
+            # no names). This is due to the fact that we end up doing the
+            # extra check for sequence types over and over (above).
+            return convert_sequence(name, getindexfunc, cache)
+        return name
+
 
 def unzip(iterable=None):
     """Inverse of the zip function.
@@ -338,5 +390,4 @@ def unzip(iterable=None):
     """
     if iterable is None:
         iterable = []
-    # NOTE: we are using six.moves.zip here (see import at the top)!
     return list(zip(*iterable))

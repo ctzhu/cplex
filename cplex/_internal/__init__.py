@@ -13,8 +13,6 @@
 
 
 """
-
-import os
 import sys
 
 from . import _aux_functions
@@ -37,6 +35,7 @@ from . import _constantsenum
 from . import _callbackinfoenum
 from . import _solutionstrategyenum
 from ..exceptions import CplexError
+from ..constant_class import ConstantClass
 
 __all__ = ["Environment", "_aux_functions", "_baseinterface",
            "_list_array_utils", "_ostream", "_procedural",
@@ -47,64 +46,75 @@ __all__ = ["Environment", "_aux_functions", "_baseinterface",
            "_solutionstrategyenum"]
 
 
-class ProblemType(object):
+class ProblemType(ConstantClass):
     """Types of problems the Cplex object can encapsulate.
 
-       For explanations of the problem types, see those topics in the
-       CPLEX User's Manual in the topic titled Continuous Optimization
-       for LP, QP, and QCP or the topic titled Discrete Optimization 
-       for MILP, FIXEDMILP, NODELP, NODEQP, MIQCP, NODEQCP.
-
+    For explanations of the problem types, see those topics in the
+    CPLEX User's Manual in the topic titled Continuous Optimization
+    for LP, QP, and QCP or the topic titled Discrete Optimization
+    for MILP, FIXEDMILP, NODELP, NODEQP, MIQCP, NODEQCP.
     """
     LP = _constants.CPXPROB_LP
+    """See CPXPROB_LP in the C API."""
+
     MILP = _constants.CPXPROB_MILP
+    """See CPXPROB_MILP in the C API."""
+
     fixed_MILP = _constants.CPXPROB_FIXEDMILP
+    """See CPXPROB_FIXEDMILP in the C API."""
+
     node_LP = _constants.CPXPROB_NODELP
+    """See CPXPROB_NODELP in the C API."""
+
     QP = _constants.CPXPROB_QP
+    """See CPXPROB_QP in the C API."""
+
     MIQP = _constants.CPXPROB_MIQP
+    """See CPXPROB_MIQP in the C API."""
+
     fixed_MIQP = _constants.CPXPROB_FIXEDMIQP
+    """See CPXPROB_MIQP in the C API."""
+
     node_QP = _constants.CPXPROB_NODEQP
+    """See CPXPROB_NODEQP in the C API."""
+
     QCP = _constants.CPXPROB_QCP
+    """See CPXPROB_QCP in the C API."""
+
     MIQCP = _constants.CPXPROB_MIQCP
+    """See CPXPROB_MIQCP in the C API."""
+
     node_QCP = _constants.CPXPROB_NODEQCP
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.problem_type.LP
-        0
-        >>> c.problem_type[0]
-        'LP'
-        """
-        if item == _constants.CPXPROB_LP:
-            return 'LP'
-        if item == _constants.CPXPROB_MILP:
-            return 'MILP'
-        if item == _constants.CPXPROB_FIXEDMILP:
-            return 'fixed_MILP'
-        if item == _constants.CPXPROB_NODELP:
-            return 'node_LP'
-        if item == _constants.CPXPROB_QP:
-            return 'QP'
-        if item == _constants.CPXPROB_MIQP:
-            return 'MIQP'
-        if item == _constants.CPXPROB_FIXEDMIQP:
-            return 'fixed_MIQP'
-        if item == _constants.CPXPROB_NODEQP:
-            return 'node_QP'
-        if item == _constants.CPXPROB_QCP:
-            return 'QCP'
-        if item == _constants.CPXPROB_MIQCP:
-            return 'MIQCP'
-        if item == _constants.CPXPROB_NODEQCP:
-            return 'node_QCP'
+    """See CPXPROB_QCP in the C API."""
 
 
-class Environment(object):
+def _needs_delete_callback(callback_instance):
+    # If the user has registered any callback that may change
+    # the user data at a node then we need to register the
+    # delete callback.
+    # The Control, Node, and Incumbent callbacks have the set_node_data
+    # method (and all who inherit from these).
+    return hasattr(callback_instance, "set_node_data")
+
+
+def _getcbattrname(cb_type_string):
+    """Returns the attribute name to be used to store the callback
+    instance.
+    """
+    return "_{0}_callback".format(cb_type_string)
+
+
+def _checkcbcls(obj):
+    """Checks callback class instance for expected attribute.
+
+    Raises a CplexError if it is not found.
+    """
+    if getattr(obj, "_cb_type_string", None) is None:
+        raise CplexError(str(obj) +
+                         " is not a subclass of a subclassable Callback class.")
+
+
+class Environment():
     """non-public"""
     RESULTS_CHNL_IDX = 0
     WARNING_CHNL_IDX = 1
@@ -140,7 +150,7 @@ class Environment(object):
         if self._disposed:
             return
         self._disposed = True
-        for chnl_idx in self._streams.keys():
+        for chnl_idx in self._streams:
             self._delete_stream(chnl_idx)
         if self._lock and self._e:
             _procedural.finitlock(self._lock)
@@ -152,36 +162,12 @@ class Environment(object):
         """non-public"""
         self._end()
 
-    def _needs_delete_callback(self, callback_instance):
-        """non-public"""
-        # If the user has registered any callback that may change
-        # the user data at a node then we need to register the
-        # delete callback.
-        # The Control, Node, and Incumbent callbacks have the set_node_data
-        # method (and all who inherit from these).
-        return hasattr(callback_instance, "set_node_data")
-
-    def _getcbattrname(self, cb_type_string):
-        """Returns the attribute name to be used to store the callback
-        instance.
-        """
-        return "_{0}_callback".format(cb_type_string)
-
-    def _checkcbcls(self, cb):
-        """Checks callback class instance for expected attribute.
-
-        Raises a CplexError if it is not found.
-        """
-        if getattr(cb, "_cb_type_string", None) is None:
-            raise CplexError(str(cb) +
-                             " is not a subclass of a subclassable Callback class.")
-
     def _get_num_delete(self):
         """Count the callbacks that are installed and require a delete
         callback.
         """
         return sum(1 for c in self._callbacks
-                   if self._needs_delete_callback(c))
+                   if _needs_delete_callback(c))
 
     def register_callback(self, callback_class):
         """Registers a callback for use when solving.
@@ -197,23 +183,24 @@ class Environment(object):
         registered.
         """
         cb = callback_class(self)
-        self._checkcbcls(cb)
+        _checkcbcls(cb)
         num_delete = self._get_num_delete()
         old_cb = getattr(
-            self, self._getcbattrname(cb._cb_type_string), None)
+            self, _getcbattrname(cb._cb_type_string), None)
         if old_cb:
             self._callbacks.remove(old_cb)
-        setattr(self, self._getcbattrname(cb._cb_type_string), cb)
+        setattr(self, _getcbattrname(cb._cb_type_string), cb)
         if cb._cb_type_string == "MIP_info":
             # self._MIP_info_callback is set above with the call to
             # setattr. So, we are passing the callback instance as the
             # second argument here rather than the environment
             # (i.e., self).
+            # pylint: disable=no-member
             cb._cb_set_function(self._e, self._MIP_info_callback)
         else:
             cb._cb_set_function(self._e, self)
         self._callbacks.append(cb)
-        if self._needs_delete_callback(cb) and num_delete < 1:
+        if _needs_delete_callback(cb) and num_delete < 1:
             # We need a delete callback and did not have one
             # before -> install it.
             _procedural.setpydel(self._e)
@@ -223,7 +210,7 @@ class Environment(object):
         """Unregisters a callback.
 
         callback_class must be one of the callback classes defined in
-        the module callback or a subclass of one of them.  This method 
+        the module callback or a subclass of one of them.  This method
         unregisters any previously registered callback of the same
         class.  If callback_class is a subclass of more than one
         callback class, this method unregisters only the callback of the
@@ -232,18 +219,18 @@ class Environment(object):
 
         """
         cb = callback_class(self)
-        self._checkcbcls(cb)
+        _checkcbcls(cb)
         current_cb = getattr(
-            self, self._getcbattrname(cb._cb_type_string), None)
+            self, _getcbattrname(cb._cb_type_string), None)
         if current_cb:
-            if (self._needs_delete_callback(current_cb) and
-                self._get_num_delete() < 2):
+            if (_needs_delete_callback(current_cb) and
+                    self._get_num_delete() < 2):
                 # We are about to remove the last callback that requires
                 # a delete callback.
                 _procedural.delpydel(self._e)
             current_cb._cb_set_function(self._e, None)
             self._callbacks.remove(current_cb)
-            delattr(self, self._getcbattrname(current_cb._cb_type_string))
+            delattr(self, _getcbattrname(current_cb._cb_type_string))
         return current_cb
 
     def _add_stream(self, which_channel):
@@ -393,8 +380,3 @@ class Environment(object):
     def get_dettime(self):
         """Returns the current deterministic time in ticks."""
         return _procedural.getdettime(self._e)
-
-    @property
-    def _apienc(self):
-        """Get the current api encoding."""
-        return self.parameters.read.apiencoding.get()

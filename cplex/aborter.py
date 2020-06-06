@@ -13,7 +13,7 @@
 from ._internal import _procedural as _proc
 
 
-class Aborter(object):
+class Aborter():
     """Gracefully terminates the solve and tuning methods of CPLEX.
 
     You can pass an instance of this class to one or more Cplex objects.
@@ -93,7 +93,7 @@ class Aborter(object):
         if self._disposed:
             return
         self._disposed = True
-        while len(self._cpxlst) > 0:
+        while self._cpxlst:
             cpx = self._cpxlst.pop()
             cpx.remove_aborter()
         _proc.delete_native_int(self._p)

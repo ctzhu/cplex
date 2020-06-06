@@ -13,9 +13,10 @@
 from . import _constants as _const
 from . import _procedural as _proc
 from ._baseinterface import BaseInterface
+from ..constant_class import ConstantClass
 
 
-class MultiObjFloatInfo(object):
+class MultiObjFloatInfo(ConstantClass):
     """Types of floating point information that can be queried for
     multi-objective optimization.
 
@@ -24,46 +25,23 @@ class MultiObjFloatInfo(object):
     during multi-objective optimization.
 
     This information can be querried for each priority level with method
-    Cplex.solution.multiobj.get_info.
+    `MultiObjSolnInterface.get_info`.
     """
 
     time = _const.CPX_MULTIOBJ_TIME
-    """See CPX_MULTIOBJ_TIME in the C API."""
+    """See :macros:`CPX_MULTIOBJ_TIME` in the C API."""
 
     dettime = _const.CPX_MULTIOBJ_DETTIME
-    """See CPX_MULTIOBJ_DETTIME in the C API."""
+    """See :macros:`CPX_MULTIOBJ_DETTIME` in the C API."""
 
     objective = _const.CPX_MULTIOBJ_OBJVAL
-    """See CPX_MULTIOBJ_OBJVAL in the C API."""
+    """See :macros:`CPX_MULTIOBJ_OBJVAL` in the C API."""
 
     best_objective = _const.CPX_MULTIOBJ_BESTOBJVAL
-    """See CPX_MULTIOBJ_BESTOBJVAL in the C API."""
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.solution.multiobj.float_info.time
-        2
-        >>> c.solution.multiobj.float_info[2]
-        'time'
-        """
-        if item == _const.CPX_MULTIOBJ_TIME:
-            return 'time'
-        elif item == _const.CPX_MULTIOBJ_DETTIME:
-            return 'dettime'
-        elif item == _const.CPX_MULTIOBJ_OBJVAL:
-            return 'objective'
-        elif item == _const.CPX_MULTIOBJ_BESTOBJVAL:
-            return 'best_objective'
-        else:
-            raise KeyError(item)
+    """See :macros:`CPX_MULTIOBJ_BESTOBJVAL` in the C API."""
 
 
-class MultiObjIntInfo(object):
+class MultiObjIntInfo(ConstantClass):
     """Types of integer information that can be queried for
     multi-objective optimization.
 
@@ -72,51 +50,26 @@ class MultiObjIntInfo(object):
     during multi-objective optimization.
 
     This information can be querried for each priority level with method
-    Cplex.solution.multiobj.get_info.
+    `MultiObjSolnInterface.get_info`.
     """
 
     error = _const.CPX_MULTIOBJ_ERROR
-    """See CPX_MULTIOBJ_ERROR in the C API."""
+    """See :macros:`CPX_MULTIOBJ_ERROR` in the C API."""
 
     status = _const.CPX_MULTIOBJ_STATUS
-    """See CPX_MULTIOBJ_STATUS in the C API."""
+    """See :macros:`CPX_MULTIOBJ_STATUS` in the C API."""
 
     method = _const.CPX_MULTIOBJ_METHOD
-    """See CPX_MULTIOBJ_METHOD in the C API."""
+    """See :macros:`CPX_MULTIOBJ_METHOD` in the C API."""
 
     priority = _const.CPX_MULTIOBJ_PRIORITY
-    """See CPX_MULTIOBJ_PRIORITY in the C API."""
+    """See :macros:`CPX_MULTIOBJ_PRIORITY` in the C API."""
 
     blend = _const.CPX_MULTIOBJ_BLEND
-    """See CPX_MULTIOBJ_BLEND in the C API."""
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.solution.multiobj.int_info.priority
-        17
-        >>> c.solution.multiobj.int_info[17]
-        'priority'
-        """
-        if item == _const.CPX_MULTIOBJ_ERROR:
-            return 'error'
-        elif item == _const.CPX_MULTIOBJ_STATUS:
-            return 'status'
-        elif item == _const.CPX_MULTIOBJ_METHOD:
-            return 'method'
-        elif item == _const.CPX_MULTIOBJ_PRIORITY:
-            return 'priority'
-        elif item == _const.CPX_MULTIOBJ_BLEND:
-            return 'blend'
-        else:
-            raise KeyError(item)
+    """See :macros:`CPX_MULTIOBJ_BLEND` in the C API."""
 
 
-class MultiObjLongInfo(object):
+class MultiObjLongInfo(ConstantClass):
     """Types of long integer information that can be queried for
     multi-objective optimization.
 
@@ -125,83 +78,44 @@ class MultiObjLongInfo(object):
     during multi-objective optimization.
 
     This information can be querried for each priority level with method
-    Cplex.solution.multiobj.get_info.
+    `MultiObjSolnInterface.get_info`.
     """
 
     num_barrier_iterations = _const.CPX_MULTIOBJ_BARITCNT
-    """See CPX_MULTIOBJ_BARITCNT in the C API."""
+    """See :macros:`CPX_MULTIOBJ_BARITCNT` in the C API."""
 
     num_sifting_iterations = _const.CPX_MULTIOBJ_SIFTITCNT
-    """See CPX_MULTIOBJ_SIFTITCNT in the C API."""
+    """See :macros:`CPX_MULTIOBJ_SIFTITCNT` in the C API."""
 
     num_sifting_phase1_iterations = _const.CPX_MULTIOBJ_SIFTPHASE1CNT
-    """See CPX_MULTIOBJ_SIFTPHASE1CNT in the C API."""
+    """See :macros:`CPX_MULTIOBJ_SIFTPHASE1CNT` in the C API."""
 
     num_degenerate_iterations = _const.CPX_MULTIOBJ_DEGCNT
-    """See CPX_MULTIOBJ_DEGCNT in the C API."""
+    """See :macros:`CPX_MULTIOBJ_DEGCNT` in the C API."""
 
     num_iterations = _const.CPX_MULTIOBJ_ITCNT
-    """See CPX_MULTIOBJ_ITCNT in the C API."""
+    """See :macros:`CPX_MULTIOBJ_ITCNT` in the C API."""
 
     num_phase1_iterations = _const.CPX_MULTIOBJ_PHASE1CNT
-    """See CPX_MULTIOBJ_PHASE1CNT in the C API."""
+    """See :macros:`CPX_MULTIOBJ_PHASE1CNT` in the C API."""
 
     num_primal_pushes = _const.CPX_MULTIOBJ_PPUSH
-    """See CPX_MULTIOBJ_PPUSH in the C API."""
+    """See :macros:`CPX_MULTIOBJ_PPUSH` in the C API."""
 
     num_primal_exchanges = _const.CPX_MULTIOBJ_PEXCH
-    """See CPX_MULTIOBJ_PEXCH in the C API."""
+    """See :macros:`CPX_MULTIOBJ_PEXCH` in the C API."""
 
     num_dual_pushes = _const.CPX_MULTIOBJ_DPUSH
-    """See CPX_MULTIOBJ_DPUSH in the C API."""
+    """See :macros:`CPX_MULTIOBJ_DPUSH` in the C API."""
 
     num_dual_exchanges = _const.CPX_MULTIOBJ_DEXCH
-    """See CPX_MULTIOBJ_DEXCH in the C API."""
+    """See :macros:`CPX_MULTIOBJ_DEXCH` in the C API."""
 
     num_nodes = _const.CPX_MULTIOBJ_NODECNT
-    """See CPX_MULTIOBJ_NODECNT in the C API."""
+    """See :macros:`CPX_MULTIOBJ_NODECNT` in the C API."""
 
     num_nodes_left = _const.CPX_MULTIOBJ_NODELEFTCNT
-    """See CPX_MULTIOBJ_NODELEFTCNT in the C API."""
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.solution.multiobj.long_info.num_iterations
-        8
-        >>> c.solution.multiobj.long_info[8]
-        'num_iterations'
-        """
-        if item == _const.CPX_MULTIOBJ_BARITCNT:
-            return 'num_barrier_iterations'
-        elif item == _const.CPX_MULTIOBJ_SIFTITCNT:
-            return 'num_sifting_iterations'
-        elif item == _const.CPX_MULTIOBJ_SIFTPHASE1CNT:
-            return 'num_sifting_phase1_iterations'
-        elif item == _const.CPX_MULTIOBJ_DEGCNT:
-            return 'num_degenerate_iterations'
-        elif item == _const.CPX_MULTIOBJ_ITCNT:
-            return 'num_iterations'
-        elif item == _const.CPX_MULTIOBJ_PHASE1CNT:
-            return 'num_phase1_iterations'
-        elif item == _const.CPX_MULTIOBJ_PPUSH:
-            return 'num_primal_pushes'
-        elif item == _const.CPX_MULTIOBJ_PEXCH:
-            return 'num_primal_exchanges'
-        elif item == _const.CPX_MULTIOBJ_DPUSH:
-            return 'num_dual_pushes'
-        elif item == _const.CPX_MULTIOBJ_DEXCH:
-            return 'num_dual_exchanges'
-        elif item == _const.CPX_MULTIOBJ_NODECNT:
-            return 'num_nodes'
-        elif item == _const.CPX_MULTIOBJ_NODELEFTCNT:
-            return 'num_nodes_left'
-        else:
-            raise KeyError(item)
+    """See :macros:`CPX_MULTIOBJ_NODELEFTCNT` in the C API."""
 
 
 class MultiObjSolnInterface(BaseInterface):
@@ -223,16 +137,15 @@ class MultiObjSolnInterface(BaseInterface):
         top-level `Cplex` class as Cplex.solution.multiobj. This
         constructor is not meant to be used externally.
         """
-        super(MultiObjSolnInterface, self).__init__(
-            cplex=parent._cplex, advanced=True)
+        super().__init__(cplex=parent._cplex, advanced=True)
 
     def get_objective_value(self, objidx):
         """Returns the value of an objective function.
 
         objidx is the name or index of the objective to be accessed.
 
-        See CPXmultiobjgetobjval in the Callable Library Reference Manual
-        for more detail.
+        See :cpxapi:`CPXmultiobjgetobjval` in the Callable Library
+        Reference Manual for more detail.
 
         Example usage:
 
@@ -264,8 +177,8 @@ class MultiObjSolnInterface(BaseInterface):
         After multi-objective optimization, returns the blended objective
         value for the specified priority.
 
-        See CPXmultiobjgetobjvalbypriority in the Callable Library
-        Reference Manual for more detail.
+        See :cpxapi:`CPXmultiobjgetobjvalbypriority` in the Callable
+        Library Reference Manual for more detail.
 
         Example usage:
 
@@ -296,8 +209,8 @@ class MultiObjSolnInterface(BaseInterface):
         """Returns the number of sub-problems that where successfully
         solved during the last optimization of a multi-objective problem.
 
-        See CPXmultiobjgetnumsolves in the Callable Library Reference
-        Manual for more detail.
+        See :cpxapi:`CPXmultiobjgetnumsolves` in the Callable Library
+        Reference Manual for more detail.
 
         Example usage:
 
@@ -322,7 +235,7 @@ class MultiObjSolnInterface(BaseInterface):
     @staticmethod
     def _isintinfo(what):
         try:
-            MultiObjSolnInterface.int_info[what]
+            _ = MultiObjSolnInterface.int_info[what]
             return True
         except KeyError:
             return False
@@ -330,7 +243,7 @@ class MultiObjSolnInterface(BaseInterface):
     @staticmethod
     def _islonginfo(what):
         try:
-            MultiObjSolnInterface.long_info[what]
+            _ = MultiObjSolnInterface.long_info[what]
             return True
         except KeyError:
             return False
@@ -338,7 +251,7 @@ class MultiObjSolnInterface(BaseInterface):
     @staticmethod
     def _isdblinfo(what):
         try:
-            MultiObjSolnInterface.float_info[what]
+            _ = MultiObjSolnInterface.float_info[what]
             return True
         except KeyError:
             return False
@@ -348,13 +261,15 @@ class MultiObjSolnInterface(BaseInterface):
 
         subprob is the sub-problem of a multi-objective optimization.
 
-        what is an attribute from Cplex.solution.multiobj.float_info,
-        Cplex.solution.multiobj.int_info, or
-        Cplex.solution.multiobj.long_info.
+        what is an attribute from Cplex.solution.multiobj.float_info
+        (see `MultiObjFloatInfo`), Cplex.solution.multiobj.int_info
+        (see `MultiObjIntInfo`), or Cplex.solution.multiobj.long_info
+        (see `MultiObjLongInfo`).
 
-        See CPXmultiobjgetdblinfo, CPXmultiobjgetintinfo,
-        CPXmultiobjgetlonginfo, etc. in the Callable Library Reference
-        Manual for more detail.
+        See :cpxapi:`CPXmultiobjgetdblinfo`,
+        :cpxapi:`CPXmultiobjgetintinfo`,
+        :cpxapi:`CPXmultiobjgetlonginfo`, etc. in the Callable Library
+        Reference Manual for more detail.
 
         Example usage:
 
@@ -381,11 +296,10 @@ class MultiObjSolnInterface(BaseInterface):
         if MultiObjSolnInterface._isintinfo(what):
             return _proc.multiobjgetintinfo(self._env._e, self._cplex._lp,
                                             subprob, what)
-        elif MultiObjSolnInterface._islonginfo(what):
+        if MultiObjSolnInterface._islonginfo(what):
             return _proc.multiobjgetlonginfo(self._env._e, self._cplex._lp,
-                                            subprob, what)
-        elif MultiObjSolnInterface._isdblinfo(what):
+                                             subprob, what)
+        if MultiObjSolnInterface._isdblinfo(what):
             return _proc.multiobjgetdblinfo(self._env._e, self._cplex._lp,
                                             subprob, what)
-        else:
-            raise ValueError(what)
+        raise ValueError(what)

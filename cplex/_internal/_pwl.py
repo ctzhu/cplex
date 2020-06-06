@@ -38,8 +38,7 @@ class PWLConstraintInterface(BaseInterface):
         class as `Cplex.pwl_constraints`.  This constructor is not meant
         to be used externally.
         """
-        super(PWLConstraintInterface, self).__init__(
-            cplex=cpx, getindexfunc=_proc.getpwlindex)
+        super().__init__(cplex=cpx, getindexfunc=_proc.getpwlindex)
 
     def get_num(self):
         """Returns the number of PWL constraints in the problem.
@@ -112,7 +111,7 @@ class PWLConstraintInterface(BaseInterface):
                          vary, varx,
                          preslope, postslope,
                          nbreaks, breakx, breaky,
-                         name, self._env._apienc)
+                         name)
         return self._add_single(self.get_num, _add, yidx, xidx,
                                 preslope, postslope, breakx, breaky,
                                 name)
@@ -204,8 +203,7 @@ class PWLConstraintInterface(BaseInterface):
         """
         def _get_names(idx):
             return _proc.getpwlname(
-                self._env._e, self._cplex._lp, idx,
-                self._env._apienc)
+                self._env._e, self._cplex._lp, idx)
         return _aux.apply_freeform_one_arg(
             _get_names, self._conv, self.get_num(), args)
 

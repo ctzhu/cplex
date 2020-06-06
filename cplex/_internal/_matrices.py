@@ -14,10 +14,9 @@
 
 from ._aux_functions import init_list_args, validate_arg_lengths
 from ..exceptions import CplexError
-from .. import six
 
 
-class SparsePair(object):
+class SparsePair():
     """A class for storing sparse vector data.
 
     An instance of this class has two attributes, ind and val.  ind
@@ -32,7 +31,7 @@ class SparsePair(object):
         """Constructor for SparsePair.
 
         Takes two arguments, ind and val; ind specifies the indices that
-        the SparsePair refers to, and val specifies the float values 
+        the SparsePair refers to, and val specifies the float values
         associated with those indices; ind and val must have the same
         length.  If ind or val is omitted, they will default to an empty
         list.
@@ -80,7 +79,7 @@ class SparsePair(object):
         return self.ind, self.val
 
 
-class _HBMatrix(object):
+class _HBMatrix():
     """non-public
 
     """
@@ -93,16 +92,15 @@ class _HBMatrix(object):
         if matrix is not None:
             for vector in matrix:
                 if isinstance(vector, SparsePair):
-                    v0 = vector.ind
-                    v1 = vector.val
+                    ind = vector.ind
+                    val = vector.val
                 else:
-                    v0 = vector[0]
-                    v1 = vector[1]
-                if len(v0) != len(v1):
-                    raise CplexError("Inconsistent input data to _HBMatrix")
+                    ind = vector[0]
+                    val = vector[1]
+                validate_arg_lengths([ind, val])
                 self.matbeg.append(len(self.matind))
-                self.matind.extend(v0)
-                self.matval.extend(v1)
+                self.matind.extend(ind)
+                self.matval.extend(val)
         else:
             self.matbeg = matbeg
             self.matind = matind
@@ -114,7 +112,7 @@ class _HBMatrix(object):
 
     def __getitem__(self, key):
         """non-public"""
-        if isinstance(key, six.integer_types):
+        if isinstance(key, int):
             if key < 0:
                 key += len(self)
             begin = self.matbeg[key]
@@ -140,7 +138,7 @@ class _HBMatrix(object):
             yield self[i]
 
 
-class SparseTriple(object):
+class SparseTriple():
     """A class for storing sparse matrix data.
 
     An instance of this class has three attributes, ind1, ind2, and val.

@@ -15,10 +15,9 @@ from ._subinterfaces import ObjSense
 from . import _procedural as _proc
 from . import _aux_functions as _aux
 from . import _matrices as _mat
-from ..exceptions import CplexSolverError, error_codes
 
 
-class _Pair(object):
+class _Pair():
     def __init__(self):
         self.first = None
         self.second = None
@@ -36,20 +35,22 @@ class MultiObjInterface(BaseInterface):
     """
 
     sense = ObjSense()
-    """See `ObjSense()` """
+    """See `ObjSense()`"""
 
     def __init__(self, cpx):
         """Creates a new MultiObjInterface.
 
         The Multi-Objective interface is exposed by the top-level `Cplex`
-        class as `Cplex.multiobj`.  This constructor is not meant to be
+        class as `Cplex.multiobj`. This constructor is not meant to be
         used externally.
         """
-        super(MultiObjInterface, self).__init__(
-            cplex=cpx, getindexfunc=_proc.multiobjgetindex)
+        super().__init__(cplex=cpx, getindexfunc=_proc.multiobjgetindex)
 
     def get_num(self):
         """Returns the number of objectives in the problem.
+
+        See :cpxapi:`CPXgetnumobjs` in the Callable Library Reference
+        Manual for more detail.
 
         Example usage:
 
@@ -68,12 +69,15 @@ class MultiObjInterface(BaseInterface):
 
         There is always at least one objective in the problem instance
         (indexed 0) thus numobj must be at least 1. If before calling
-        this function there were more objectives in the instance than the
+        this method there were more objectives in the instance than the
         specified numobj then the objectives whose index is >= numobj are
-        removed from the instance. If before calling this function the
+        removed from the instance. If before calling this method the
         number of objectives was <= numobj then new objectives are
         created, all with all-zero coefficients and default settings
         (like priority, weight, etc).
+
+        See :cpxapi:`CPXsetnumobjs` in the Callable Library Reference
+        Manual for more detail.
 
         Example usage:
 
@@ -106,8 +110,8 @@ class MultiObjInterface(BaseInterface):
           the objectives with indices between begin and end, inclusive of
           end. Equivalent to multiobj.get_names(range(begin, end + 1)).
 
-        See CPXmultiobjgetnames in the Callable Library Reference Manual
-        for more detail.
+        See :cpxapi:`CPXmultiobjgetname` in the Callable Library
+        Reference Manual for more detail.
 
         Example usage:
 
@@ -119,7 +123,7 @@ class MultiObjInterface(BaseInterface):
         """
         def _get_name(objidx):
             return _proc.multiobjgetname(self._env._e, self._cplex._lp,
-                                         objidx, self._env._apienc)
+                                         objidx)
         return _aux.apply_freeform_one_arg(_get_name, self._conv,
                                            self.get_num(), args)
 
@@ -159,8 +163,8 @@ class MultiObjInterface(BaseInterface):
         returned (i.e., begin will default to the first variable index
         and end will default to the last variable index).
 
-        See CPXmultiobjgetobj in the Callable Library Reference Manual
-        for more detail.
+        See :cpxapi:`CPXmultiobjgetobj` in the Callable Library Reference
+        Manual for more detail.
 
         Example usage:
 
@@ -175,11 +179,11 @@ class MultiObjInterface(BaseInterface):
         if begin is None:
             begin = 0
         else:
-            begin = var_conv(begin)
+            begin = varconv(begin)
         if end is None:
             end = self._cplex.variables.get_num() - 1
         else:
-            end = var_conv(end)
+            end = varconv(end)
         return _proc.multiobjgetobj(self._env._e, self._cplex._lp,
                                     objidx, begin, end)
 
@@ -226,8 +230,8 @@ class MultiObjInterface(BaseInterface):
         name is a string representing the name of the objective to be
         set. If not specified, the objective name will default to None.
 
-        See CPXmultiobjsetobj in the Callable Library Reference Manual
-        for more detail.
+        See :cpxapi:`CPXmultiobjsetobj` in the Callable Library Reference
+        Manual for more detail.
 
         Example usage:
 
@@ -258,7 +262,7 @@ class MultiObjInterface(BaseInterface):
             reltol = self._cplex.parameters.mip.tolerances.mipgap.default()
         _proc.multiobjsetobj(self._env._e, self._cplex._lp, objidx, objind,
                              objval, offset, weight, priority, abstol, reltol,
-                             name, self._env._apienc)
+                             name)
 
     def get_linear(self, objidx, *args):
         """Returns the linear coefficients of a set of variables.
@@ -365,6 +369,8 @@ class MultiObjInterface(BaseInterface):
     def get_sense(self):
         """Returns the sense of all objective functions.
 
+        See `ObjSense`.
+
         Example usage:
 
         >>> import cplex
@@ -388,8 +394,8 @@ class MultiObjInterface(BaseInterface):
           objective with a different sense use a negative value for the
           weight attribute. See `set_weight`.
 
-        The argument to this method must be either
-        multiobj.sense.minimize or multiobj.sense.maximize.
+        The argument to this method must be either `ObjSense.minimize`
+        or `ObjSense.maximize`.
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -532,6 +538,15 @@ class MultiObjInterface(BaseInterface):
 
         objidx must be an objective name or index.
 
+        abstol should be a float. When specifying a new value, the same
+        limits apply as with the
+        Cplex.parameters.mip.tolerances.absmipgap parameter. See the
+        section on Specifying multiple objective problems in the CPLEX
+        User's Manual for the details on the meaning of this tolerance.
+
+        See :cpxapi:`CPXmultiobjchgattribs` in the Callable Library
+        Reference Manual for more detail.
+
         Example usage:
 
         >>> import cplex
@@ -565,6 +580,16 @@ class MultiObjInterface(BaseInterface):
         """Sets the relative tolerance of an objective function.
 
         objidx must be an objective name or index.
+
+        reltol should be a float. When specifying a new value, the same
+        limits apply as with the Cplex.parameters.mip.tolerances.mipgap
+        parameter. Note that a nondefault setting of this parameter only
+        applies to MIP multiobjective problems. See the section on
+        Specifying multiple objective problems in the CPLEX User's Manual
+        for the details on the meaning of this tolerance.
+
+        See :cpxapi:`CPXmultiobjchgattribs` in the Callable Library
+        Reference Manual for more detail.
 
         Example usage:
 

@@ -16,8 +16,7 @@ optim.cplex.errorcodes in the reference manual of the CPLEX Callable
 Library, and the topic Interpreting Error Codes in the Overview of the
 APIs.
 """
-
-from . import error_codes
-from .errors import (CplexError, CplexSolverError,
+from . import error_codes  # noqa: F401
+from .errors import (CplexError, CplexSolverError,  # noqa: F401
                      WrongNumberOfArgumentsError,
                      ErrorChannelMessage)

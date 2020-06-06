@@ -9,16 +9,16 @@
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 # ------------------------------------------------------------------------
-
+"""Functions to convert Python lists to C arrays."""
 from contextlib import contextmanager
 from . import _pycplex as CPX
-from ..six.moves import range
 
 # int_list_to_C_array    = CPX.int_list_to_C_array
 # double_list_to_C_array = CPX.double_list_to_C_array
 
 
 def int_list_to_array(inputlist):
+    """Convert a list of ints into an array of C ints."""
     length = len(inputlist)
     if length == 0:
         return CPX.cvar.CPX_NULL
@@ -29,6 +29,7 @@ def int_list_to_array(inputlist):
 
 
 def long_list_to_array(inputlist):
+    """Convert a list of ints into an array of C longs."""
     length = len(inputlist)
     if length == 0:
         return CPX.cvar.CPX_NULL
@@ -37,10 +38,14 @@ def long_list_to_array(inputlist):
         output[i] = inputlist[i]
     return output
 
-# FIXME: Is this function really necessary?
-
 
 def int_list_to_array_trunc_int32(inputlist):
+    """Convert a list of ints into an array of 32-bit C ints.
+
+    This is necessary for the CPXXtuneparam and CPXXtuneparamprobset
+    methods where the function signature does not allow for long integer
+    values.
+    """
     int32_min = -2147483648
     int32_max = 2147483647
     length = len(inputlist)
@@ -58,6 +63,7 @@ def int_list_to_array_trunc_int32(inputlist):
 
 
 def double_list_to_array(inputlist):
+    """Convert a list of floatss into an array of C doubles."""
     length = len(inputlist)
     if length == 0:
         return CPX.cvar.CPX_NULL
@@ -84,6 +90,16 @@ def int_c_array(seq):
         yield array
     finally:
         CPX.free_int_C_array(array)
+
+
+@contextmanager
+def long_c_array(seq):
+    """See matrix_conversion.c:long_list_to_C_array.()"""
+    array = CPX.long_list_to_C_array(seq)
+    try:
+        yield array
+    finally:
+        CPX.free_long_C_array(array)
 
 
 @contextmanager

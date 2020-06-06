@@ -11,79 +11,65 @@
 # ------------------------------------------------------------------------
 """
 """
-
 import weakref
-import warnings
 
+from ._aux_functions import identity
 from ._procedural import check_status
-from ..exceptions import CplexError, ErrorChannelMessage
-from .. import six
+from ..exceptions import ErrorChannelMessage
 
 
-class _NoOpStream(object):
+class _NoOpStream():
     """Simple no-op file-like object."""
 
-    def write(self, str):
+    def write(self, ignored):
         """No-op write method."""
-        pass
 
     def flush(self):
         """No-op flush method."""
-        pass
 
 
-def _identity(x):
-    """Simple identity function."""
-    return x
-
-
-class OutputStream(object):
+class OutputStream():
     """Class to parse and write strings to a file object."""
 
     def __init__(self, outputfile, env, fn=None, initerrorstr=False):
         """OutputStream constructor.
 
-        outputfile must provide methods write(self, str) and flush(self).
-        Can be None to suppress output.
+        outputfile must be a file-like object. At a minimum, it must
+        provide methods write(self, str) and flush(self). Can be None to
+        suppress output.
 
         If fn is specified, it must be a fuction with signature
-        fn(str) -> str.
+        fn(str) -> str. Strings sent to this stream will be processed by
+        this function before being written.
+
+        This constructor is not meant to be used externally.
         """
         self._env = weakref.proxy(env)
         if fn:
             self._fn = fn
         else:
-            self._fn = _identity
+            self._fn = identity
         self._is_valid = False
-        self._was_opened = False
         self._disposed = False
         # We only create this attribute for the error channel.
         if initerrorstr:
             self._error_string = None
-        if isinstance(outputfile, six.string_types):
-            warnings.warn("passing a file name to the "
-                          "Cplex.set_*_stream methods is deprecated "
-                          "since V12.9.0",
-                          DeprecationWarning)
-            self._file = open(outputfile, "w")
-            self._was_opened = True
+        if outputfile:
+            self._file = outputfile
         else:
-            if outputfile:
-                self._file = outputfile
-            else:
-                self._file = _NoOpStream()
+            self._file = _NoOpStream()
         try:
             tst = callable(self._file.write)
         except AttributeError:
             tst = False
         if not tst:
-            raise CplexError("Output object must have write method")
+            raise TypeError("outputfile must have a write method")
         try:
             tst = callable(self._file.flush)
         except AttributeError:
             tst = False
         if not tst:
-            raise CplexError("Output object must have flush method")
+            raise TypeError("outputfile must have a flush method")
         self._is_valid = True
 
     def _end(self):
@@ -104,11 +90,6 @@ class OutputStream(object):
                 # If the file is already closed, then ignore the error
                 # and continue.
                 pass
-            # If we opened the file, then we need to close it.
-            if self._was_opened:
-                # The Python docs state that, "close() may be called more
-                # than once without error."
-                self._file.close()
 
     def __del__(self):
         """OutputStream destructor."""

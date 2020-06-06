@@ -7,22 +7,21 @@
 # disclosure restricted by GSA ADP Schedule Contract with
 # IBM Corp.
 # ------------------------------------------------------------------------------
-"""
-"""
+"""Imports the shared library on supported platforms."""
 
 import platform
 
 from sys import version_info
 
-ERROR_STRING = "CPLEX 12.9.0.1 is not compatible with this version of Python."
+ERROR_STRING = "CPLEX 12.10.0.0 is not compatible with this version of Python."
 
 if platform.system() in ('Darwin', 'Linux', 'AIX', 'Windows', 'Microsoft'):
     if version_info < (3, 6, 0):
         raise Exception(ERROR_STRING)
     elif version_info < (3, 7, 0):
-        from cplex._internal.py36_cplex1290 import *
+        from cplex._internal.py36_cplex12100 import *
     elif version_info < (3, 8, 0):
-        from cplex._internal.py37_cplex1290 import *
+        from cplex._internal.py37_cplex12100 import *
     else:
         raise Exception(ERROR_STRING)
 else:

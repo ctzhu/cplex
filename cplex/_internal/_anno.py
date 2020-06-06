@@ -14,9 +14,10 @@ from ._baseinterface import BaseInterface
 from . import _procedural as _proc
 from . import _aux_functions as _aux
 from . import _constants
+from ..constant_class import ConstantClass
 
 
-class AnnotationObjectType(object):
+class AnnotationObjectType(ConstantClass):
     """Constants defining annotation object types."""
     objective = _constants.CPX_ANNOTATIONOBJ_OBJ
     variable = _constants.CPX_ANNOTATIONOBJ_COL
@@ -24,31 +25,6 @@ class AnnotationObjectType(object):
     sos_constraint = _constants.CPX_ANNOTATIONOBJ_SOS
     indicator_constraint = _constants.CPX_ANNOTATIONOBJ_IND
     quadratic_constraint = _constants.CPX_ANNOTATIONOBJ_QC
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.long_annotations.object_type.objective
-        0
-        >>> c.long_annotations.object_type[0]
-        'objective'
-        """
-        if item == _constants.CPX_ANNOTATIONOBJ_OBJ:
-            return "objective"
-        if item == _constants.CPX_ANNOTATIONOBJ_COL:
-            return "variable"
-        if item == _constants.CPX_ANNOTATIONOBJ_ROW:
-            return "row"
-        if item == _constants.CPX_ANNOTATIONOBJ_SOS:
-            return "sos_constraint"
-        if item == _constants.CPX_ANNOTATIONOBJ_IND:
-            return "indicator_constraint"
-        if item == _constants.CPX_ANNOTATIONOBJ_QC:
-            return "quadratic_constraint"
 
 
 class AnnotationInterface(BaseInterface):
@@ -58,20 +34,17 @@ class AnnotationInterface(BaseInterface):
     """See `AnnotationObjectType()` """
 
     def _getnumobjtype(self, objtype):
-        if objtype == self.object_type.objective:
-            return 1
-        elif objtype == self.object_type.variable:
-            return _proc.getnumcols(self._env._e, self._cplex._lp)
-        elif objtype == self.object_type.row:
-            return _proc.getnumrows(self._env._e, self._cplex._lp)
-        elif objtype == self.object_type.sos_constraint:
-            return _proc.getnumsos(self._env._e, self._cplex._lp)
-        elif objtype == self.object_type.indicator_constraint:
-            return _proc.getnumindconstrs(self._env._e, self._cplex._lp)
-        elif objtype == self.object_type.quadratic_constraint:
-            return _proc.getnumqconstrs(self._env._e, self._cplex._lp)
-        else:
-            raise ValueError("invalid objtype")
+        switcher = {
+            # NB: For now, it is documented that multiobj is not supported.
+            self.object_type.objective: lambda env, lp: 1,
+            self.object_type.variable: _proc.getnumcols,
+            self.object_type.row: _proc.getnumrows,
+            self.object_type.sos_constraint: _proc.getnumsos,
+            self.object_type.indicator_constraint: _proc.getnumindconstrs,
+            self.object_type.quadratic_constraint: _proc.getnumqconstrs
+        }
+        func = switcher[objtype]
+        return func(self._env._e, self._cplex._lp)
 
 
 class LongAnnotationInterface(AnnotationInterface):
@@ -90,8 +63,7 @@ class LongAnnotationInterface(AnnotationInterface):
         class as `Cplex.long_annotations`.  This constructor is not meant
         to be used externally.
         """
-        super(LongAnnotationInterface, self).__init__(
-            cplex=cpx, getindexfunc=_proc.getlongannoindex)
+        super().__init__(cplex=cpx, getindexfunc=_proc.getlongannoindex)
 
     def get_num(self):
         """Returns the number of long annotations in the problem.
@@ -130,8 +102,7 @@ class LongAnnotationInterface(AnnotationInterface):
         # unified).
         def _add(name, defval):
             _proc.newlonganno(
-                self._env._e, self._cplex._lp, name, int(defval),
-                self._env._apienc)
+                self._env._e, self._cplex._lp, name, int(defval))
         return self._add_single(self.get_num, _add, name, defval)
 
     def delete(self, *args):
@@ -219,8 +190,7 @@ class LongAnnotationInterface(AnnotationInterface):
         """
         def _get_names(idx):
             return _proc.getlongannoname(
-                self._env._e, self._cplex._lp, idx,
-                self._env._apienc)
+                self._env._e, self._cplex._lp, idx)
         return _aux.apply_freeform_one_arg(
             _get_names, self._conv, self.get_num(), args)
 
@@ -364,8 +334,7 @@ class DoubleAnnotationInterface(AnnotationInterface):
         `Cplex` class as `Cplex.double_annotations`.  This constructor is
         not meant to be used externally.
         """
-        super(DoubleAnnotationInterface, self).__init__(
-            cplex=cpx, getindexfunc=_proc.getdblannoindex)
+        super().__init__(cplex=cpx, getindexfunc=_proc.getdblannoindex)
 
     def get_num(self):
         """Returns the number of double annotations in the problem.
@@ -401,8 +370,7 @@ class DoubleAnnotationInterface(AnnotationInterface):
         """
         def _add(name, defval):
             _proc.newdblanno(
-                self._env._e, self._cplex._lp, name, float(defval),
-                self._env._apienc)
+                self._env._e, self._cplex._lp, name, float(defval))
         return self._add_single(self.get_num, _add, name, defval)
 
     def delete(self, *args):
@@ -492,8 +460,7 @@ class DoubleAnnotationInterface(AnnotationInterface):
         """
         def _get_names(idx):
             return _proc.getdblannoname(
-                self._env._e, self._cplex._lp, idx,
-                self._env._apienc)
+                self._env._e, self._cplex._lp, idx)
         return _aux.apply_freeform_one_arg(
             _get_names, self._conv, self.get_num(), args)
 

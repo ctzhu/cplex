@@ -14,7 +14,6 @@
 
 class CplexError(Exception):
     """Class for exceptions raised by the CPLEX Python API."""
-    pass
 
 
 class CplexSolverError(CplexError):
@@ -28,7 +27,7 @@ class CplexSolverError(CplexError):
     """
 
     def __str__(self):
-        return self.args[0]
+        return self.args[0]  # pylint: disable=unsubscriptable-object
 
 
 class WrongNumberOfArgumentsError(CplexError, TypeError):
@@ -38,7 +37,6 @@ class WrongNumberOfArgumentsError(CplexError, TypeError):
     dynamic number of arguments, but also enforce certain rules (e.g., to
     be grouped in pairs, requires at least one argument, etc.).
     """
-    pass
 
 
 class ErrorChannelMessage(CplexError):
@@ -46,4 +44,3 @@ class ErrorChannelMessage(CplexError):
 
     For internal use only.
     """
-    pass

@@ -11,140 +11,65 @@
 # --------------------------------------------------------------------------
 """Callback classes for the CPLEX Python API.
 
-This module defines a hierarchy of classes, many of which can be
-subclassed to define alternative behavior for the algorithms in 
-CPLEX.  The methods provided by the classes allow you to query
-information about the optimization in progress and to control the
+This module defines the `Context` class which provides methods to query
+information and perform all actions that can be performed from a generic
+callback. See `Cplex.set_callback()`.
+
+See the following examples for more information on generic callbacks:
+
+ * admipex8.py
+ * admipex9.py
+ * bendersatsp2.py
+
+This module also defines a hierarchy of classes for legacy callbacks,
+many of which can be subclassed to define alternative behavior for the
+algorithms in CPLEX. The methods provided by the classes allow you to
+query information about the optimization in progress and to control the
 optimization algorithm.
 
-To use a subclassable callback class, define a subclass of it that
-defines a __call__ method.  Then pass that class name to the
-register_callback method of an instance of the Cplex class.  The Cplex
-class will instantiate the class and return the instance of the class
-to you.  If you wish to associate additional data with your callback
-class, you may do so after it has been registered with the Cplex
-object.
+To use a subclassable legacy callback class, define a subclass of it that
+defines a __call__ method. Then pass that class name to the
+`Cplex.register_callback` method. The `Cplex` class will instantiate the
+legacy callback class and return the instance of the class that was
+created. If you wish to associate additional data with your callback
+class, you may do so after it has been registered with the `Cplex` object.
 
-See the following examples for more information.
+See the following examples for more information on legacy callbacks:
 
-- admipex1.py
-- admipex2.py
-- admipex3.py
-- admipex4.py
-- admipex6.py
-- lpex4.py
-- mipex4.py
+ * admipex1.py
+ * admipex2.py
+ * admipex3.py
+ * admipex5.py
+ * admipex6.py
+ * bendersatsp.py
+ * lpex4.py
+ * mipex4.py
 
 Note
-  If you operate the CPLEX Python API in parallel mode with
-  callbacks registered, there will be a single instance of each of your
-  callback classes shared among all threads.
+  If you operate the CPLEX Python API in parallel mode with callbacks
+  registered, there will be a single instance of each of your callback
+  classes shared among all threads.
 """
-
-
-import math
 import weakref
 
 from . import _internal
-from ._internal import _callbackinfoenum
-from ._internal import _solutionstrategyenum
+from ._internal._callbackinfoenum import CallbackInfo
+from ._internal import _constants as _const
+from ._internal._solutionstrategyenum import SolutionStrategy
 from ._internal import _procedural as _proc
 from ._internal._aux_functions import (apply_freeform_two_args,
                                        apply_freeform_one_arg,
                                        init_list_args, convert, max_arg_length,
                                        validate_arg_lengths, unzip)
 from ._internal._matrices import SparsePair, _HBMatrix, unpack_pair
+from ._internal._subinterfaces import SolutionStatus
+from ._internal import _pycplex
 from .exceptions import (CplexError, CplexSolverError,
                          WrongNumberOfArgumentsError)
+from .constant_class import ConstantClass
+from .exceptions.error_codes import CPXERR_UNSUPPORTED_OPERATION
 
-from . import six
-from .six.moves import map
-from .six.moves import zip
-
-# Dynamically import based on C extension name.
-exec("from ._internal." + _internal._pycplex.ext_name +
-     " import fast_getcallbackinfo")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_getcolindex")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_getrowindex")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_getqconstrindex")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_getsosindex")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_getnumcols")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_getnumrows")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_getnumqconstrs")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_getnumsos")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_gettime")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_getdettime")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_getstat")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_solninfo")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_primopt")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_dualopt")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_hybbaropt")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_hybnetopt")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_copystart")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_chgbds")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_slackfromx")
-exec("from ._internal." + _internal._pycplex.ext_name +
-     " import cb_qconstrslackfromx")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_crushx")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_crushpi")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_getobj")
-exec("from ._internal." + _internal._pycplex.ext_name + " import cb_getprestat_c")
-
-from ._internal._constants import CPX_CALLBACK_INFO_ENDTIME
-from ._internal._constants import CPX_CALLBACK_INFO_ENDDETTIME
-from ._internal._constants import CPX_CALLBACK_INFO_DUAL_INFMEAS
-from ._internal._constants import CPX_CALLBACK_INFO_PRIMAL_INFMEAS
-from ._internal._constants import CPX_CALLBACK_INFO_ITCOUNT_LONG
-from ._internal._constants import CPX_CALLBACK_INFO_PRIMAL_OBJ
-from ._internal._constants import CPX_CALLBACK_INFO_DUAL_FEAS
-from ._internal._constants import CPX_CALLBACK_INFO_PRIMAL_FEAS
-from ._internal._constants import CPX_CALLBACK_INFO_DUAL_OBJ
-from ._internal._constants import CPX_CALLBACK_INFO_CROSSOVER_DEXCH_LONG
-from ._internal._constants import CPX_CALLBACK_INFO_CROSSOVER_DPUSH_LONG
-from ._internal._constants import CPX_CALLBACK_INFO_CROSSOVER_PEXCH_LONG
-from ._internal._constants import CPX_CALLBACK_INFO_CROSSOVER_PPUSH_LONG
-from ._internal._constants import CPX_CALLBACK_INFO_CROSSOVER_SBCNT
-from ._internal._constants import CPX_CALLBACK_INFO_BEST_REMAINING
-from ._internal._constants import CPX_CALLBACK_INFO_CUTOFF
-from ._internal._constants import CPX_CALLBACK_INFO_BEST_INTEGER
-from ._internal._constants import CPX_CALLBACK_INFO_MIP_REL_GAP
-from ._internal._constants import CPX_CALLBACK_INFO_MIP_ITERATIONS_LONG
-from ._internal._constants import CPX_CALLBACK_INFO_NODE_COUNT_LONG
-from ._internal._constants import CPX_CALLBACK_INFO_NODES_LEFT_LONG
-from ._internal._constants import CPX_CALLBACK_INFO_MIP_FEAS
-from ._internal._constants import CPX_CALLBACK_INFO_DISJCUT_PROGRESS
-from ._internal._constants import CPX_CALLBACK_INFO_FLOWMIR_PROGRESS
-from ._internal._constants import CPX_CALLBACK_INFO_FRACCUT_PROGRESS
-from ._internal._constants import CPX_CALLBACK_INFO_PROBE_PHASE
-from ._internal._constants import CPX_CALLBACK_INFO_PROBE_PROGRESS
-from ._internal._constants import CPX_CALLBACK_INFO_CLIQUE_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_COVER_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_FLOWCOVER_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_GUBCOVER_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_IMPLBD_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_FRACCUT_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_DISJCUT_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_FLOWPATH_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_MIRCUT_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_ZEROHALFCUT_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_MCFCUT_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_LANDPCUT_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_USERCUT_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_TABLECUT_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_SOLNPOOLCUT_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_BENDERS_COUNT
-from ._internal._constants import CPX_CALLBACK_INFO_TUNING_PROGRESS
-from ._internal._constants import CPX_CALLBACK_INFO_KAPPA_STABLE
-from ._internal._constants import CPX_CALLBACK_INFO_KAPPA_SUSPICIOUS
-from ._internal._constants import CPX_CALLBACK_INFO_KAPPA_UNSTABLE
-from ._internal._constants import CPX_CALLBACK_INFO_KAPPA_ILLPOSED
-from ._internal._constants import CPX_CALLBACK_INFO_KAPPA_MAX
-from ._internal._constants import CPX_CALLBACK_INFO_KAPPA_ATTENTION
-from ._internal._constants import CPX_CALLBACK_INFO_STARTTIME
-from ._internal._constants import CPX_CALLBACK_INFO_STARTDETTIME
-
-
-class Callback(object):
+class Callback():
     """Base class for Cplex callback classes.
 
     """
@@ -154,9 +79,15 @@ class Callback(object):
         self._env = weakref.proxy(env)
         self._cb_type_string = None
         self._cb_set_function = None
+        self._cbstruct = None
+        self._env_lp_ptr = None
+        self._status = 0
 
     def __call__(self):
-        """Method to be overridden by user-defined callback class."""
+        """Method to be overridden by user-defined callback class.
+
+        See the `Cplex.register_callback` method.
+        """
         raise CplexError("Callback.__call__ is a pure virtual method")
 
     def _conv_col(self, name, cache=None):
@@ -164,9 +95,8 @@ class Callback(object):
 
     def _get_col_index(self, name):
         """non-public"""
-        status = cb_getcolindex(
-            self._cbstruct, self._env_lp_ptr,
-            _proc.cpx_transcode(name, self._env._apienc))
+        status = _pycplex.cb_getcolindex(
+            self._cbstruct, self._env_lp_ptr, name)
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         return status[1]
 
@@ -175,9 +105,9 @@ class Callback(object):
 
     def _get_row_index(self, name):
         """non-public"""
-        status = cb_getrowindex(
+        status = _pycplex.cb_getrowindex(
             self._cbstruct, self._env_lp_ptr,
-            _proc.cpx_transcode(name, self._env._apienc))
+            name)
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         return status[1]
 
@@ -186,9 +116,9 @@ class Callback(object):
 
     def _get_quad_index(self, name):
         """non-public"""
-        status = cb_getqconstrindex(
+        status = _pycplex.cb_getqconstrindex(
             self._cbstruct, self._env_lp_ptr,
-            _proc.cpx_transcode(name, self._env._apienc))
+            name)
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         return status[1]
 
@@ -197,9 +127,9 @@ class Callback(object):
 
     def _get_sos_index(self, name):
         """non-public"""
-        status = cb_getsosindex(
+        status = _pycplex.cb_getsosindex(
             self._cbstruct, self._env_lp_ptr,
-            _proc.cpx_transcode(name, self._env._apienc))
+            name)
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         return status[1]
 
@@ -212,7 +142,7 @@ class Callback(object):
           effect of the abort statement.
         """
         if hasattr(self, "_useraction"):
-            self._useraction = _internal._constants.CPX_CALLBACK_FAIL
+            self._useraction = _const.CPX_CALLBACK_FAIL
             self._status = 0
         else:
             self._status = 1
@@ -227,7 +157,10 @@ class Callback(object):
         The interpretation of this value as wall clock time or CPU
         time is controlled by the parameter clocktype.
         """
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_ENDTIME, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_ENDTIME,
+            CplexSolverError)
 
     def get_end_dettime(self):
         """Returns a deterministic time stamp in ticks.
@@ -236,7 +169,10 @@ class Callback(object):
         return value of this method yields the time remaining in
         deterministic ticks.
         """
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_ENDDETTIME, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_ENDDETTIME,
+            CplexSolverError)
 
     def get_start_time(self):
         """Returns a time stamp specifying when the solving process started.
@@ -246,7 +182,10 @@ class Callback(object):
         yields either wallclock time (also known as real time) or CPU time,
         depending on the clock set by the clocktype parameter.
         """
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_STARTTIME, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_STARTTIME,
+            CplexSolverError)
 
     def get_start_dettime(self):
         """Returns a deterministic time stamp specifying when the solving process started.
@@ -254,7 +193,10 @@ class Callback(object):
         To compute elapsed deterministic time in ticks, subtract the result of
         Callback.get_dettime() from the result of this method.
         """
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_STARTDETTIME, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_STARTDETTIME,
+            CplexSolverError)
 
     def get_time(self):
         """Returns a time stamp for the current time.
@@ -266,7 +208,7 @@ class Callback(object):
         The interpretation of this value as wall clock time or CPU
         time is controlled by the parameter clocktype.
         """
-        status = cb_gettime(self._cbstruct)
+        status = _pycplex.cb_gettime(self._cbstruct)
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         return status[1]
 
@@ -277,7 +219,7 @@ class Callback(object):
         value of Callback.get_end_dettime() yields the time remaining in
         deterministic ticks.
         """
-        status = cb_getdettime(self._cbstruct)
+        status = _pycplex.cb_getdettime(self._cbstruct)
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         return status[1]
 
@@ -291,15 +233,15 @@ class OptimizationCallback(Callback):
 
     def get_num_quadratic_constraints(self):
         """Returns the number of quadratic constraints in the problem."""
-        return cb_getnumqconstrs(self._cbstruct, self._env_lp_ptr)
+        return _pycplex.cb_getnumqconstrs(self._cbstruct, self._env_lp_ptr)
 
     def get_num_cols(self):
         """Returns the number of variables in the problem."""
-        return cb_getnumcols(self._cbstruct, self._env_lp_ptr)
+        return _pycplex.cb_getnumcols(self._cbstruct, self._env_lp_ptr)
 
     def get_num_rows(self):
         """Returns the number of linear constraints in the problem."""
-        return cb_getnumrows(self._cbstruct, self._env_lp_ptr)
+        return _pycplex.cb_getnumrows(self._cbstruct, self._env_lp_ptr)
 
 
 class ContinuousCallback(OptimizationCallback):
@@ -316,42 +258,60 @@ class ContinuousCallback(OptimizationCallback):
 
     def __init__(self, env):
         """non-public"""
-        super(ContinuousCallback, self).__init__(env)
+        super().__init__(env)
         self._cb_type_string = "continuous"
         self._cb_set_function = _proc.setlpcallbackfunc
 
     def get_dual_infeasibility(self):
         """Returns a measure of the dual infeasibility of the problem."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_DUAL_INFMEAS, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_DUAL_INFMEAS,
+            CplexSolverError)
 
     def get_primal_infeasibility(self):
         """Returns a measure of the primal infeasibility of the problem."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_PRIMAL_INFMEAS, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_PRIMAL_INFMEAS,
+            CplexSolverError)
 
     def get_num_iterations(self):
         """Returns the number of iterations completed."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_ITCOUNT_LONG, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_ITCOUNT_LONG,
+            CplexSolverError)
 
     def get_objective_value(self):
         """Returns the current value of the objective function."""
-        if self._wherefrom() == _internal._constants.CPX_CALLBACK_DUAL:
-            return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_DUAL_OBJ, CplexSolverError)
-        else:
-            return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_PRIMAL_OBJ, CplexSolverError)
+        if self._wherefrom() == _const.CPX_CALLBACK_DUAL:
+            return _pycplex.fast_getcallbackinfo(
+                self._cbstruct,
+                _const.CPX_CALLBACK_INFO_DUAL_OBJ,
+                CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_PRIMAL_OBJ,
+            CplexSolverError)
 
     def is_dual_feasible(self):
         """Returns whether or not the current solution is dual feasible."""
-        if self._wherefrom() == _internal._constants.CPX_CALLBACK_PRIMAL:
+        if self._wherefrom() == _const.CPX_CALLBACK_PRIMAL:
             return self.get_dual_infeasibility() <= 0.0
-        else:
-            return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_DUAL_FEAS, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_DUAL_FEAS,
+            CplexSolverError)
 
     def is_primal_feasible(self):
         """Returns whether or not the current solution is primal feasible."""
-        if self._wherefrom() == _internal._constants.CPX_CALLBACK_DUAL:
+        if self._wherefrom() == _const.CPX_CALLBACK_DUAL:
             return self.get_primal_infeasibility() <= 0.0
-        else:
-            return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_PRIMAL_FEAS, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_PRIMAL_FEAS,
+            CplexSolverError)
 
 
 class SimplexCallback(ContinuousCallback):
@@ -364,7 +324,7 @@ class SimplexCallback(ContinuousCallback):
 
     def __init__(self, env):
         """non-public"""
-        super(SimplexCallback, self).__init__(env)
+        super().__init__(env)
         self._cb_type_string = "simplex"
 
 
@@ -378,12 +338,15 @@ class BarrierCallback(ContinuousCallback):
 
     def __init__(self, env):
         """non-public"""
-        super(BarrierCallback, self).__init__(env)
+        super().__init__(env)
         self._cb_type_string = "barrier"
 
     def get_dual_objective_value(self):
         """Returns the current dual value of the objective function."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_DUAL_OBJ, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_DUAL_OBJ,
+            CplexSolverError)
 
 
 class CrossoverCallback(OptimizationCallback):
@@ -396,29 +359,80 @@ class CrossoverCallback(OptimizationCallback):
 
     def __init__(self, env):
         """non-public"""
-        super(CrossoverCallback, self).__init__(env)
+        super().__init__(env)
         self._cb_type_string = "crossover"
         self._cb_set_function = _proc.setlpcallbackfunc
 
     def get_num_dual_exchanges(self):
         """Returns the number of dual exchanges performed so far."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_CROSSOVER_DEXCH_LONG, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_CROSSOVER_DEXCH_LONG,
+            CplexSolverError)
 
     def get_num_dual_pushes(self):
         """Returns the number of dual pushes performed so far."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_CROSSOVER_DPUSH_LONG, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_CROSSOVER_DPUSH_LONG,
+            CplexSolverError)
 
     def get_num_primal_exchanges(self):
         """Returns the number of primal exchanges performed so far."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_CROSSOVER_PEXCH_LONG, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_CROSSOVER_PEXCH_LONG,
+            CplexSolverError)
 
     def get_num_primal_pushes(self):
         """Returns the number of primal pushes performed so far."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_CROSSOVER_PPUSH_LONG, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_CROSSOVER_PPUSH_LONG,
+            CplexSolverError)
 
     def get_num_superbasics(self):
         """Returns the number of superbasic variables in the basis."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_CROSSOVER_SBCNT, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_CROSSOVER_SBCNT,
+            CplexSolverError)
+
+
+class QualityMetric(ConstantClass):
+    """Constants defining metrics for the quality of the MIP solve."""
+    kappa_stable = _const.CPX_CALLBACK_INFO_KAPPA_STABLE
+    kappa_suspicious = _const.CPX_CALLBACK_INFO_KAPPA_SUSPICIOUS
+    kappa_unstable = _const.CPX_CALLBACK_INFO_KAPPA_UNSTABLE
+    kappa_illposed = _const.CPX_CALLBACK_INFO_KAPPA_ILLPOSED
+    kappa_max = _const.CPX_CALLBACK_INFO_KAPPA_MAX
+    kappa_attention = _const.CPX_CALLBACK_INFO_KAPPA_ATTENTION
+
+
+class CutType(ConstantClass):
+    """Arguments to MIPInfoCallback.get_num_cuts()."""
+    # NB: If you edit these, look at _subinterfaces.py:CutType too!
+    #     Also add the cut to the list of valid values get_num_cuts()!
+    cover = _const.CPX_CALLBACK_INFO_COVER_COUNT
+    GUB_cover = _const.CPX_CALLBACK_INFO_GUBCOVER_COUNT
+    flow_cover = _const.CPX_CALLBACK_INFO_FLOWCOVER_COUNT
+    clique = _const.CPX_CALLBACK_INFO_CLIQUE_COUNT
+    fractional = _const.CPX_CALLBACK_INFO_FRACCUT_COUNT
+    MIR = _const.CPX_CALLBACK_INFO_MIRCUT_COUNT
+    flow_path = _const.CPX_CALLBACK_INFO_FLOWPATH_COUNT
+    disjunctive = _const.CPX_CALLBACK_INFO_DISJCUT_COUNT
+    implied_bound = _const.CPX_CALLBACK_INFO_IMPLBD_COUNT
+    zero_half = _const.CPX_CALLBACK_INFO_ZEROHALFCUT_COUNT
+    multi_commodity_flow = _const.CPX_CALLBACK_INFO_MCFCUT_COUNT
+    lift_and_project = _const.CPX_CALLBACK_INFO_LANDPCUT_COUNT
+    user = _const.CPX_CALLBACK_INFO_USERCUT_COUNT
+    table = _const.CPX_CALLBACK_INFO_TABLECUT_COUNT
+    solution_pool = _const.CPX_CALLBACK_INFO_SOLNPOOLCUT_COUNT
+    benders = _const.CPX_CALLBACK_INFO_BENDERS_COUNT
+    # Not Implemented:
+    # local_implied_bound
+    # BQP
+    # RLT
 
 
 class MIPInfoCallback(OptimizationCallback):
@@ -428,43 +442,15 @@ class MIPInfoCallback(OptimizationCallback):
 
     """
 
-    class quality_metric(object):
-        """Constants defining metrics for the quality of the MIP solve."""
-        kappa_stable = CPX_CALLBACK_INFO_KAPPA_STABLE
-        kappa_suspicious = CPX_CALLBACK_INFO_KAPPA_SUSPICIOUS
-        kappa_unstable = CPX_CALLBACK_INFO_KAPPA_UNSTABLE
-        kappa_illposed = CPX_CALLBACK_INFO_KAPPA_ILLPOSED
-        kappa_max = CPX_CALLBACK_INFO_KAPPA_MAX
-        kappa_attention = CPX_CALLBACK_INFO_KAPPA_ATTENTION
+    quality_metric = QualityMetric()
+    """See `QualityMetric()`"""
 
-    class cut_type(object):
-        """Arguments to MIPInfoCallback.get_num_cuts()."""
-        # NB: If you edit these, look at _subinterfaces.py:CutType too!
-        #     Also add the cut to the list of valid values get_num_cuts()!
-        cover = CPX_CALLBACK_INFO_COVER_COUNT
-        GUB_cover = CPX_CALLBACK_INFO_GUBCOVER_COUNT
-        flow_cover = CPX_CALLBACK_INFO_FLOWCOVER_COUNT
-        clique = CPX_CALLBACK_INFO_CLIQUE_COUNT
-        fractional = CPX_CALLBACK_INFO_FRACCUT_COUNT
-        MIR = CPX_CALLBACK_INFO_MIRCUT_COUNT
-        flow_path = CPX_CALLBACK_INFO_FLOWPATH_COUNT
-        disjunctive = CPX_CALLBACK_INFO_DISJCUT_COUNT
-        implied_bound = CPX_CALLBACK_INFO_IMPLBD_COUNT
-        zero_half = CPX_CALLBACK_INFO_ZEROHALFCUT_COUNT
-        multi_commodity_flow = CPX_CALLBACK_INFO_MCFCUT_COUNT
-        lift_and_project = CPX_CALLBACK_INFO_LANDPCUT_COUNT
-        user = CPX_CALLBACK_INFO_USERCUT_COUNT
-        table = CPX_CALLBACK_INFO_TABLECUT_COUNT
-        solution_pool = CPX_CALLBACK_INFO_SOLNPOOLCUT_COUNT
-        benders = CPX_CALLBACK_INFO_BENDERS_COUNT
-        # Not Implemented:
-        # local_implied_bound
-        # BQP
-        # RLT
+    cut_type = CutType()
+    """See `CutType()`"""
 
     def __init__(self, env):
         """non-public"""
-        super(MIPInfoCallback, self).__init__(env)
+        super().__init__(env)
         self._cb_type_string = "MIP_info"
         self._cb_set_function = _proc.setinfocallbackfunc
 
@@ -484,36 +470,46 @@ class MIPInfoCallback(OptimizationCallback):
 
     def get_num_cuts(self, cut_type):
         """Returns the number of cuts of type cut_type added so far."""
-        if cut_type not in (CPX_CALLBACK_INFO_COVER_COUNT,
-                            CPX_CALLBACK_INFO_GUBCOVER_COUNT,
-                            CPX_CALLBACK_INFO_FLOWCOVER_COUNT,
-                            CPX_CALLBACK_INFO_CLIQUE_COUNT,
-                            CPX_CALLBACK_INFO_FRACCUT_COUNT,
-                            CPX_CALLBACK_INFO_MIRCUT_COUNT,
-                            CPX_CALLBACK_INFO_FLOWPATH_COUNT,
-                            CPX_CALLBACK_INFO_DISJCUT_COUNT,
-                            CPX_CALLBACK_INFO_IMPLBD_COUNT,
-                            CPX_CALLBACK_INFO_ZEROHALFCUT_COUNT,
-                            CPX_CALLBACK_INFO_MCFCUT_COUNT,
-                            CPX_CALLBACK_INFO_LANDPCUT_COUNT,
-                            CPX_CALLBACK_INFO_USERCUT_COUNT,
-                            CPX_CALLBACK_INFO_TABLECUT_COUNT,
-                            CPX_CALLBACK_INFO_SOLNPOOLCUT_COUNT,
-                            CPX_CALLBACK_INFO_BENDERS_COUNT):
+        if cut_type not in (_const.CPX_CALLBACK_INFO_COVER_COUNT,
+                            _const.CPX_CALLBACK_INFO_GUBCOVER_COUNT,
+                            _const.CPX_CALLBACK_INFO_FLOWCOVER_COUNT,
+                            _const.CPX_CALLBACK_INFO_CLIQUE_COUNT,
+                            _const.CPX_CALLBACK_INFO_FRACCUT_COUNT,
+                            _const.CPX_CALLBACK_INFO_MIRCUT_COUNT,
+                            _const.CPX_CALLBACK_INFO_FLOWPATH_COUNT,
+                            _const.CPX_CALLBACK_INFO_DISJCUT_COUNT,
+                            _const.CPX_CALLBACK_INFO_IMPLBD_COUNT,
+                            _const.CPX_CALLBACK_INFO_ZEROHALFCUT_COUNT,
+                            _const.CPX_CALLBACK_INFO_MCFCUT_COUNT,
+                            _const.CPX_CALLBACK_INFO_LANDPCUT_COUNT,
+                            _const.CPX_CALLBACK_INFO_USERCUT_COUNT,
+                            _const.CPX_CALLBACK_INFO_TABLECUT_COUNT,
+                            _const.CPX_CALLBACK_INFO_SOLNPOOLCUT_COUNT,
+                            _const.CPX_CALLBACK_INFO_BENDERS_COUNT):
             raise ValueError("invalid value for cut_type ({0})".format(cut_type))
-        return fast_getcallbackinfo(self._cbstruct, cut_type, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(self._cbstruct, cut_type,
+                                             CplexSolverError)
 
     def get_best_objective_value(self):
         """Returns the best objective value among unexplored nodes."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_BEST_REMAINING, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_BEST_REMAINING,
+            CplexSolverError)
 
     def get_cutoff(self):
         """Returns the current cutoff value."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_CUTOFF, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_CUTOFF,
+            CplexSolverError)
 
     def get_incumbent_objective_value(self):
         """Returns the objective value of the incumbent solution."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_BEST_INTEGER, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_BEST_INTEGER,
+            CplexSolverError)
 
     def get_incumbent_linear_slacks(self, *args):
         """Returns a set of linear slacks for the incumbent solution.
@@ -542,7 +538,7 @@ class MIPInfoCallback(OptimizationCallback):
           inclusive of end.  Equivalent to
           self.get_incumbent_linear_slacks(range(begin, end + 1)).
         """
-        status = cb_slackfromx(
+        status = _pycplex.cb_slackfromx(
             self._cbstruct, self._env_lp_ptr, self.get_incumbent_values())
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         slacks = status[1]
@@ -580,7 +576,7 @@ class MIPInfoCallback(OptimizationCallback):
           inclusive of end. Equivalent to
           self.get_incumbent_quadratic_slacks(range(begin, end + 1)).
         """
-        status = cb_qconstrslackfromx(
+        status = _pycplex.cb_qconstrslackfromx(
             self._cbstruct, self._env_lp_ptr, self.get_incumbent_values())
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         slacks = status[1]
@@ -628,23 +624,38 @@ class MIPInfoCallback(OptimizationCallback):
         and CPXgetmiprelgap in the Callable Library Reference Manual for
         more detail.
         """
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_MIP_REL_GAP, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_MIP_REL_GAP,
+            CplexSolverError)
 
     def get_num_iterations(self):
         """Returns the number of iterations performed so far."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_MIP_ITERATIONS_LONG, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_MIP_ITERATIONS_LONG,
+            CplexSolverError)
 
     def get_num_nodes(self):
         """Returns the number of nodes processed so far."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_NODE_COUNT_LONG, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_NODE_COUNT_LONG,
+            CplexSolverError)
 
     def get_num_remaining_nodes(self):
         """Returns the number of unexplored nodes remaining."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_NODES_LEFT_LONG, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_NODES_LEFT_LONG,
+            CplexSolverError)
 
     def has_incumbent(self):
         """Returns whether or not an incumbent solution has been found."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_MIP_FEAS, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_MIP_FEAS,
+            CplexSolverError)
 
     def get_float_quality(self, which):
         """Returns a measure of the quality of the MIP solution as a floating point value.
@@ -660,14 +671,27 @@ class MIPInfoCallback(OptimizationCallback):
         self.quality_metric.kappa_max
         self.quality_metric.kappa_attention
         """
-        if which not in (CPX_CALLBACK_INFO_KAPPA_STABLE,
-                         CPX_CALLBACK_INFO_KAPPA_SUSPICIOUS,
-                         CPX_CALLBACK_INFO_KAPPA_UNSTABLE,
-                         CPX_CALLBACK_INFO_KAPPA_ILLPOSED,
-                         CPX_CALLBACK_INFO_KAPPA_MAX,
-                         CPX_CALLBACK_INFO_KAPPA_ATTENTION):
+        if which not in (_const.CPX_CALLBACK_INFO_KAPPA_STABLE,
+                         _const.CPX_CALLBACK_INFO_KAPPA_SUSPICIOUS,
+                         _const.CPX_CALLBACK_INFO_KAPPA_UNSTABLE,
+                         _const.CPX_CALLBACK_INFO_KAPPA_ILLPOSED,
+                         _const.CPX_CALLBACK_INFO_KAPPA_MAX,
+                         _const.CPX_CALLBACK_INFO_KAPPA_ATTENTION):
             raise ValueError("invalid value for which ({0})".format(which))
-        return fast_getcallbackinfo(self._cbstruct, which, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(self._cbstruct, which,
+                                             CplexSolverError)
+
+    def get_thread_num(self):
+        """Returns the identifier for the thread from which the callback
+        was invoked.
+
+        See CPX_CALLBACK_INFO_MY_THREAD_NUM in the Callable Library
+        Reference Manual for more detail.
+        """
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_MY_THREAD_NUM,
+            CplexSolverError)
 
 
 class MIPCallback(MIPInfoCallback):
@@ -679,7 +703,7 @@ class MIPCallback(MIPInfoCallback):
 
     def __init__(self, env):
         """non-public"""
-        super(MIPCallback, self).__init__(env)
+        super().__init__(env)
         self._cb_type_string = "MIP"
         self._cb_set_function = _proc.setmipcallbackfunc
 
@@ -698,7 +722,7 @@ class MIPCallback(MIPInfoCallback):
         be called.
 
         self.get_objective_coefficients()
-          returns the entire objective function. 
+          returns the entire objective function.
 
         self.get_objective_coefficients(i)
           i must be a variable index or name.  Returns the objective
@@ -718,20 +742,50 @@ class MIPCallback(MIPInfoCallback):
           self.get_objective_coefficients(range(begin, end + 1))
         """
         def getobj(begin, end=self.get_num_cols() - 1):
-            status = cb_getobj(self._cbstruct, self._env_lp_ptr, begin, end)
+            status = _pycplex.cb_getobj(self._cbstruct, self._env_lp_ptr,
+                                        begin, end)
             _proc.check_status(self._cbstruct, status[0], from_cb=True)
             return status[1]
         return apply_freeform_two_args(
             getobj, self._conv_col, args)
 
+    def get_current_node_depth(self):
+        """Returns the depth of the current node in the search tree.
+
+        The root node has depth 0 (zero). The depth of other nodes is defined
+        recursively as the depth of their parent node plus one.  In other
+        words, the depth of a node is its distance in terms of the number of
+        branches from the root.
+        """
+        # The function is called get_current_node_depth() rather than
+        # get_depth() (as in the other APIs) for historical reasons:
+        # when we introduced the function we already had a get_depth()
+        # function in the node callback which had a different signature and
+        # different semantics
+        return _proc.getcallbacknodeinfo(
+            self._cbstruct, 0,
+            _const.CPX_CALLBACK_INFO_NODE_DEPTH_LONG)
+
+
+class FeasibilityStatus(ConstantClass):
+    """Feasibility status codes."""
+    feasible = _const.CPX_INTEGER_FEASIBLE
+    implied_feasible = _const.CPX_IMPLIED_INTEGER_FEASIBLE
+    infeasible = _const.CPX_INTEGER_INFEASIBLE
+
 
 class ControlCallback(MIPCallback):
-    """Base class for Cplex MIP control callback classes."""
+    """Base class for Cplex MIP control callback classes.
 
-    class feasibility_status(object):
-        feasible = _internal._constants.CPX_INTEGER_FEASIBLE
-        implied_feasible = _internal._constants.CPX_IMPLIED_INTEGER_FEASIBLE
-        infeasible = _internal._constants.CPX_INTEGER_INFEASIBLE
+    """
+
+    feasibility_status = FeasibilityStatus()
+    """See `FeasibilityStatus()`"""
+
+    def __init__(self, env):
+        """non-public"""
+        super().__init__(env)
+        self._useraction = _const.CPX_CALLBACK_DEFAULT
 
     def get_pseudo_costs(self, *args):
         """Returns the current pseudo costs.
@@ -873,7 +927,8 @@ class ControlCallback(MIPCallback):
 
         Returns None if no handle is set for the node.
         """
-        return self._get_node_info(_internal._constants.CPX_CALLBACK_INFO_NODE_USERHANDLE, 0)
+        return self._get_node_info(
+            _const.CPX_CALLBACK_INFO_NODE_USERHANDLE, 0)
 
     def set_node_data(self, data):
         """Set the user handle for the current node.
@@ -885,7 +940,8 @@ class ControlCallback(MIPCallback):
 
     def get_node_ID(self):
         """Return the sequence number of this node."""
-        return self._get_node_info(_internal._constants.CPX_CALLBACK_INFO_NODE_SEQNUM_LONG, 0)
+        return self._get_node_info(
+            _const.CPX_CALLBACK_INFO_NODE_SEQNUM_LONG, 0)
 
     def get_objective_value(self):
         """Returns the value of the objective function at the current node."""
@@ -919,7 +975,7 @@ class ControlCallback(MIPCallback):
           inclusive of end.  Equivalent to
           self.get_linear_slacks(range(begin, end + 1)).
         """
-        status = cb_slackfromx(
+        status = _pycplex.cb_slackfromx(
             self._cbstruct, self._env_lp_ptr, self.get_values())
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         slacks = status[1]
@@ -956,7 +1012,7 @@ class ControlCallback(MIPCallback):
           inclusive of end. Equivalent to
           self.get_quadratic_slacks(range(begin, end + 1)).
         """
-        status = cb_qconstrslackfromx(
+        status = _pycplex.cb_qconstrslackfromx(
             self._cbstruct, self._env_lp_ptr, self.get_values())
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         slacks = status[1]
@@ -975,7 +1031,7 @@ class ControlCallback(MIPCallback):
         cplex.infinity.  Thus, often the vector can be used directly,
         for example to separate a lazy constraint.  However, due to
         the presence of large values in the vector care must be taken
-        to avoid potential numerical errors.  If in doubt, 
+        to avoid potential numerical errors.  If in doubt,
         rescale the vector, and use it as an unbounded ray
         rather than a primal vector.
 
@@ -1043,10 +1099,20 @@ class ControlCallback(MIPCallback):
           method get_SOS_feasibilities.
         """
         def is_sos_feasible(index):
-            return _proc.getcallbacksosinfo(self._cbstruct, index, 0, _internal._constants.CPX_CALLBACK_INFO_SOS_IS_FEASIBLE)
+            return _proc.getcallbacksosinfo(
+                self._cbstruct, index, 0,
+                _const.CPX_CALLBACK_INFO_SOS_IS_FEASIBLE)
         return apply_freeform_one_arg(
             is_sos_feasible, self._conv_sos,
-            cb_getnumsos(self._cbstruct, self._env_lp_ptr), args)
+            _pycplex.cb_getnumsos(self._cbstruct, self._env_lp_ptr), args)
+
+
+class BranchType(ConstantClass):
+    """Constants defining types of branches."""
+    any = _const.CPX_TYPE_ANY
+    SOS1 = _const.CPX_TYPE_SOS1
+    SOS2 = _const.CPX_TYPE_SOS2
+    variable = _const.CPX_TYPE_VAR
 
 
 class BranchCallback(ControlCallback):
@@ -1054,7 +1120,8 @@ class BranchCallback(ControlCallback):
 
     The user must be careful when using this class. Pruning a valid node
     can prune the optimal solution. Also, choosing a different branching
-    variable can result in placing an invalid bound on a variable.
+    variable can result in placing an invalid bound on a variable, in case
+    the variable was already restricted to other bounds before.
 
     In particular, the user must not branch on variables that are implied
     feasible. ImpliedFeasible specifies that the variable has been
@@ -1085,21 +1152,25 @@ class BranchCallback(ControlCallback):
 
     """
 
-    class branch_type(object):
-        """Constants defining types of branches."""
-        any = _internal._constants.CPX_TYPE_ANY
-        SOS1 = _internal._constants.CPX_TYPE_SOS1
-        SOS2 = _internal._constants.CPX_TYPE_SOS2
-        variable = _internal._constants.CPX_TYPE_VAR
+    branch_type = BranchType()
+    """See `BranchType()`"""
 
     def __init__(self, env):
         """non-public"""
         def fn(a, b):
             _proc.setbranchcallbackfunc(a, b)
             _proc.setbranchnosolncallbackfunc(a, b)
-        super(BranchCallback, self).__init__(env)
+        super().__init__(env)
         self._cb_type_string = "branch"
         self._cb_set_function = fn
+        self._node_count = 0
+        self._bound_count = 0
+        self._node_begin = []
+        self._index = []
+        self._bounds = []
+        self._lu = []
+        self._node_estimate = []
+        self._branch_type = None
 
     def get_branch(self, which_branch):
         """Returns one of the candidate branches at the current node.
@@ -1115,17 +1186,16 @@ class BranchCallback(ControlCallback):
         that the branch will change the lower bound, the upper bound,
         or both, respectively.
         """
-        if which_branch >= 0 and which_branch < self._node_count:
-            if which_branch == self._node_count - 1:
-                end = self._bound_count
-            else:
-                end = self._node_begin[which_branch + 1]
-            vars = self._index[self._node_begin[which_branch]: end]
-            bnds = self._bounds[self._node_begin[which_branch]: end]
-            dirs = self._lu[self._node_begin[which_branch]: end]
-            return (self._node_estimate[which_branch], list(zip(vars, dirs, bnds)))
-        else:
+        if which_branch < 0 or which_branch >= self._node_count:
             raise CplexError("BranchCallback.get_branch: Bad branch index")
+        if which_branch == self._node_count - 1:
+            end = self._bound_count
+        else:
+            end = self._node_begin[which_branch + 1]
+        vars = self._index[self._node_begin[which_branch]: end]
+        bnds = self._bounds[self._node_begin[which_branch]: end]
+        dirs = self._lu[self._node_begin[which_branch]: end]
+        return (self._node_estimate[which_branch], list(zip(vars, dirs, bnds)))
 
     def get_branch_type(self):
         """Returns the type of the branch.
@@ -1136,9 +1206,7 @@ class BranchCallback(ControlCallback):
         self.branch_type.SOS2
         self.branch_type.variable
         """
-        cpx_encode = _proc.cpx_encode
-        enc = _proc.default_encoding
-        return cpx_encode(self._branch_type, enc)
+        return self._branch_type
 
     def get_num_branches(self):
         """Return the number of nodes Cplex will create from this branch."""
@@ -1168,8 +1236,8 @@ class BranchCallback(ControlCallback):
         second of which specifies the values of the constraint.  rhs
         must be a float determining the righthand side of the
         constraint.  sense must be one of "L", "G", or "E", specifying
-        whether the constraint is a less-than, greater-than, or
-        equality constraint.
+        whether the constraint is a less-than-or-equal-to (<=),
+        greater-than-or-equal-to (>=), or equality constraint.
 
         node_data may be any object to be associated with the created
         node.  It can be queried by the get_node_data methods of the
@@ -1177,31 +1245,31 @@ class BranchCallback(ControlCallback):
         """
         variables, constraints = init_list_args(variables, constraints)
         obje = objective_estimate
-        if len(variables) == 0:
-            a = [[], [], []]
-        else:
+        if variables:
             a = unzip(variables)
+        else:
+            a = [[], [], []]
         vars = list(a[0])
         dirs = ''.join(list(a[1]))
         bnds = list(a[2])
-        if len(constraints) == 0:
-            a = [[], [], []]
-        else:
+        if constraints:
             a = unzip(constraints)
+        else:
+            a = [[], [], []]
         rmat = _HBMatrix(a[0])
         sense = ''.join(list(a[1]))
         rhs = list(a[2])
         seqnum = _proc.branchcallbackbranchgeneral(
             self._cbstruct, vars, dirs, bnds, rhs, sense, rmat.matbeg,
             rmat.matind, rmat.matval, obje, node_data)
-        self._useraction = _internal._constants.CPX_CALLBACK_SET
+        self._useraction = _const.CPX_CALLBACK_SET
         return (seqnum,)
 
     def make_cplex_branch(self, which_branch, node_data=None):
         """Replicates a CPLEX branch.
 
-        The function replicates the n-th branch that CPLEX would create
-        at the current node. The purpose of this function is to branch
+        This method replicates the n-th branch that CPLEX would create
+        at the current node. The purpose of this method is to branch
         exactly like CPLEX, but at the same time attach a user object to
         the newly created node.
 
@@ -1212,13 +1280,13 @@ class BranchCallback(ControlCallback):
         node.  It can be queried by the get_node_data methods of various
         callback classes.
 
-        The function returns the sequence number of the newly created
+        This method returns the sequence number of the newly created
         node.
         """
         seqnum = _proc.branchcallbackbranchasCPLEX(self._cbstruct,
                                                    which_branch,
                                                    node_data)
-        self._useraction = _internal._constants.CPX_CALLBACK_SET
+        self._useraction = _const.CPX_CALLBACK_SET
         return seqnum
 
     def prune(self):
@@ -1226,11 +1294,11 @@ class BranchCallback(ControlCallback):
 
         Note
           Prune must not be called in combination with make_branch.
-          Prune is not compatible with the populate_solution_pool 
-          method of the Cplex class because 
+          Prune is not compatible with the populate_solution_pool
+          method of the Cplex class because
           that method retains fathomed nodes for subsequent use.
         """
-        self._useraction = _internal._constants.CPX_CALLBACK_SET
+        self._useraction = _const.CPX_CALLBACK_SET
         self._status = 0
 
 
@@ -1239,7 +1307,7 @@ class CutCallback(ControlCallback):
 
     """
 
-    def add(self, cut, sense, rhs, use_cut):
+    def _add(self, cut, sense, rhs, use_cut):
         """non-public"""
         indices, values = unpack_pair(cut)
         if use_cut is True:
@@ -1251,12 +1319,18 @@ class CutCallback(ControlCallback):
             self._conv_col(indices),
             values, use_cut)
 
-    def add_local(self, cut, sense, rhs):
+    def _add_local(self, cut, sense, rhs):
         """non-public"""
         indices, values = unpack_pair(cut)
         _proc.cutcallbackaddlocal(
             self._cbstruct, rhs, sense,
             self._conv_col(indices), values)
+
+
+class UseConstraint(ConstantClass):
+    """Constants to specify when to use the added constraint"""
+    force = _const.CPX_USECUT_FORCE
+    purge = _const.CPX_USECUT_PURGE
 
 
 class LazyConstraintCallback(CutCallback):
@@ -1275,7 +1349,7 @@ class LazyConstraintCallback(CutCallback):
         - MIP start processing occurs very early in the solution process.
           At this point no search tree is setup yet and there are no
           search tree nodes yet.  Consequently, a lot of the callback
-          functions that require a node context will fail in this
+          methods that require a node context will fail in this
           situation.
         - Lazy constraints separated when processing a MIP start will be
           discarded after that MIP start has been processed. This means
@@ -1285,14 +1359,12 @@ class LazyConstraintCallback(CutCallback):
 
     """
 
-    class use_constraint(object):
-        """Constants to specify when to use the added constraint"""
-        force = _internal._constants.CPX_USECUT_FORCE
-        purge = _internal._constants.CPX_USECUT_PURGE
+    use_constraint = UseConstraint()
+    """See `UseConstraint()`"""
 
     def __init__(self, env):
         """non-public"""
-        super(LazyConstraintCallback, self).__init__(env)
+        super().__init__(env)
         self._cb_type_string = "lazycon"
         self._cb_set_function = _proc.setlazyconstraintcallbackfunc
 
@@ -1315,13 +1387,13 @@ class LazyConstraintCallback(CutCallback):
 
         When you add a lazy constraint with the nondefault value purge,
         you authorize CPLEX to purge (that is, to eliminate) the lazy
-        constraint under certain circumstances, for example, if the 
+        constraint under certain circumstances, for example, if the
         lazy constraint becomes slack. Consequently, in view of such
         purging, you must not assume that any previously added constraints
         are still in current relaxation. In other words, the purged
         lazy constraint may be violated in subsequent relaxations.
         """
-        CutCallback.add(self, constraint, sense, rhs, use)
+        self._add(constraint, sense, rhs, use)
 
     def add_local(self, constraint, sense, rhs):
         """Adds a linear local constraint to the current subproblem.
@@ -1339,12 +1411,11 @@ class LazyConstraintCallback(CutCallback):
 
         rhs is a float, specifying the righthand side of the constraint.
         """
-        CutCallback.add_local(self, constraint, sense, rhs)
+        self._add_local(constraint, sense, rhs)
 
     def is_unbounded_node(self):
         """Returns True if the current LP relaxation is unbounded, False otherwise."""
-        return (self._wherefrom() ==
-                _internal._constants.CPX_CALLBACK_MIP_CUT_UNBD)
+        return self._wherefrom() == _const.CPX_CALLBACK_MIP_CUT_UNBD
 
     def get_solution_source(self):
         """Returns the source of the solution for which the lazy constraint callback was invoked.
@@ -1361,15 +1432,22 @@ class LazyConstraintCallback(CutCallback):
         IncumbentCallback.solution_source.mipstart_solution: The integral solution has been
         found during MIP start processing.
         """
-        if _internal._constants.CPX_LAZYCONSTRAINTCALLBACK_NODE == self._get_node_info(_internal._constants.CPX_CALLBACK_INFO_LAZY_SOURCE, 0):
-            return IncumbentCallback.solution_source.node_solution
-        elif _internal._constants.CPX_LAZYCONSTRAINTCALLBACK_HEUR == self._get_node_info(_internal._constants.CPX_CALLBACK_INFO_LAZY_SOURCE, 0):
-            return IncumbentCallback.solution_source.heuristic_solution
-        elif _internal._constants.CPX_LAZYCONSTRAINTCALLBACK_MIPSTART == self._get_node_info(_internal._constants.CPX_CALLBACK_INFO_LAZY_SOURCE, 0):
-            return IncumbentCallback.solution_source.mipstart_solution
-        else:
-            raise CplexError(
-                "Unexpected wherefrom value in LazyConstraintCallback.get_solution_source()")
+        node_info = self._get_node_info(_const.CPX_CALLBACK_INFO_LAZY_SOURCE, 0)
+        source = IncumbentCallback.solution_source
+        switcher = {
+            _const.CPX_LAZYCONSTRAINTCALLBACK_NODE: source.node_solution,
+            _const.CPX_LAZYCONSTRAINTCALLBACK_HEUR: source.heuristic_solution,
+            _const.CPX_LAZYCONSTRAINTCALLBACK_MIPSTART: source.mipstart_solution,
+            _const.CPX_LAZYCONSTRAINTCALLBACK_USER: source.user_solution
+        }
+        return switcher[node_info]
+
+
+class UseCut(ConstantClass):
+    """Constants to specify when to use the added cut."""
+    force = _const.CPX_USECUT_FORCE
+    purge = _const.CPX_USECUT_PURGE
+    filter = _const.CPX_USECUT_FILTER
 
 
 class UserCutCallback(CutCallback):
@@ -1382,15 +1460,12 @@ class UserCutCallback(CutCallback):
 
     """
 
-    class use_cut(object):
-        """Constants to specify when to use the added cut."""
-        force = _internal._constants.CPX_USECUT_FORCE
-        purge = _internal._constants.CPX_USECUT_PURGE
-        filter = _internal._constants.CPX_USECUT_FILTER
+    use_cut = UseCut()
+    """See `UseCut()`"""
 
     def __init__(self, env):
         """non-public"""
-        super(UserCutCallback, self).__init__(env)
+        super().__init__(env)
         self._cb_type_string = "usercut"
         self._cb_set_function = _proc.setusercutcallbackfunc
 
@@ -1412,13 +1487,13 @@ class UserCutCallback(CutCallback):
         self.use_cut.purge           : allow CPLEX to purge the cut
         self.use_cut.filter          : treat as cuts CPLEX creates
         """
-        CutCallback.add(self, cut, sense, rhs, use)
+        self._add(cut, sense, rhs, use)
 
     def add_local(self, cut, sense, rhs):
         """Adds a linear local cut to the current subproblem.
 
         A local cut is a cut that is only valid at the current
-        node and the subtree rooted by the current node. It does 
+        node and the subtree rooted by the current node. It does
         not need to be globally valid.
 
         cut must be either a SparsePair instance or a list of two
@@ -1429,16 +1504,23 @@ class UserCutCallback(CutCallback):
 
         rhs is a float, specifying the righthand side of the cut.
         """
-        CutCallback.add_local(self, cut, sense, rhs)
+        self._add_local(cut, sense, rhs)
 
     def is_after_cut_loop(self):
         """Returns True if called after the cut loop, False otherwise."""
-        return (self._wherefrom() ==
-                _internal._constants.CPX_CALLBACK_MIP_CUT_LAST)
+        return self._wherefrom() == _const.CPX_CALLBACK_MIP_CUT_LAST
 
     def abort_cut_loop(self):
         """Terminate the cut loop and proceed with branching."""
-        self._useraction = _internal._constants.CPX_CALLBACK_ABORT_CUT_LOOP
+        self._useraction = _const.CPX_CALLBACK_ABORT_CUT_LOOP
+
+
+class MethodType(ConstantClass):
+    """Constants defining methods for solving the node LP."""
+    primal = _const.CPX_ALG_PRIMAL
+    dual = _const.CPX_ALG_DUAL
+    barrier = _const.CPX_ALG_BARRIER
+    network = _const.CPX_ALG_NET
 
 
 class HSCallback(ControlCallback):
@@ -1447,35 +1529,31 @@ class HSCallback(ControlCallback):
     status = _internal._subinterfaces.SolutionStatus()
     """See `_internal._subinterfaces.SolutionStatus()` """
 
-    class method(object):
-        """Constants defining methods for solving the node LP."""
-        primal = _internal._constants.CPX_ALG_PRIMAL
-        dual = _internal._constants.CPX_ALG_DUAL
-        barrier = _internal._constants.CPX_ALG_BARRIER
-        network = _internal._constants.CPX_ALG_NET
+    method = MethodType()
+    """See `MethodType()`"""
 
     def get_cplex_status(self):
         """Returns the solution status of the current subproblem.
 
         Returns an attribute of self.status.
         """
-        status = cb_getstat(self._cbstruct)
+        status = _pycplex.cb_getstat(self._cbstruct)
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         return status[1]
 
     def is_dual_feasible(self):
         """Returns whether the solution of the current subproblem is dual feasible."""
-        status = cb_solninfo(self._cbstruct)
+        status = _pycplex.cb_solninfo(self._cbstruct)
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         return bool(status[2])
 
     def is_primal_feasible(self):
         """Returns whether the solution of the current subproblem is primal feasible."""
-        status = cb_solninfo(self._cbstruct)
+        status = _pycplex.cb_solninfo(self._cbstruct)
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         return bool(status[1])
 
-    def solve(self, alg=_internal._constants.CPX_ALG_DUAL):
+    def solve(self, alg=_const.CPX_ALG_DUAL):
         """Solves the current subproblem.
 
         The value of alg, if specified, determines the algorithm to
@@ -1492,20 +1570,17 @@ class HSCallback(ControlCallback):
         If this method generates a feasible solution it returns True,
         otherwise it returns False.
         """
-        if alg == _internal._constants.CPX_ALG_PRIMAL:
-            status = cb_primopt(self._cbstruct)
-            _proc.check_status(self._cbstruct, status, from_cb=True)
-        elif alg == _internal._constants.CPX_ALG_DUAL or alg == _internal._constants.CPX_ALG_AUTOMATIC:
-            status = cb_dualopt(self._cbstruct)
-            _proc.check_status(self._cbstruct, status, from_cb=True)
-        elif alg == _internal._constants.CPX_ALG_BARRIER:
-            status = cb_hybbaropt(self._cbstruct)
-            _proc.check_status(self._cbstruct, status, from_cb=True)
-        elif alg == _internal._constants.CPX_ALG_NET:
-            status = cb_hybnetopt(self._cbstruct)
-            _proc.check_status(self._cbstruct, status, from_cb=True)
+        if alg == _const.CPX_ALG_PRIMAL:
+            status = _pycplex.cb_primopt(self._cbstruct)
+        elif alg in (_const.CPX_ALG_DUAL, _const.CPX_ALG_AUTOMATIC):
+            status = _pycplex.cb_dualopt(self._cbstruct)
+        elif alg == _const.CPX_ALG_BARRIER:
+            status = _pycplex.cb_hybbaropt(self._cbstruct)
+        elif alg == _const.CPX_ALG_NET:
+            status = _pycplex.cb_hybnetopt(self._cbstruct)
         else:
             raise CplexError("HSCallback.solve: bad algorithm identifier")
+        _proc.check_status(self._cbstruct, status, from_cb=True)
         return self.get_cplex_status() in (self.status.optimal,
                                            self.status.feasible,
                                            self.status.MIP_optimal,
@@ -1523,9 +1598,10 @@ class HeuristicCallback(HSCallback):
 
     def __init__(self, env):
         """non-public"""
-        super(HeuristicCallback, self).__init__(env)
+        super().__init__(env)
         self._cb_type_string = "heuristic"
         self._cb_set_function = _proc.setheuristiccallbackfunc
+        self._x = []
 
     def set_bounds(self, *args):
         """Sets the bounds for a set of variables.
@@ -1563,7 +1639,7 @@ class HeuristicCallback(HSCallback):
         else:
             raise WrongNumberOfArgumentsError()
         vars = self._conv_col(vars)
-        status = cb_getprestat_c(self._cbstruct, self._env_lp_ptr)
+        status = _pycplex.cb_getprestat_c(self._cbstruct, self._env_lp_ptr)
         if status is not None:
             _proc.check_status(self._cbstruct, status[0], from_cb=True)
             pstat = status[1]
@@ -1583,9 +1659,7 @@ class HeuristicCallback(HSCallback):
                 ind.append(v)
                 lu = ''.join([lu, "LU"])
                 bd.extend([lb[i], ub[i]])
-        cpx_decode = _proc.cpx_decode
-        enc = _proc.default_encoding
-        status = cb_chgbds(self._cbstruct, ind, cpx_decode(lu, enc), bd)
+        status = _pycplex.cb_chgbds(self._cbstruct, ind, lu, bd)
         _proc.check_status(self._cbstruct, status, from_cb=True)
 
     def set_solution(self, solution, objective_value=None):
@@ -1602,7 +1676,7 @@ class HeuristicCallback(HSCallback):
         value of the new solution.  Otherwise, the objective value is
         computed.
 
-        Do not call this method multiple times. 
+        Do not call this method multiple times.
         Calling it again will overwrite any previously specified solution.
         """
         vars, vals = unpack_pair(solution)
@@ -1615,7 +1689,7 @@ class HeuristicCallback(HSCallback):
             for i, v in enumerate(self._x):
                 objective_value += v * obj_coef[i]
         self._objective_value = objective_value
-        self._useraction = _internal._constants.CPX_CALLBACK_SET
+        self._useraction = _const.CPX_CALLBACK_SET
         self._check_feasibility = 1
         self._status = 0
 
@@ -1630,7 +1704,7 @@ class SolveCallback(HSCallback):
 
     def __init__(self, env):
         """non-public"""
-        super(SolveCallback, self).__init__(env)
+        super().__init__(env)
         self._cb_type_string = "solve"
         self._cb_set_function = _proc.setsolvecallbackfunc
 
@@ -1668,38 +1742,46 @@ class SolveCallback(HSCallback):
             prim[var[i]] = val
         for i, val in enumerate(pi):
             dual[rng[i]] = val
-        if len(var) > 0:
-            status = cb_crushx(self._cbstruct, self._env_lp_ptr, prim)
+        if var:
+            status = _pycplex.cb_crushx(self._cbstruct, self._env_lp_ptr, prim)
             if status is not None:
                 _proc.check_status(self._cbstruct,
                                    status[0], from_cb=True)
                 prim = status[1]
-        if len(rng) > 0:
-            status = cb_crushpi(self._cbstruct, self._env_lp_ptr, dual)
+        if rng:
+            status = _pycplex.cb_crushpi(self._cbstruct, self._env_lp_ptr, dual)
             if status is not None:
                 _proc.check_status(self._cbstruct,
                                    status, from_cb=True)
                 raise CplexError(
                     "Presolve must be disabled to set dual vectors in SolveCallback.set_start")
-        status = cb_copystart(self._cbstruct, prim, dual)
+        status = _pycplex.cb_copystart(self._cbstruct, prim, dual)
         _proc.check_status(self._cbstruct, status, from_cb=True)
 
     def use_solution(self):
         """Tell CPLEX to use the resident solution after calling solve."""
-        self._useraction = _internal._constants.CPX_CALLBACK_SET
+        self._useraction = _const.CPX_CALLBACK_SET
         self._status = 0
+
+
+class SolutionSource(ConstantClass):
+    """Attributes defining possible solution sources."""
+    node_solution = _const.CPX_CALLBACK_MIP_INCUMBENT_NODESOLN
+    heuristic_solution = _const.CPX_CALLBACK_MIP_INCUMBENT_HEURSOLN
+    user_solution = _const.CPX_CALLBACK_MIP_INCUMBENT_USERSOLN
+    mipstart_solution = _const.CPX_CALLBACK_MIP_INCUMBENT_MIPSTART
 
 
 class IncumbentCallback(MIPCallback):
     """Subclassable class for incumbent callback classes.
 
     This callback will be used after each new potential incumbent is found.
-    If the callback is used to reject incumbents, the user must set 
-    the parameter 
+    If the callback is used to reject incumbents, the user must set
+    the parameter
     c.parameters.preprocessing.reduce either to the value
     1 (one) to restrict presolve to primal reductions only or to 0 (zero)
     to disable all presolve reductions. This setting of the parameter is
-    not necessary if the incumbent callback is used for other purposes. 
+    not necessary if the incumbent callback is used for other purposes.
 
     Note
       The incumbent callback may be invoked during MIP start processing.
@@ -1708,30 +1790,29 @@ class IncumbentCallback(MIPCallback):
 
       - MIP start processing occurs very early in the solution process.
         At this point no search tree is setup yet and there are no search
-        tree nodes yet.  Consequently, a lot of the callback functions
+        tree nodes yet.  Consequently, a lot of the callback methods
         that require a node context will fail in this situation.
 
     """
 
-    class solution_source(object):
-        """Attributes defining possible solution sources."""
-        node_solution = _internal._constants.CPX_CALLBACK_MIP_INCUMBENT_NODESOLN
-        heuristic_solution = _internal._constants.CPX_CALLBACK_MIP_INCUMBENT_HEURSOLN
-        user_solution = _internal._constants.CPX_CALLBACK_MIP_INCUMBENT_USERSOLN
-        mipstart_solution = _internal._constants.CPX_CALLBACK_MIP_INCUMBENT_MIPSTART
+    solution_source = SolutionSource()
+    """See `SolutionSource()`"""
 
     def __init__(self, env):
         """non-public"""
-        super(IncumbentCallback, self).__init__(env)
+        super().__init__(env)
         self._cb_type_string = "incumbent"
         self._cb_set_function = _proc.setincumbentcallbackfunc
+        self._useraction = _const.CPX_CALLBACK_DEFAULT
+        self._objective_value = 0.0
+        self._x = []
 
     def get_node_data(self):
         """Returns the user handle for the current node.
 
         Returns None if no handle is set for the node.
         """
-        return self._get_node_info(_internal._constants.CPX_CALLBACK_INFO_NODE_USERHANDLE, 0)
+        return self._get_node_info(_const.CPX_CALLBACK_INFO_NODE_USERHANDLE, 0)
 
     def set_node_data(self, data):
         """Set the user handle for the current node.
@@ -1743,7 +1824,7 @@ class IncumbentCallback(MIPCallback):
 
     def get_node_ID(self):
         """Returns the sequence number of the current node."""
-        return self._get_node_info(_internal._constants.CPX_CALLBACK_INFO_NODE_SEQNUM_LONG, 0)
+        return self._get_node_info(_const.CPX_CALLBACK_INFO_NODE_SEQNUM_LONG, 0)
 
     def get_objective_value(self):
         """Returns the objective value of the potential incumbent."""
@@ -1777,7 +1858,8 @@ class IncumbentCallback(MIPCallback):
           inclusive of end.  Equivalent to
           self.get_linear_slacks(range(begin, end + 1)).
         """
-        status = cb_slackfromx(self._cbstruct, self._env_lp_ptr, self._x)
+        status = _pycplex.cb_slackfromx(self._cbstruct, self._env_lp_ptr,
+                                        self._x)
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         slacks = status[1]
 
@@ -1813,7 +1895,7 @@ class IncumbentCallback(MIPCallback):
           end, inclusive of end. Equivalent to
           self.get_quadratic_slacks(range(begin, end + 1)).
         """
-        status = cb_qconstrslackfromx(
+        status = _pycplex.cb_qconstrslackfromx(
             self._cbstruct, self._env_lp_ptr, self._x)
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         slacks = status[1]
@@ -1870,21 +1952,19 @@ class IncumbentCallback(MIPCallback):
         self.solution_source.mipstart_solution: The integral solution has been
         found during MIP start processing.
         """
-        if self._wherefrom() == _internal._constants.CPX_CALLBACK_MIP_INCUMBENT_NODESOLN:
-            return self.solution_source.node_solution
-        elif self._wherefrom() == _internal._constants.CPX_CALLBACK_MIP_INCUMBENT_HEURSOLN:
-            return self.solution_source.heuristic_solution
-        elif self._wherefrom() == _internal._constants.CPX_CALLBACK_MIP_INCUMBENT_USERSOLN:
-            return self.solution_source.user_solution
-        elif self._wherefrom() == _internal._constants.CPX_CALLBACK_MIP_INCUMBENT_MIPSTART:
-            return self.solution_source.mipstart_solution
-        else:
-            raise CplexError(
-                "Unexpected wherefrom value in IncumbentCallback.get_solution_source()")
+        wherefrom = self._wherefrom()
+        source = self.solution_source
+        switcher = {
+            _const.CPX_CALLBACK_MIP_INCUMBENT_NODESOLN: source.node_solution,
+            _const.CPX_CALLBACK_MIP_INCUMBENT_HEURSOLN: source.heuristic_solution,
+            _const.CPX_CALLBACK_MIP_INCUMBENT_USERSOLN: source.user_solution,
+            _const.CPX_CALLBACK_MIP_INCUMBENT_MIPSTART: source.mipstart_solution
+        }
+        return switcher[wherefrom]
 
     def reject(self):
         """Tells Cplex not to use the potential incumbent."""
-        self._useraction = _internal._constants.CPX_CALLBACK_SET
+        self._useraction = _const.CPX_CALLBACK_SET
         self._is_feasible = False
 
 
@@ -1899,14 +1979,14 @@ class NodeCallback(MIPCallback):
     def __conditionally_convert(self, which_node):
         if isinstance(which_node, type(())):
             return self.get_node_number(which_node)
-        else:
-            return which_node
+        return which_node
 
     def __init__(self, env):
         """non-public"""
-        super(NodeCallback, self).__init__(env)
+        super().__init__(env)
         self._cb_type_string = "node"
         self._cb_set_function = _proc.setnodecallbackfunc
+        self._useraction = _const.CPX_CALLBACK_DEFAULT
 
     def get_branch_variable(self, which_node):
         """Returns the index of the variable used to branch at node which_node.
@@ -1915,7 +1995,7 @@ class NodeCallback(MIPCallback):
         number of the desired node, or a 1-tuple whose entry is an
         integer specifying the sequence number of the desired node.
         """
-        return self._get_node_info(_internal._constants.CPX_CALLBACK_INFO_NODE_VAR,
+        return self._get_node_info(_const.CPX_CALLBACK_INFO_NODE_VAR,
                                    self.__conditionally_convert(which_node))
 
     def get_depth(self, which_node):
@@ -1925,8 +2005,24 @@ class NodeCallback(MIPCallback):
         number of the desired node, or a 1-tuple whose entry is an
         integer specifying the sequence number of the desired node.
         """
-        return self._get_node_info(_internal._constants.CPX_CALLBACK_INFO_NODE_DEPTH_LONG,
+        return self._get_node_info(_const.CPX_CALLBACK_INFO_NODE_DEPTH_LONG,
                                    self.__conditionally_convert(which_node))
+
+    def get_current_node_depth(self):
+        """Returns the depth of the current node in the search tree.
+
+        This method always raises an exception since the node callback is not
+        invoked in the context of any node.
+        """
+        # Overrides MIPCallback.get_current_node_depth
+        # Always throw an exception.
+        # The intention is this: The super class has a getCurrentNodeDepth()
+        # function as well. That would throw an exception because the callable
+        # library returns a non-zero status.
+        # However, by explicitly overriding this function, we can explicitly
+        # document that this will fail.
+        raise CplexSolverError('Not in a node context', None,
+                               CPXERR_UNSUPPORTED_OPERATION)
 
     def get_estimated_objective_value(self, which_node):
         """Returns the estimated objective function value at node which_node.
@@ -1935,7 +2031,7 @@ class NodeCallback(MIPCallback):
         number of the desired node, or a 1-tuple whose entry is an
         integer specifying the sequence number of the desired node.
         """
-        return self._get_node_info(_internal._constants.CPX_CALLBACK_INFO_NODE_ESTIMATE,
+        return self._get_node_info(_const.CPX_CALLBACK_INFO_NODE_ESTIMATE,
                                    self.__conditionally_convert(which_node))
 
     def get_infeasibility_sum(self, which_node):
@@ -1945,7 +2041,7 @@ class NodeCallback(MIPCallback):
         number of the desired node, or a 1-tuple whose entry is an
         integer specifying the sequence number of the desired node.
         """
-        return self._get_node_info(_internal._constants.CPX_CALLBACK_INFO_NODE_SIINF,
+        return self._get_node_info(_const.CPX_CALLBACK_INFO_NODE_SIINF,
                                    self.__conditionally_convert(which_node))
 
     def get_num_infeasibilities(self, which_node):
@@ -1955,7 +2051,7 @@ class NodeCallback(MIPCallback):
         number of the desired node, or a 1-tuple whose entry is an
         integer specifying the sequence number of the desired node.
         """
-        return self._get_node_info(_internal._constants.CPX_CALLBACK_INFO_NODE_NIINF,
+        return self._get_node_info(_const.CPX_CALLBACK_INFO_NODE_NIINF,
                                    self.__conditionally_convert(which_node))
 
     def get_node_data(self, which_node):
@@ -1967,7 +2063,7 @@ class NodeCallback(MIPCallback):
         number of the desired node, or a 1-tuple whose entry is an
         integer specifying the sequence number of the desired node.
         """
-        return self._get_node_info(_internal._constants.CPX_CALLBACK_INFO_NODE_USERHANDLE,
+        return self._get_node_info(_const.CPX_CALLBACK_INFO_NODE_USERHANDLE,
                                    self.__conditionally_convert(which_node))
 
     def set_node_data(self, which_node, data):
@@ -1985,7 +2081,8 @@ class NodeCallback(MIPCallback):
         which_node must be an integer specifying the index
         number of the desired node.
         """
-        return (self._get_node_info(_internal._constants.CPX_CALLBACK_INFO_NODE_SEQNUM_LONG, which_node),)
+        return (self._get_node_info(
+            _const.CPX_CALLBACK_INFO_NODE_SEQNUM_LONG, which_node),)
 
     def get_node_number(self, which_node):
         """Returns the index number of node which_node.
@@ -1993,7 +2090,8 @@ class NodeCallback(MIPCallback):
         which_node must be a 1-tuple whose entry is an integer
         specifying the sequence number of the desired node.
         """
-        return self._get_seq_info(_internal._constants.CPX_CALLBACK_INFO_NODE_NODENUM_LONG, which_node[0])
+        return self._get_seq_info(
+            _const.CPX_CALLBACK_INFO_NODE_NODENUM_LONG, which_node[0])
 
     def get_objective_value(self, which_node):
         """Returns the objective function value for node which_node.
@@ -2002,7 +2100,7 @@ class NodeCallback(MIPCallback):
         number of the desired node, or a 1-tuple whose entry is an
         integer specifying the sequence number of the desired node.
         """
-        return self._get_node_info(_internal._constants.CPX_CALLBACK_INFO_NODE_OBJVAL,
+        return self._get_node_info(_const.CPX_CALLBACK_INFO_NODE_OBJVAL,
                                    self.__conditionally_convert(which_node))
 
     def select_node(self, which_node):
@@ -2013,7 +2111,7 @@ class NodeCallback(MIPCallback):
         integer specifying the sequence number of the desired node.
         """
         self._node_number = self.__conditionally_convert(which_node)
-        self._useraction = _internal._constants.CPX_CALLBACK_SET
+        self._useraction = _const.CPX_CALLBACK_SET
         self._status = 0
 
 
@@ -2029,85 +2127,96 @@ class TuningCallback(Callback):
 
     def __init__(self, env):
         """non-public"""
-        super(TuningCallback, self).__init__(env)
+        super().__init__(env)
         self._cb_type_string = "tuning"
         self._cb_set_function = _proc.settuningcallbackfunc
 
     def get_progress(self):
         """Returns the fraction of the tuning process that is done."""
-        return fast_getcallbackinfo(self._cbstruct, CPX_CALLBACK_INFO_TUNING_PROGRESS, CplexSolverError)
+        return _pycplex.fast_getcallbackinfo(
+            self._cbstruct,
+            _const.CPX_CALLBACK_INFO_TUNING_PROGRESS,
+            CplexSolverError)
 
 
-class Context(object):
-    """Callback context
+class ContextType(ConstantClass):
+    """The different contexts in which a generic callback can be invoked.
 
-    An instance of this class defines the context in which a callback was
-    invoked. It provides functions to query information and perform all actions
-    that can be performed from a callback.
+    The values defined here serve two purposes:
 
-    Note an instance of this class is only valid during execution of the
-    callback into which it was passed. Don't store a reference to the context
-    across that callback invocation.
+       They are returned from `Context.get_id()` to indicate in which
+       context a particular callback invocation happened.
+
+       The bit-wise OR of these values specifies to
+       `Cplex.set_callback()` in which contexts CPLEX invokes the
+       callback.
+
+    See the reference manual of the CPLEX Callable Library (C API)
+    for a more detailed description of the various contexts.
+    """
+
+    thread_up = _const.CPX_CALLBACKCONTEXT_THREAD_UP
+    """See :macros:`CPX_CALLBACKCONTEXT_THREAD_UP` in the C API."""
+
+    thread_down = _const.CPX_CALLBACKCONTEXT_THREAD_DOWN
+    """See :macros:`CPX_CALLBACKCONTEXT_THREAD_DOWN` in the C API."""
+
+    local_progress = _const.CPX_CALLBACKCONTEXT_LOCAL_PROGRESS
+    """See :macros:`CPX_CALLBACKCONTEXT_LOCAL_PROGRESS` in the C API."""
+
+    global_progress = _const.CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS
+    """See :macros:`CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS` in the C API."""
+
+    candidate = _const.CPX_CALLBACKCONTEXT_CANDIDATE
+    """See :macros:`CPX_CALLBACKCONTEXT_CANDIDATE` in the C API."""
+
+    relaxation = _const.CPX_CALLBACKCONTEXT_RELAXATION
+    """See :macros:`CPX_CALLBACKCONTEXT_RELAXATION` in the C API."""
+
+    branching = _const.CPX_CALLBACKCONTEXT_BRANCHING
+    """See :macros:`CPX_CALLBACKCONTEXT_BRANCHING` in the C API."""
+
+
+class RelaxationFlags(ConstantClass):
+    """The flags that can be passed to `Context.get_relaxation_status()`.
+
+    See the reference manual of the CPLEX Callable Library (C API)
+    for a more detailed description of the various contexts.
+    """
+
+    no_solve = _const.CPX_RELAXATION_FLAG_NOSOLVE
+    """See :macros:`CPX_RELAXATION_FLAG_NOSOLVE` in the C API."""
+
+
+class Context():
+    """Context for the generic callback.
+
+    An instance of this class defines the context in which a generic
+    callback was invoked. It provides methods to query information and
+    perform all actions that can be performed from a generic callback.
+
+    Note that an instance of this class is only valid during the
+    execution of the callback into which it was passed. Don't store a
+    reference to the context across callback invocations.
+
+    See `Cplex.set_callback()`.
 
     """
 
-    class info(_callbackinfoenum.CallbackInfo):
-        """The values that can be used with get_int_info(),
-        get_long_info(), get_double_info().
+    info = CallbackInfo()
+    """See `CallbackInfo`"""
 
-        See the reference manual of the CPLEX Callable Library (C API)
-        for the constants in the enumeration CPXCALLBACKINFO for details
-        about what those values query.
-        """
-        pass
+    solution_strategy = SolutionStrategy()
+    """See `SolutionStrategy`"""
 
-    class solution_strategy(_solutionstrategyenum.SolutionStrategy):
-        """The different types of solutions that can submitted to
-        post_heuristic_solution().
+    id = ContextType()
+    """See `ContextType`"""
 
-        For further details about these values, see the reference manual of
-        the CPLEX Callable Library (C API) particularly, the enumeration
-        CPXCALLBACKSOLUTIONSTRATEGY.
-        """
-        pass
+    relaxation_flags = RelaxationFlags()
+    """See `RelaxationFlags`"""
 
-    class id(object):
-        """The different contexts in which a callback can be invoked.
-
-        The values defined here serve two purposes:
-
-           They are returned from cplex.callbacks.Context.get_id() to
-           indicate in which context a particular callback invocation
-           happened.
-
-           The bit-wise OR of these values specifies to
-           `Cplex.set_callback()` in which contexts CPLEX invokes the
-           callback function.
-
-        See the reference manual of the CPLEX Callable Library (C API)
-        for a more detailed description of the various contexts.
-        """
-        thread_up = _internal._constants.CPX_CALLBACKCONTEXT_THREAD_UP
-        thread_down = _internal._constants.CPX_CALLBACKCONTEXT_THREAD_DOWN
-        local_progress = _internal._constants.CPX_CALLBACKCONTEXT_LOCAL_PROGRESS
-        global_progress = _internal._constants.CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS
-        candidate = _internal._constants.CPX_CALLBACKCONTEXT_CANDIDATE
-        relaxation = _internal._constants.CPX_CALLBACKCONTEXT_RELAXATION
-
-        def __getitem__(self, item):
-            if item == _internal._constants.CPX_CALLBACKCONTEXT_THREAD_UP:
-                return 'thread_up'
-            if item == _internal._constants.CPX_CALLBACKCONTEXT_THREAD_DOWN:
-                return 'thread_down'
-            if item == _internal._constants.CPX_CALLBACKCONTEXT_LOCAL_PROGRESS:
-                return 'local_progress'
-            if item == _internal._constants.CPX_CALLBACKCONTEXT_GLOBAL_PROGRESS:
-                return 'global_progress'
-            if item == _internal._constants.CPX_CALLBACKCONTEXT_CANDIDATE:
-                return 'candidate'
-            if item == _internal._constants.CPX_CALLBACKCONTEXT_RELAXATION:
-                return 'relaxation'
-            raise KeyError(item)
+    solution_status = SolutionStatus()
+    """See `SolutionStatus`"""
 
     def __init__(self, cpx, contextptr, contextid):
         """non-public"""
@@ -2119,7 +2228,7 @@ class Context(object):
         """non-public"""
         # Adapted from Callback._get_col_index
         return _proc.getcolindex(env=self._cpx._env._e, lp=self._cpx._lp,
-                                 colname=name, enc=self._cpx._env._apienc)
+                                 colname=name)
 
     def _get_column_count(self):
         """non-public"""
@@ -2131,91 +2240,130 @@ class Context(object):
         return convert(name, self._get_column_index, cache)
 
     def get_id(self):
-        """Get the context in which the current callback was invoked."""
+        """Returns the context in which the current callback was invoked.
+
+        The return value will be one of the constants in `ContextType`.
+        """
         return self._contextid
 
     def in_thread_up(self):
-        """Test whether the callback was invoked in context id.thread_up.
+        """Returns True if the callback was invoked in context
+        `ContextType.thread_up`.
 
-        It is a shortcut for get_id() == id.thread_up.
+        It is a shortcut for checking whether `get_id()` returns
+        `ContextType.thread_up` or not.
         """
         return self._contextid == self.id.thread_up
 
     def in_thread_down(self):
-        """Test whether the callback was invoked in context id.thread_down.
+        """Returns True if the callback was invoked in context
+        `ContextType.thread_down`.
 
-        It is a shortcut for get_id() == id.thread_down.
+        It is a shortcut for checking whether `get_id()` returns
+        `ContextType.thread_down` or not.
         """
         return self._contextid == self.id.thread_down
 
     def in_local_progress(self):
-        """Test whether the callback was invoked in context id.local_progress.
+        """Returns True if the callback was invoked in context
+        `ContextType.local_progress`.
 
-        It is a shortcut for get_id() == id.local_progress.
+        It is a shortcut for checking whether `get_id()` returns
+        `ContextType.local_progress` or not.
         """
         return self._contextid == self.id.local_progress
 
     def in_global_progress(self):
-        """Test whether the callback was invoked in context id.global_progress.
+        """Returns True if the callback was invoked in context
+        `ContextType.global_progress`.
 
-        It is a shortcut for get_id() == id.global_progress.
+        It is a shortcut for checking whether `get_id()` returns
+        `ContextType.global_progress` or not.
         """
         return self._contextid == self.id.global_progress
 
     def in_candidate(self):
-        """Test whether the callback was invoked in context id.candidate.
+        """Returns True if the callback was invoked in context
+        `ContextType.candidate`.
 
-        It is a shortcut for get_id() == id.candidate.
+        It is a shortcut for checking whether `get_id()` returns
+        `ContextType.candidate` or not.
         """
         return self._contextid == self.id.candidate
 
     def in_relaxation(self):
-        """Test whether the callback was invoked in context id.relaxation.
+        """Returns True if the callback was invoked in context
+        `ContextType.relaxation`.
 
-        It is a shortcut for get_id() == id.relaxation.
+        It is a shortcut for checking whether `get_id()` returns
+        `ContextType.relaxation` or not.
         """
         return self._contextid == self.id.relaxation
 
-    def get_int_info(self, what):
-        """Get a 32bit signed information value.
+    def in_branching(self):
+        """Returns True if the callback was invoked in context
+        `ContextType.branching`.
 
-        Potential values are listed in cplex.callback.Context.info.
-        Note that in all contexts but cplex.callback.Context.id.global_progress
-        the information returned by the function is thread-local."""
+        It is a shortcut for checking whether `get_id()` returns
+        `ContextType.branching` or not.
+        """
+        return self._contextid == self.id.branching
+
+    def get_int_info(self, what):
+        """Returns a 32bit signed information value.
+
+        Potential values are listed in `Context.info`. Note that in all
+        contexts but `ContextType.global_progress` the information
+        returned by the method is thread-local.
+
+        See :cpxapi:`CPXcallbackgetinfoint` in the Callable Library
+        Reference Manual for more detail.
+        """
         return _proc.callbackgetinfoint(self._contextptr, what)
 
     def get_long_info(self, what):
-        """Get a 64bit signed information value.
+        """Returns a 64bit signed information value.
 
-        Potential values are listed in cplex.callback.Context.info.
-        Note that in all contexts but cplex.callback.Context.id.global_progress
-        the information returned by the function is thread-local."""
+        Potential values are listed in `Context.info`. Note that in all
+        contexts but `ContextType.global_progress` the information
+        returned by the method is thread-local.
+
+        See :cpxapi:`CPXcallbackgetinfolong` in the Callable Library
+        Reference Manual for more detail.
+        """
         return _proc.callbackgetinfolong(self._contextptr, what)
 
     def get_double_info(self, what):
-        """Get a float information value.
+        """Returns a float information value.
 
-        Potential values are listed in cplex.callback.Context.info.
-        Note that in all contexts but cplex.callback.Context.id.global_progress
-        the information returned by the function is thread-local."""
+        Potential values are listed in `Context.info`. Note that in all
+        contexts but `ContextType.global_progress` the information
+        returned by the method is thread-local.
+
+        See :cpxapi:`CPXcallbackgetinfodbl` in the Callable Library
+        Reference Manual for more detail.
+        """
         return _proc.callbackgetinfodbl(self._contextptr, what)
 
     def abort(self):
-        """Abort optimization.
+        """Aborts the optimization.
 
-        If you call this function then CPLEX will abort optimization at the
-        next opportunity.
+        If you call this method then CPLEX will abort optimization at
+        the next opportunity.
+
+        See :cpxapi:`CPXcallbackabort` in the Callable Library Reference
+        Manual for more detail.
         """
         _proc.callbackabort(self._contextptr)
 
     def get_relaxation_point(self, *args):
-        """Get the solution to the current relaxation.
+        """Returns the solution to the current relaxation.
 
-        This function can only be invoked if get_id() returns
-        cplex.callbacks.Context.id.relaxation. If invoked in a different
-        context it will raise an exception.
+        This method can only be invoked if `get_id()` returns
+        `ContextType.relaxation` or `ContextType.branching`. If invoked
+        in a different context it will raise an exception.
 
-        The function returns the values in the solution for the current
+        This method returns the values in the solution for the current
         relaxation for the variables specified by the arguments.
 
         There are four forms by which get_relaxation_point may be called.
@@ -2224,21 +2372,24 @@ class Context(object):
           returns the full solution vector.
 
         self.get_relaxation_point(i)
-          i must be a variable index or name.  Returns the value of the
+          i must be a variable index or name. Returns the value of the
           variable with index or name i in the solution to the current
           relaxation.
 
         self.get_relaxation_point(s)
-          s must be a sequence of variable indices or names.  Returns
-          a list of the values of the variables with indices
-          the members of s, in the same order as they appear in s.
-          Equivalent to [self.get_relaxation_point(i) for i in s]
+          s must be a sequence of variable indices or names. Returns a
+          list of the values of the variables with indices the members of
+          s, in the same order as they appear in s. Equivalent to
+          [self.get_relaxation_point(i) for i in s]
 
         self.get_relaxation_point(begin, end)
           begin and end must be variable indices or variable names.
           Returns a list of solution values of variables with indices
           between begin and end, inclusive of end. Equivalent to
-          self.get_relaxation_point(range(begin, end + 1))
+          self.get_relaxation_point(range(begin, end + 1)).
+
+        See :cpxapi:`CPXcallbackgetrelaxationpoint` in the Callable
+        Library Reference Manual for more detail.
         """
         def callbackgetrelaxationpoint(begin, end=self._get_column_count() - 1):
             return _proc.callbackgetrelaxationpoint(self._contextptr, begin, end)
@@ -2246,40 +2397,148 @@ class Context(object):
             callbackgetrelaxationpoint, self._colname2idx, args)
 
     def get_relaxation_objective(self):
-        """Get objective value of current relaxation.
+        """Returns the objective value of current relaxation.
 
-        This function can only be invoked if get_id() returns
-        cplex.callbacks.Context.id.relaxation. If invoked in a different
-        context it will raise an exception.
+        This method can only be invoked if `get_id()` returns
+        `ContextType.relaxation` or `ContextType.branching`. If invoked
+        in a different context it will raise an exception.
+
+        See :cpxapi:`CPXcallbackgetrelaxationpoint` in the Callable
+        Library Reference Manual for more detail.
         """
         return _proc.callbackgetrelaxationpointobj(self._contextptr)
 
-    def get_incumbent(self, *args):
-        """Get the current incumbent solution.
+    def get_relaxation_status(self, flags=0):
+        """Returns the solution status of the relaxation LP.
 
-        The function returns the values in the current incumbent solution
+        Returns the solution status of the LP relaxation at the current
+        node.
+
+        This method can only be invoked if `get_id()` returns
+        `ContextType.relaxation` or `ContextType.branching`. If invoked
+        in a different context it will raise an exception.
+
+        See :cpxapi:`CPXcallbackgetrelaxationstatus` in the Callable
+        Library Reference Manual for more detail.
+        """
+        return _proc.callbackgetrelaxationstatus(self._contextptr, flags)
+
+    def make_branch(self, objective_estimate, variables=None,
+                    constraints=None):
+        """Makes a new branch with the specified data.
+
+        This method can only be invoked if `get_id()` returns
+        `ContextType.branching`. If invoked in a different context it
+        will raise an exception.
+
+        objective_estimate is a float representing the estimated
+        objective value resulting from the specified branch.
+
+        variables is a sequence of (var, dir, bnd) tuples specifying
+        the variables on which to branch. var must be an index of a
+        variable, dir must be one of "L" and "U", indicating that the
+        bound is a lower or upper bound, respectively, and bnd is an
+        integer specifying the new bound for the variable.
+
+        constraints is a sequence of (vec, sense, rhs) tuples specifying
+        the constraints with which to branch. vec must be either an
+        instance of `SparsePair` or a sequence with two entries, the
+        first of which specifies the indices and the second of which
+        specifies the values of the constraint. rhs must be a float
+        determining the righthand side of the constraint. sense must be
+        one of "L", "G", or "E", specifying whether the constraint is a
+        less-than-or-equal-to (<=), greater-than-or-equal-to (>=), or
+        equality constraint (=).
+
+        The method returns an integer that uniquely identifies the newly
+        created child node in the search tree.
+
+        Note that the children will be dropped if you call
+        `prune_current_node()` at the same node.
+
+        See :cpxapi:`CPXcallbackmakebranch` in the Callable Library
+        Reference Manual for more detail.
+        """
+        variables, constraints = init_list_args(variables, constraints)
+        if variables:
+            a = unzip(variables)
+        else:
+            a = [[], [], []]
+        vars = list(a[0])
+        dirs = ''.join(list(a[1]))
+        bnds = list(a[2])
+        if constraints:
+            a = unzip(constraints)
+        else:
+            a = [[], [], []]
+        rmat = _HBMatrix(a[0])
+        sense = ''.join(list(a[1]))
+        rhs = list(a[2])
+        return _proc.callbackmakebranch(self._contextptr,
+                                        vars, dirs, bnds, rhs, sense,
+                                        rmat.matbeg, rmat.matind, rmat.matval,
+                                        objective_estimate)
+
+    def prune_current_node(self):
+        """Ask CPLEX to prune the current node from the search tree.
+
+        This method can only be invoked if `get_id()` returns
+        `ContextType.relaxation` or `ContextType.branching`. If invoked
+        in a different context it will raise an exception.
+
+        The node is marked for pruning. As soon as the callback returns,
+        CPLEX stops processing the node. In particular, no child nodes
+        will be created from that node, even if you called
+        `make_branch()` to explicitly create new nodes.
+
+        See :cpxapi:`CPXcallbackprunenode` in the Callable Library
+        Reference Manual for more detail.
+        """
+        _proc.callbackprunenode(self._contextptr)
+
+    def exit_cut_loop(self):
+        """Ask CPLEX to stop cutting plane separatation at the current
+        node.
+
+        This method can only be invoked if `get_id()` returns
+        `ContextType.relaxation`. If invoked in a different context it
+        will raise an exception.
+
+        See :cpxapi:`CPXcallbackexitcutloop` in the Callable Library
+        Reference Manual for more detail.
+        """
+        return _proc.callbackexitcutloop(self._contextptr)
+
+    def get_incumbent(self, *args):
+        """Returns the current incumbent solution.
+
+        The method returns the values in the current incumbent solution
         for the variables specified by the arguments.
 
-        There are four forms by which get_candidate_point may be called.
+        There are four forms by which get_incumbent may be called.
 
         self.get_incumbent()
           returns the full incumbent vector.
 
         self.get_incumbent(i)
-          i must be a variable index or name.  Returns the value of the
-          variable with index or name i in the current incumbent solution.
+          i must be a variable index or name. Returns the value of the
+          variable with index or name i in the current incumbent
+          solution.
 
         self.get_incumbent(s)
-          s must be a sequence of variable indices or names.  Returns
-          a list of the values of the variables with indices
-          the members of s, in the same order as they appear in s.
-          Equivalent to [self.get_incumbent(i) for i in s]
+          s must be a sequence of variable indices or names. Returns a
+          list of the values of the variables with indices the members of
+          s, in the same order as they appear in s. Equivalent to
+          [self.get_incumbent(i) for i in s]
 
         self.get_incumbent(begin, end)
           begin and end must be variable indices or variable names.
           Returns a list of solution values of variables with indices
           between begin and end, inclusive of end. Equivalent to
-          self.get_incumbent(range(begin, end + 1))
+          self.get_incumbent(range(begin, end + 1)).
+
+        See :cpxapi:`CPXcallbackgetincumbent` in the Callable Library
+        Reference Manual for more detail.
         """
         def callbackgetincumbent(begin, end=self._get_column_count() - 1):
             return _proc.callbackgetincumbent(self._contextptr, begin, end)
@@ -2287,38 +2546,61 @@ class Context(object):
             callbackgetincumbent, self._colname2idx, args)
 
     def get_incumbent_objective(self):
-        """ Get objective value of the current incumbent.
+        """Returns the objective value of the current incumbent.
 
-        The returned value may be a huge value (such as 1e75) to indicate that
-        no incumbent was found yet. Consider using get_int_info() with
-        cplex.callbacks.Context.info.feasible first to check whether there
-        is an incumbent.
+        The returned value may be a huge value (such as 1e75) to indicate
+        that no incumbent was found yet. Consider using `get_int_info()`
+        with `CallbackInfo.feasible` first to check whether there is an
+        incumbent.
+
+        See :cpxapi:`CPXcallbackgetincumbent` in the Callable Library
+        Reference Manual for more detail.
         """
         return _proc.callbackgetincumbentobj(self._contextptr)
 
     def is_candidate_point(self):
-        """Test if the callback was invoked for a candidate feasible point.
+        """Test if the callback was invoked for a candidate feasible
+        point.
 
-        This function can only be invoked if get_id() returns
-        cplex.callbacks.Context.id.candidate. If invoked in a different
-        context it will raise an exception.
+        This method can only be invoked if `get_id()` returns
+        `ContextType.candidate`. If invoked in a different context it
+        will raise an exception.
 
-        The function returns true if the callback was invoked for a
-        candidate feasible point. In that case the candidate feasible point
-        can be examined using get_candidate_point() and
-        get_candidate_objective().
+        This method returns true if the callback was invoked for a
+        candidate feasible point. In that case the candidate feasible
+        point can be examined using `get_candidate_point()` and
+        `get_candidate_objective()`.
+
+        See :cpxapi:`CPXcallbackcandidateispoint` in the Callable Library
+        Reference Manual for more detail.
         """
         return _proc.callbackcandidateispoint(self._contextptr)
 
+    def get_candidate_source(self):
+        """Get the source from which the current candidate solution originated.
+
+        The value returned is from IncumbentCallback.solution_source.
+        """
+
+        # FIXME: Share this code with above
+        source = IncumbentCallback.solution_source
+        switcher = {
+            _const.CPX_LAZYCONSTRAINTCALLBACK_NODE: source.node_solution,
+            _const.CPX_LAZYCONSTRAINTCALLBACK_HEUR: source.heuristic_solution,
+            _const.CPX_LAZYCONSTRAINTCALLBACK_MIPSTART: source.mipstart_solution,
+            _const.CPX_LAZYCONSTRAINTCALLBACK_USER: source.user_solution
+        }
+
+        return switcher[self.get_int_info(self.info.candidate_source)]
+
     def get_candidate_point(self, *args):
-        """Get the current candidate solution.
+        """Returns the current candidate solution.
 
-        This function can only be invoked if get_id() returns
-        cplex.callbacks.Context.id.candidate and is_candidate_point()
-        returns true. If invoked in a different
-        context it will raise an exception.
+        This method can only be invoked if `get_id()` returns
+        `ContextType.candidate` and `is_candidate_point()` returns true.
+        If invoked in a different context it will raise an exception.
 
-        The function returns the values in the current candidate solution
+        This method returns the values in the current candidate solution
         for the variables specified by the arguments.
 
         There are four forms by which get_candidate_point may be called.
@@ -2327,20 +2609,24 @@ class Context(object):
           returns the full solution vector.
 
         self.get_candidate_point(i)
-          i must be a variable index or name.  Returns the value of the
-          variable with index or name i in the current candidate solution.
+          i must be a variable index or name. Returns the value of the
+          variable with index or name i in the current candidate
+          solution.
 
         self.get_candidate_point(s)
-          s must be a sequence of variable indices or names.  Returns
-          a list of the values of the variables with indices
-          the members of s, in the same order as they appear in s.
-          Equivalent to [self.get_candidate_point(i) for i in s]
+          s must be a sequence of variable indices or names. Returns a
+          list of the values of the variables with indices the members of
+          s, in the same order as they appear in s. Equivalent to
+          [self.get_candidate_point(i) for i in s]
 
         self.get_candidate_point(begin, end)
           begin and end must be variable indices or variable names.
           Returns a list of solution values of variables with indices
           between begin and end, inclusive of end. Equivalent to
           self.get_candidate_point(range(begin, end + 1))
+
+        See :cpxapi:`CPXcallbackgetcandidatepoint` in the Callable Library
+        Reference Manual for more detail.
         """
         def callbackgetcandidatepoint(begin, end=self._get_column_count() - 1):
             return _proc.callbackgetcandidatepoint(self._contextptr, begin, end)
@@ -2348,38 +2634,42 @@ class Context(object):
             callbackgetcandidatepoint, self._colname2idx, args)
 
     def get_candidate_objective(self):
-        """ Get objective value of current candidate solution.
+        """Returns the objective value of current candidate solution.
 
-        This function can only be invoked if get_id() returns
-        cplex.callbacks.Context.id.candidate and is_candidate_point()
-        returns true. It will raise an exception if
-        invoked in a different context.
+        This method can only be invoked if `get_id()` returns
+        `ContextType.candidate` and `is_candidate_point()` returns true.
+        It will raise an exception if invoked in a different context.
+
+        See :cpxapi:`CPXcallbackgetcandidatepoint` in the Callable Library
+        Reference Manual for more detail.
         """
         return _proc.callbackgetcandidateobj(self._contextptr)
 
     def is_candidate_ray(self):
         """Test if the callback was invoked for an unbounded ray.
 
-        This function can only be invoked if get_id() returns
-        cplex.callbacks.Context.id.candidate. If invoked in a different
-        context it will raise an exception.
+        This method can only be invoked if `get_id()` returns
+        `ContextType.candidate`. If invoked in a different context it
+        will raise an exception.
 
-        The function returns true if the callback was invoked for an
-        unbounded relaxation. In that case the unbounded ray
-        can be obtained using get_candidate_ray() and.
+        This method returns true if the callback was invoked for an
+        unbounded relaxation. In that case the unbounded ray can be
+        obtained using `get_candidate_ray()` and.
+
+        See :cpxapi:`CPXcallbackcandidateisray` in the Callable Library
+        Reference Manual for more detail.
         """
         return _proc.callbackcandidateisray(self._contextptr)
 
     def get_candidate_ray(self, *args):
-        """Get the current unbounded ray.
+        """Returns the current unbounded ray.
 
-        This function can only be invoked if get_id() returns
-        cplex.callbacks.Context.id.candidate and is_candidate_ray()
-        returns true. If invoked in a different
-        context it will raise an exception.
+        This method can only be invoked if `get_id()` returns
+        `ContextType.candidate` and `is_candidate_ray()` returns true. If
+        invoked in a different context it will raise an exception.
 
-        The function returns the values for in the unbounded ray
-        for the variables specified by the arguments.
+        The method returns the values for in the unbounded ray for the
+        variables specified by the arguments.
 
         There are four forms by which get_candidate_ray may be called.
 
@@ -2387,20 +2677,23 @@ class Context(object):
           returns the full ray vector.
 
         self.get_candidate_ray(i)
-          i must be a variable index or name.  Returns the value of the
+          i must be a variable index or name. Returns the value of the
           variable with index or name i in the unbounded ray.
 
         self.get_candidate_ray(s)
-          s must be a sequence of variable indices or names.  Returns
-          a list of the values of the variables with indices
-          the members of s, in the same order as they appear in s.
-          Equivalent to [self.get_candidate_ray(i) for i in s]
+          s must be a sequence of variable indices or names. Returns a
+          list of the values of the variables with indices the members of
+          s, in the same order as they appear in s. Equivalent to
+          [self.get_candidate_ray(i) for i in s]
 
         self.get_candidate_ray(begin, end)
           begin and end must be variable indices or variable names.
           Returns a list of unbounded reay values of variables with
           indices between begin and end, inclusive of end. Equivalent to
-          self.get_candidate_ray(range(begin, end + 1))
+          self.get_candidate_ray(range(begin, end + 1)).
+
+        See :cpxapi:`CPXcallbackgetcandidateray` in the Callable Library
+        Reference Manual for more detail.
         """
         def callbackgetcandidateray(begin, end=self._get_column_count() - 1):
             return _proc.callbackgetcandidateray(self._contextptr, begin, end)
@@ -2408,24 +2701,25 @@ class Context(object):
             callbackgetcandidateray, self._colname2idx, args)
 
     def get_local_lower_bounds(self, *args):
-        """Get the current local lower bounds.
+        """Returns the current local lower bounds.
 
-        This function can only be invoked if get_id() returns
-        cplex.callbacks.Context.id.relaxation. If invoked in a different
-        context it will raise an exception.
+        This method can only be invoked if `get_id()` returns
+        `ContextType.relaxation`. If invoked in a different context it
+        will raise an exception.
 
-        There are four forms by which get_local_lower_bounds may be called.
+        There are four forms by which get_local_lower_bounds may be
+        called.
 
         self.get_local_lower_bounds()
           returns local lower bounds for all variables.
 
         self.get_local_lower_bounds(i)
-          i must be a variable index or name.  Returns the local lower
+          i must be a variable index or name. Returns the local lower
           bound of the variable with index or name i.
 
         self.get_local_lower_bounds(s)
-          s must be a sequence of variable indices or names.  Returns
-          a list of the local lower bounds of the variables with indices
+          s must be a sequence of variable indices or names. Returns a
+          list of the local lower bounds of the variables with indices
           the members of s, in the same order as they appear in s.
           Equivalent to [self.get_local_lower_bounds(i) for i in s]
 
@@ -2433,7 +2727,10 @@ class Context(object):
           begin and end must be variable indices or variable names.
           Returns a list of the local lower bounds of variables with
           indices between begin and end, inclusive of end. Equivalent to
-          self.get_local_lower_bounds(range(begin, end + 1))
+          self.get_local_lower_bounds(range(begin, end + 1)).
+
+        See :mipapi:`CPXcallbackgetlocallb` in the Callable Library
+        Reference Manual for more detail.
         """
         def callbackgetlocallb(begin, end=self._get_column_count() - 1):
             return _proc.callbackgetlocallb(self._contextptr, begin, end)
@@ -2441,24 +2738,25 @@ class Context(object):
             callbackgetlocallb, self._colname2idx, args)
 
     def get_local_upper_bounds(self, *args):
-        """Get the current local upper bounds.
+        """Returns the current local upper bounds.
 
-        This function can only be invoked if get_id() returns
-        cplex.callbacks.Context.id.relaxation. If invoked in a different
-        context it will raise an exception.
+        This method can only be invoked if `get_id()` returns
+        `ContextType.relaxation`. If invoked in a different context it
+        will raise an exception.
 
-        There are four forms by which get_local_upper_bounds may be called.
+        There are four forms by which get_local_upper_bounds may be
+        called.
 
         self.get_local_upper_bounds()
           returns local upper bounds for all variables.
 
         self.get_local_upper_bounds(i)
-          i must be a variable index or name.  Returns the local upper
+          i must be a variable index or name. Returns the local upper
           bound of the variable with index or name i.
 
         self.get_local_upper_bounds(s)
-          s must be a sequence of variable indices or names.  Returns
-          a list of the local upper bounds of the variables with indices
+          s must be a sequence of variable indices or names. Returns a
+          list of the local upper bounds of the variables with indices
           the members of s, in the same order as they appear in s.
           Equivalent to [self.get_local_upper_bounds(i) for i in s]
 
@@ -2466,33 +2764,35 @@ class Context(object):
           begin and end must be variable indices or variable names.
           Returns a list of the local upper bounds of variables with
           indices between begin and end, inclusive of end. Equivalent to
-          self.get_local_upper_bounds(range(begin, end + 1))
+          self.get_local_upper_bounds(range(begin, end + 1)).
+
+        See :mipapi:`CPXcallbackgetlocalub` in the Callable Library
+        Reference Manual for more detail.
         """
         def callbackgetlocalub(begin, end=self._get_column_count() - 1):
             return _proc.callbackgetlocalub(self._contextptr, begin, end)
         return apply_freeform_two_args(
             callbackgetlocalub, self._colname2idx, args)
 
-
     def get_global_lower_bounds(self, *args):
-        """Get the current globally valid lower bounds.
+        """Returns the current globally valid lower bounds.
 
-        This function cannot be invoked if get_id() returns
-        cplex.callbacks.Context.id.thread_up or
-        cplex.callbacks.Context.id.thread_down.
+        This method cannot be invoked if `get_id()` returns
+        `ContextType.thread_up` or `ContextType.thread_down`.
 
-        There are four forms by which get_global_lower_bounds may be called.
+        There are four forms by which get_global_lower_bounds may be
+        called.
 
         self.get_global_lower_bounds()
           returns global lower bounds for all variables.
 
         self.get_global_lower_bounds(i)
-          i must be a variable index or name.  Returns the global lower
+          i must be a variable index or name. Returns the global lower
           bound of the variable with index or name i.
 
         self.get_global_lower_bounds(s)
-          s must be a sequence of variable indices or names.  Returns
-          a list of the global lower bounds of the variables with indices
+          s must be a sequence of variable indices or names. Returns a
+          list of the global lower bounds of the variables with indices
           the members of s, in the same order as they appear in s.
           Equivalent to [self.get_global_lower_bounds(i) for i in s]
 
@@ -2500,7 +2800,10 @@ class Context(object):
           begin and end must be variable indices or variable names.
           Returns a list of the global lower bounds of variables with
           indices between begin and end, inclusive of end. Equivalent to
-          self.get_global_lower_bounds(range(begin, end + 1))
+          self.get_global_lower_bounds(range(begin, end + 1)).
+
+        See :mipapi:`CPXcallbackgetgloballb` in the Callable Library
+        Reference Manual for more detail.
         """
         def callbackgetgloballb(begin, end=self._get_column_count() - 1):
             return _proc.callbackgetgloballb(self._contextptr, begin, end)
@@ -2508,24 +2811,24 @@ class Context(object):
             callbackgetgloballb, self._colname2idx, args)
 
     def get_global_upper_bounds(self, *args):
-        """Get the current globally valid upper bounds.
+        """Returns the current globally valid upper bounds.
 
-        This function cannot be invoked if get_id() returns
-        cplex.callbacks.Context.id.thread_up or
-        cplex.callbacks.Context.id.thread_down.
+        This method cannot be invoked if `get_id()` returns
+        `ContextType.thread_up` or `ContextType.thread_down`.
 
-        There are four forms by which get_global_upper_bounds may be called.
+        There are four forms by which get_global_upper_bounds may be
+        called.
 
         self.get_global_upper_bounds()
           returns global upper bounds for all variables.
 
         self.get_global_upper_bounds(i)
-          i must be a variable index or name.  Returns the global upper
+          i must be a variable index or name. Returns the global upper
           bound of the variable with index or name i.
 
         self.get_global_upper_bounds(s)
-          s must be a sequence of variable indices or names.  Returns
-          a list of the global upper bounds of the variables with indices
+          s must be a sequence of variable indices or names. Returns a
+          list of the global upper bounds of the variables with indices
           the members of s, in the same order as they appear in s.
           Equivalent to [self.get_global_upper_bounds(i) for i in s]
 
@@ -2533,7 +2836,10 @@ class Context(object):
           begin and end must be variable indices or variable names.
           Returns a list of the global upper bounds of variables with
           indices between begin and end, inclusive of end. Equivalent to
-          self.get_global_upper_bounds(range(begin, end + 1))
+          self.get_global_upper_bounds(range(begin, end + 1)).
+
+        See :mipapi:`CPXcallbackgetglobalub` in the Callable Library
+        Reference Manual for more detail.
         """
         def callbackgetglobalub(begin, end=self._get_column_count() - 1):
             return _proc.callbackgetglobalub(self._contextptr, begin, end)
@@ -2541,22 +2847,24 @@ class Context(object):
             callbackgetglobalub, self._colname2idx, args)
 
     def post_heuristic_solution(self, x, obj, strategy):
-        """Post a feasible solution vector to CPLEX.
+        """Posts a feasible solution vector to CPLEX.
 
-        The function posts a (partial) feasible solution to CPLEX. CPLEX may
-        use this vector to find a new incumbent solution.
+        This method posts a (possibly partial) feasible solution to
+        CPLEX. CPLEX may use this vector to find a new incumbent
+        solution.
 
-        x is either a SparsePair instance or a list of two lists, the first
-        of which specifies the variables (by index or name) and the second of
-        which specifies the values. Note that for
-        cplex.callbacks.Context.solution_strategy.complete the x vector
-        must also explicitly contain all variables that are set to 0!
+        x is either a `SparsePair` instance or a list of two lists, the
+        first of which specifies the variables (by index or name) and the
+        second of which specifies the values.
 
-        obj is an estimate for the objective function value of the solution
-        provided by x.
+        obj is an estimate for the objective function value of the
+        solution provided by x.
 
-        strategy specifies how CPLEX should complete partial solutions. See
-        cplex.callbacks.Context.solution_strategy for further details.
+        strategy specifies how CPLEX should complete partial solutions.
+        See `SolutionStrategy` for further details.
+
+        See :cpxapi:`CPXcallbackpostheursoln` in the Callable Library
+        Reference Manual for more detail.
         """
         indices, values = unpack_pair(x)
         _proc.callbackpostheursoln(self._contextptr, len(indices),
@@ -2564,20 +2872,21 @@ class Context(object):
                                    obj, strategy)
 
     def add_user_cuts(self, cuts, senses, rhs, cutmanagement, local):
-        """Add user cuts.
+        """Adds user cuts.
 
-        This function can only be invoked if get_id() returns
-        cplex.callbacks.Context.id.relaxation. If invoked in a different
-        context it will raise an exception.
+        This method can only be invoked if `get_id()` returns
+        `ContextType.relaxation`. If invoked in a different context it
+        will raise an exception.
 
-        The function submits the specified user cuts to CPLEX.
+        This method submits the specified user cuts to CPLEX.
 
-        cuts, senses, rhs, cutmanagement, local must all be lists of compatible
-        dimensions. The first three specify the cuts to be added.
+        cuts, senses, rhs, cutmanagement, local must all be lists of
+        compatible dimensions. The first three specify the cuts to be
+        added.
 
-        cuts must be either a list of SparsePair instances or a list of lists of
-        two lists, the first of which specifies variables, the second
-        of which specifies the values of the constraint.
+        cuts must be either a list of `SparsePair` instances or a list of
+        lists of two lists, the first of which specifies variables, the
+        second of which specifies the values of the constraint.
 
         senses must be list of single-character strings; ("L", "G", "E")
         It may also be one single string (the concatenation of the single
@@ -2586,52 +2895,59 @@ class Context(object):
         rhs is a list of floats, specifying the righthand side of the
         constraints.
 
-        cutmanagement must be a list of cutmanagement constants and specifies
-        for each cut how CPLEX should handle it (see the cutmanagement constants
-        for further details). The values in cutmanagement should be chosen from
-        the constants defined in cplex.callbacks.UserCutCallback.use_cut.
+        cutmanagement must be a list of integer values specifying how
+        CPLEX should treat each cut (see `UseCut` constants for further
+        details).
 
         local must be a list of boolean values and specifies for each cut
-        whether it is only locally valid (True) or globally valid (False).
+        whether it is only locally valid (True) or globally valid
+        (False).
+
+        See :cpxapi:`CPXcallbackaddusercuts` in the Callable Library
+        Reference Manual for more detail.
         """
-        if not isinstance(senses, six.string_types):
+        if not isinstance(senses, str):
             senses = "".join(senses)
         arg_list = [rhs, senses, cuts, cutmanagement, local]
         ncuts = max_arg_length(arg_list)
         validate_arg_lengths(arg_list)
         if ncuts > 0:
-            with _proc.chbmatrix(cuts, self._cpx._env_lp_ptr, 0,
-                                 self._cpx._env._apienc) as (rmat, nnz):
+            with _proc.chbmatrix(cuts, self._cpx._env_lp_ptr,
+                                 0) as (rmat, nnz):
                 _proc.callbackaddusercuts(self._contextptr, ncuts, nnz,
                                           rhs, senses, rmat,
-                                          cutmanagement, local,
-                                          self._cpx._env._apienc)
+                                          cutmanagement, local)
+
     def add_user_cut(self, cut, sense, rhs, cutmanagement, local):
-        """Convenience wrapper for add_user_cuts that only adds a single cut."""
+        """Convenience wrapper for `add_user_cuts()` that only adds a
+        single cut.
+        """
         self.add_user_cuts([cut], [sense], [rhs], [cutmanagement], [local])
 
     def reject_candidate(self, constraints=None, senses=None, rhs=None):
-        """Reject the current candidate solution.
+        """Rejects the current candidate solution.
 
-        This function can only be invoked if get_id() returns
-        cplex.callbacks.Context.id.candidate. If invoked in a different
-        context it will raise an exception.
+        This method can only be invoked if `get_id()` returns
+        `ContextType.candidate`. If invoked in a different context it
+        will raise an exception.
 
-        The function marks the current candidate solution as infeasible,
+        This method marks the current candidate solution as infeasible,
         potentially specifying additional constraints that cut it off.
 
-        If constraints, senses, and rhs are all None then the current candidate
-        solution is just rejected. If any of the three is not None then
-        all must be not None and all must have compatible dimensions. In that
-        case the three arguments specify a set of constraints that cut off the
-        current candidate solution. CPLEX may use this information to tighten
-        the problem formulation and to avoid finding the same solution again.
-        There is however no guarantee that CPLEX will actually use those
-        additional constraints.
+        If constraints, senses, and rhs are all None then the current
+        candidate solution is just rejected. If any of the three is not
+        None then all must be not None and all must have compatible
+        dimensions. In that case the three arguments specify a set of
+        constraints that cut off the current candidate solution. CPLEX
+        may use this information to tighten the problem formulation and
+        to avoid finding the same solution again. There is however no
+        guarantee that CPLEX will actually use those additional
+        constraints.
 
-        constraints must be either a list of SparsePair instances or a list of lists of
-        two lists, the first of which specifies variables, the second
-        of which specifies the values of the constraint.
+        constraints must be either a list of `SparsePair` instances or a
+        list of lists of two lists, the first of which specifies
+        variables, the second of which specifies the values of the
+        constraint.
 
         senses must be list of single-character strings; ("L", "G", "E")
         It may also be one single string (the concatenation of the single
@@ -2639,15 +2955,17 @@ class Context(object):
 
         rhs is a list of floats, specifying the righthand side of the
         constraints.
+
+        See :cpxapi:`CPXcallbackrejectcandidate` in the Callable Library
+        Reference Manual for more detail.
         """
         constraints, senses, rhs = init_list_args(constraints, senses, rhs)
-        if not isinstance(senses, six.string_types):
+        if not isinstance(senses, str):
             senses = "".join(senses)
         arg_list = [rhs, senses, constraints]
         nconstraints = max_arg_length(arg_list)
         validate_arg_lengths(arg_list)
-        with _proc.chbmatrix(constraints, self._cpx._env_lp_ptr, 0,
-                             self._cpx._env._apienc) as (rmat, nnz):
+        with _proc.chbmatrix(constraints, self._cpx._env_lp_ptr,
+                             0) as (rmat, nnz):
             _proc.callbackrejectcandidate(self._contextptr, nconstraints, nnz,
-                                          rhs, senses, rmat,
-                                          self._cpx._env._apienc)
+                                          rhs, senses, rmat)

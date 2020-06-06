@@ -11,8 +11,8 @@
 # ------------------------------------------------------------------------
 """Sub-interfaces of the CPLEX API."""
 from contextlib import closing, contextmanager
+from io import StringIO
 import numbers
-import weakref
 
 from . import _constants
 from . import _procedural as CPX_PROC
@@ -26,24 +26,31 @@ from ._aux_functions import (apply_freeform_one_arg,
                              validate_arg_lengths, apply_pairs,
                              delete_set_by_range,
                              make_group, _group,
-                             deprecated, init_list_args, listify,
-                             convert, unzip)
-from ..exceptions import CplexError, WrongNumberOfArgumentsError
-from .. import six
-from ..six.moves import map, zip, cStringIO
+                             init_list_args, listify,
+                             unzip, convert_sequence)
+from ..exceptions import CplexSolverError, WrongNumberOfArgumentsError
+from ..constant_class import ConstantClass
 
 
-class Histogram(object):
+class Histogram():
+    """A class to retrieve histogram data of the columns or rows of the
+    linear constraint matrix.
+
+    See `VariablesInterface.get_histogram()` and
+    `LinearConstraintInterface.get_histogram()`.
+    """
+
     def __init__(self, c, key):
         self.__hist = CPX_PROC.gethist(c._env._e, c._lp, key[0])
         self.orientation = key
 
     def __getitem__(self, key):
-        if isinstance(key, six.integer_types):
+        """Returns the number of columns/rows with a given nonzero count."""
+        if isinstance(key, int):
             if key < 0:
                 raise IndexError("histogram keys must be non-negative")
             return self.__hist[key]
-        elif isinstance(key, slice):
+        if isinstance(key, slice):
             start, stop, step = key.start, key.stop, key.step
             if start is None:
                 start = 0
@@ -56,10 +63,10 @@ class Histogram(object):
             if stop < 0:
                 raise IndexError("histogram keys must be non-negative")
             return [self.__hist[i] for i in range(start, stop, step)]
-        else:
-            raise TypeError("key must be an integer or a slice")
+        raise TypeError("key must be an integer or a slice")
 
     def __str__(self):
+        """Returns a string containing a histogram in human readable form."""
         if self.orientation[0] == "c":
             hdr0 = "Column counts (excluding fixed variables):"
             hdr1 = "    Nonzero Count:"
@@ -125,8 +132,7 @@ class AdvancedVariablesInterface(BaseInterface):
         `Cplex` class as Cplex.variables.advanced.  This constructor is
         not meant to be used externally.
         """
-        super(AdvancedVariablesInterface, self).__init__(
-            cplex=parent._cplex, advanced=True)
+        super().__init__(cplex=parent._cplex, advanced=True)
 
     def protect(self, *args):
         """Prevents variables from being aggregated during presolve.
@@ -234,7 +240,7 @@ class AdvancedVariablesInterface(BaseInterface):
         apply_pairs(tub, self._cplex.variables._conv, *args)
 
 
-class VarTypes(object):
+class VarTypes(ConstantClass):
     """Constants defining variable types
 
     For a definition of each type, see those topics in the CPLEX User's
@@ -245,29 +251,6 @@ class VarTypes(object):
     integer = _constants.CPX_INTEGER
     semi_integer = _constants.CPX_SEMIINT
     semi_continuous = _constants.CPX_SEMICONT
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.variables.type.binary
-        'B'
-        >>> c.variables.type['B']
-        'binary'
-        """
-        if item == _constants.CPX_CONTINUOUS:
-            return 'continuous'
-        if item == _constants.CPX_BINARY:
-            return 'binary'
-        if item == _constants.CPX_INTEGER:
-            return 'integer'
-        if item == _constants.CPX_SEMIINT:
-            return 'semi_integer'
-        if item == _constants.CPX_SEMICONT:
-            return 'semi_continuous'
 
 
 class VariablesInterface(BaseInterface):
@@ -308,8 +291,7 @@ class VariablesInterface(BaseInterface):
         as `Cplex.variables`.  This constructor is not meant to be used
         externally.
         """
-        super(VariablesInterface, self).__init__(
-            cplex=cplex, getindexfunc=CPX_PROC.getcolindex)
+        super().__init__(cplex=cplex, getindexfunc=CPX_PROC.getcolindex)
         self.advanced = AdvancedVariablesInterface(self)
         """See `AdvancedVariablesInterface()` """
 
@@ -385,7 +367,7 @@ class VariablesInterface(BaseInterface):
 
     def _add(self, obj, lb, ub, types, names, columns):
         """non-public"""
-        if not isinstance(types, six.string_types):
+        if not isinstance(types, str):
             types = "".join(types)
         arg_list = [obj, lb, ub, types, names, columns]
         num_new_cols = max_arg_length(arg_list)
@@ -393,14 +375,13 @@ class VariablesInterface(BaseInterface):
         num_old_cols = self.get_num()
         if columns == []:
             CPX_PROC.newcols(self._env._e, self._cplex._lp, obj, lb, ub,
-                             types, names, self._env._apienc)
+                             types, names)
         else:
-            with CPX_PROC.chbmatrix(columns, self._cplex._env_lp_ptr, 1,
-                                    self._env._apienc) as (cmat, nnz):
+            with CPX_PROC.chbmatrix(columns, self._cplex._env_lp_ptr,
+                                    1) as (cmat, nnz):
                 CPX_PROC.addcols(self._env._e, self._cplex._lp,
                                  num_new_cols, nnz, obj,
-                                 cmat, lb, ub, names,
-                                 self._env._apienc)
+                                 cmat, lb, ub, names)
             if types != "":
                 CPX_PROC.chgctype(
                     self._env._e, self._cplex._lp,
@@ -444,22 +425,26 @@ class VariablesInterface(BaseInterface):
           either by index, name, or a combination of index and name,
           an exception will be raised.
 
-        Returns an iterator containing the indices of the added variables.
+        Returns an iterator containing the indices of the added
+        variables.
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.linear_constraints.add(names = ["c0", "c1", "c2"])
-        >>> indices = c.variables.add(obj = [1.0, 2.0, 3.0],\
-                                      types = [c.variables.type.integer] * 3)
-        >>> indices = c.variables.add(obj = [1.0, 2.0, 3.0],\
-                                      lb = [-1.0, 1.0, 0.0],\
-                                      ub = [100.0, cplex.infinity, cplex.infinity],\
-                                      types = [c.variables.type.integer] * 3,\
-                                      names = ["0", "1", "2"],\
-                                      columns = [cplex.SparsePair(ind = ['c0', 2], val = [1.0, -1.0]),\
-                                      [['c2'],[2.0]],\
-                                      cplex.SparsePair(ind = [0, 1], val = [3.0, 4.0])])
-
+        >>> indices = c.linear_constraints.add(names=["c0", "c1", "c2"])
+        >>> indices = c.variables.add(
+        ...     obj=[1.0, 2.0, 3.0],
+        ...     types=[c.variables.type.integer] * 3)
+        >>> indices = c.variables.add(
+        ...     obj=[1.0, 2.0, 3.0],
+        ...     lb=[-1.0, 1.0, 0.0],
+        ...     ub=[100.0, cplex.infinity, cplex.infinity],
+        ...     types=[c.variables.type.integer] * 3,
+        ...     names=["0", "1", "2"],
+        ...     columns=[cplex.SparsePair(ind=['c0', 2],
+        ...                               val=[1.0, -1.0]),
+        ...              [['c2'],[2.0]],
+        ...              cplex.SparsePair(ind=[0, 1],
+        ...                               val=[3.0, 4.0])])
         >>> c.variables.get_lower_bounds()
         [0.0, 0.0, 0.0, -1.0, 1.0, 0.0]
         >>> c.variables.get_cols("1")
@@ -494,8 +479,8 @@ class VariablesInterface(BaseInterface):
           variables.delete(range(begin, end + 1)). This will give the
           best performance when deleting batches of variables.
 
-        See CPXdelcols in the Callable Library Reference Manual for
-        more detail.
+        See :cpxapi:`CPXdelcols` in the Callable Library Reference Manual
+        for more detail.
 
         Example usage:
 
@@ -610,8 +595,7 @@ class VariablesInterface(BaseInterface):
         ['first', 'second', 'third']
         """
         def setnames(a, b):
-            CPX_PROC.chgcolname(self._env._e, self._cplex._lp, a, b,
-                                self._env._apienc)
+            CPX_PROC.chgcolname(self._env._e, self._cplex._lp, a, b)
         apply_pairs(setnames, self._conv, *args)
 
     def set_types(self, *args):
@@ -782,8 +766,7 @@ class VariablesInterface(BaseInterface):
         """
         def getname(a, b=self.get_num() - 1):
             return CPX_PROC.getcolname(
-                self._env._e, self._cplex._lp, a, b,
-                self._env._apienc)
+                self._env._e, self._cplex._lp, a, b)
         return apply_freeform_two_args(getname, self._conv, args)
 
     def get_types(self, *args):
@@ -862,21 +845,30 @@ class VariablesInterface(BaseInterface):
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.linear_constraints.add(names = ['c1', 'c2'])
-        >>> indices = c.variables.add(names = [str(i) for i in range(3)],\
-                                      columns = [cplex.SparsePair(ind = ['c1'],val = [1.0]),\
-                                                 cplex.SparsePair(ind = ['c2'],val = [2.0]),\
-                                                 cplex.SparsePair(ind = ['c1','c2'],val = [3.0,4.0])])
+        >>> indices = c.linear_constraints.add(names=['c1', 'c2'])
+        >>> indices = c.variables.add(
+        ...     names=[str(i) for i in range(3)],
+        ...     columns=[cplex.SparsePair(ind=['c1'], val=[1.0]),
+        ...     cplex.SparsePair(ind=['c2'], val=[2.0]),
+        ...     cplex.SparsePair(ind=['c1','c2'], val=[3.0, 4.0])])
         >>> c.variables.get_num()
         3
         >>> c.variables.get_cols(2)
         SparsePair(ind = [0, 1], val = [3.0, 4.0])
-        >>> c.variables.get_cols(1,2)
-        [SparsePair(ind = [1], val = [2.0]), SparsePair(ind = [0, 1], val = [3.0, 4.0])]
-        >>> c.variables.get_cols([2,0,1])
-        [SparsePair(ind = [0, 1], val = [3.0, 4.0]), SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [1], val = [2.0])]
-        >>> c.variables.get_cols()
-        [SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [1], val = [2.0]), SparsePair(ind = [0, 1], val = [3.0, 4.0])]
+        >>> for col in c.variables.get_cols(1, 2):
+        ...     print(col)
+        SparsePair(ind = [1], val = [2.0])
+        SparsePair(ind = [0, 1], val = [3.0, 4.0])
+        >>> for col in c.variables.get_cols([2, 0, 1]):
+        ...     print(col)
+        SparsePair(ind = [0, 1], val = [3.0, 4.0])
+        SparsePair(ind = [0], val = [1.0])
+        SparsePair(ind = [1], val = [2.0])
+        >>> for col in c.variables.get_cols():
+        ...     print(col)
+        SparsePair(ind = [0], val = [1.0])
+        SparsePair(ind = [1], val = [2.0])
+        SparsePair(ind = [0, 1], val = [3.0, 4.0])
         """
         def getcols(a, b=self.get_num() - 1):
             mat = _HBMatrix()
@@ -894,7 +886,7 @@ class VariablesInterface(BaseInterface):
         slice notation.  If a negative nonzero count is queried in
         this manner an IndexError will be raised.
 
-        The __str__ method of the histogram object returns a string
+        The __str__ method of the `Histogram` object returns a string
         displaying the number of columns with given nonzeros counts in
         human readable form.
 
@@ -946,8 +938,7 @@ class AdvancedLinearConstraintInterface(BaseInterface):
         top-level `Cplex` class as Cplex.linear_constraints.advanced.
         This constructor is not meant to be used externally.
         """
-        super(AdvancedLinearConstraintInterface, self).__init__(
-            cplex=parent._cplex, advanced=True)
+        super().__init__(cplex=parent._cplex, advanced=True)
 
     def get_num_lazy_constraints(self):
         """Returns the number of lazy cuts in the problem.
@@ -989,12 +980,12 @@ class AdvancedLinearConstraintInterface(BaseInterface):
 
     def _add_lazy_constraints(self, lin_expr, senses, rhs, names):
         """non-public"""
-        if not isinstance(senses, six.string_types):
+        if not isinstance(senses, str):
             senses = "".join(senses)
         validate_arg_lengths([rhs, senses, names, lin_expr])
         CPX_PROC.addlazyconstraints(
             self._env._e, self._cplex._lp, rhs, senses,
-            lin_expr, names, self._env._apienc)
+            lin_expr, names)
 
     def add_lazy_constraints(self, lin_expr=None, senses="", rhs=None,
                              names=None):
@@ -1052,12 +1043,12 @@ class AdvancedLinearConstraintInterface(BaseInterface):
 
     def _add_user_cuts(self, lin_expr, senses, rhs, names):
         """non-public"""
-        if not isinstance(senses, six.string_types):
+        if not isinstance(senses, str):
             senses = "".join(senses)
         validate_arg_lengths([rhs, senses, names, lin_expr])
         CPX_PROC.addusercuts(
             self._env._e, self._cplex._lp, rhs, senses,
-            lin_expr, names, self._env._apienc)
+            lin_expr, names)
 
     def add_user_cuts(self, lin_expr=None, senses="", rhs=None, names=None):
         """Adds user cuts to the problem.
@@ -1078,7 +1069,7 @@ class AdvancedLinearConstraintInterface(BaseInterface):
           name, an exception will be raised.
 
         senses must be either a list of single-character strings or a
-        string containing the senses of the linear constraints.  
+        string containing the senses of the linear constraints.
 
         rhs is a list of floats, specifying the righthand side of
         each linear constraint.
@@ -1164,8 +1155,7 @@ class LinearConstraintInterface(BaseInterface):
         `Cplex` class as `Cplex.linear_constraints`.  This constructor is
         not meant to be used externally.
         """
-        super(LinearConstraintInterface, self).__init__(
-            cplex=cplex, getindexfunc=CPX_PROC.getrowindex)
+        super().__init__(cplex=cplex, getindexfunc=CPX_PROC.getrowindex)
         self.advanced = AdvancedLinearConstraintInterface(self)
         """See `AdvancedLinearConstraintInterface()` """
 
@@ -1184,29 +1174,28 @@ class LinearConstraintInterface(BaseInterface):
 
     def _add(self, lin_expr, senses, rhs, range_values, names):
         """non-public"""
-        if not isinstance(senses, six.string_types):
+        if not isinstance(senses, str):
             senses = "".join(senses)
         arg_list = [rhs, senses, range_values, names, lin_expr]
         num_new_rows = max_arg_length(arg_list)
         validate_arg_lengths(arg_list)
         num_old_rows = self.get_num()
-        if lin_expr == []:
-            if senses.find('R') != -1 and len(range_values) == 0:
-                range_values = [0.0] * len(senses)
-            CPX_PROC.newrows(self._env._e, self._cplex._lp, rhs, senses,
-                             range_values, names,
-                             self._env._apienc)
-        else:
-            with CPX_PROC.chbmatrix(lin_expr, self._cplex._env_lp_ptr, 0,
-                                    self._env._apienc) as (rmat, nnz):
+        if lin_expr:
+            with CPX_PROC.chbmatrix(lin_expr, self._cplex._env_lp_ptr,
+                                    0) as (rmat, nnz):
                 CPX_PROC.addrows(self._env._e, self._cplex._lp, 0,
                                  num_new_rows, nnz, rhs, senses,
-                                 rmat, [], names, self._env._apienc)
+                                 rmat, [], names)
             if range_values != []:
                 CPX_PROC.chgrngval(
                     self._env._e, self._cplex._lp,
                     list(range(num_old_rows, num_old_rows + num_new_rows)),
                     range_values)
+        else:
+            if senses.find('R') != -1 and not range_values:
+                range_values = [0.0] * len(senses)
+            CPX_PROC.newrows(self._env._e, self._cplex._lp, rhs, senses,
+                             range_values, names)
 
     def add(self, lin_expr=None, senses="", rhs=None, range_values=None,
             names=None):
@@ -1228,10 +1217,11 @@ class LinearConstraintInterface(BaseInterface):
           name, an exception will be raised.
 
         senses must be either a list of single-character strings or a
-        string containing the senses of the linear constraints.  
+        string containing the senses of the linear constraints.
         Each entry must
-        be one of 'G', 'L', 'E', and 'R', indicating greater-than,
-        less-than, equality, and ranged constraints, respectively.
+        be one of 'G', 'L', 'E', and 'R', indicating
+        greater-than-or-equal-to (>=), less-than-or-equal-to (<=),
+        equality (=), and ranged constraints, respectively.
 
         rhs is a list of floats, specifying the righthand side of
         each linear constraint.
@@ -1240,7 +1230,7 @@ class LinearConstraintInterface(BaseInterface):
         between lefthand side and righthand side of each linear constraint.
         If range_values[i] > 0 (zero) then the constraint i is defined as
         rhs[i] <= rhs[i] + range_values[i]. If range_values[i] < 0 (zero)
-        then constraint i is defined as 
+        then constraint i is defined as
         rhs[i] + range_value[i] <= a*x <= rhs[i].
 
         names is a list of strings.
@@ -1294,8 +1284,8 @@ class LinearConstraintInterface(BaseInterface):
           give the best performance when deleting batches of linear
           constraints.
 
-        See CPXdelrows in the Callable Library Reference Manual for
-        more detail.
+        See :cpxapi:`CPXdelrows` in the Callable Library Reference Manual
+        for more detail.
 
         Example usage:
 
@@ -1383,8 +1373,7 @@ class LinearConstraintInterface(BaseInterface):
         ['c0', 'second', 'middle', 'last']
         """
         def setnames(a, b):
-            CPX_PROC.chgrowname(self._env._e, self._cplex._lp, a, b,
-                                self._env._apienc)
+            CPX_PROC.chgrowname(self._env._e, self._cplex._lp, a, b)
         apply_pairs(setnames, self._conv, *args)
 
     def set_senses(self, *args):
@@ -1405,8 +1394,9 @@ class LinearConstraintInterface(BaseInterface):
           [linear_constraints.set_senses(pair[0], pair[1]) for pair in seq_of_pairs].
 
         The senses of the constraints must be one of 'G', 'L', 'E',
-        and 'R', indicating greater-than, less-than, equality, and
-        ranged constraints, respectively.
+        and 'R', indicating greater-than-or-equal-to (>=),
+        less-than-or-equal-to (<=), equality (=), and ranged constraints,
+        respectively.
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -1448,30 +1438,41 @@ class LinearConstraintInterface(BaseInterface):
           each of which consists of a row name or index and a vector
           as described above.  Sets the specified rows
           to the corresponding vector.  Equivalent to
-          [linear_constraints.set_linear_components(pair[0], pair[1]) for pair in seq_of_pairs].
+          [linear_constraints.set_linear_components(pair[0], pair[1])
+          for pair in seq_of_pairs].
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.linear_constraints.add(names = ["c0", "c1", "c2", "c3"])
-        >>> indices = c.variables.add(names = ["x0", "x1"])
+        >>> indices = c.linear_constraints.add(names=["c0", "c1", "c2", "c3"])
+        >>> indices = c.variables.add(names=["x0", "x1"])
         >>> c.linear_constraints.set_linear_components("c0", [["x0"], [1.0]])
         >>> c.linear_constraints.get_rows("c0")
         SparsePair(ind = [0], val = [1.0])
-        >>> c.linear_constraints.set_linear_components([("c3", cplex.SparsePair(ind = ["x1"], val = [-1.0])),\
-                                                        (2, [[0, 1], [-2.0, 3.0]])])
-        >>> c.linear_constraints.get_rows()
-        [SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [], val = []), SparsePair(ind = [0, 1], val = [-2.0, 3.0]), SparsePair(ind = [1], val = [-1.0])]
+        >>> c.linear_constraints.set_linear_components([
+        ...     ("c3", cplex.SparsePair(ind=["x1"], val=[-1.0])),
+        ...     (2, [[0, 1], [-2.0, 3.0]])])
+        >>> c.linear_constraints.get_rows("c3")
+        SparsePair(ind = [1], val = [-1.0])
+        >>> c.linear_constraints.get_rows(2)
+        SparsePair(ind = [0, 1], val = [-2.0, 3.0])
         """
-        def setlin(aa, bb):
-            lincache, varcache = {}, {}
-            for i, a in enumerate(aa):
-                b = bb[i]
-                ind, val = unpack_pair(b)
+        def setlin(cons, vars_):
+            validate_arg_lengths([cons, vars_])
+            cons = convert_sequence(cons, self._get_index)
+            varcache = {}
+            for c, v in zip(cons, vars_):
+                ind, val = unpack_pair(v)
                 CPX_PROC.chgcoeflist(
-                    self._env._e, self._cplex._lp,
-                    [self._conv(a, lincache)] * len(ind),
-                    self._cplex.variables._conv(ind, varcache),
-                    val)
+                    self._env._e,
+                    self._cplex._lp,
+                    [c] * len(ind),
+                    convert_sequence(
+                        ind,
+                        self._cplex.variables._get_index,
+                        varcache
+                    ),
+                    val
+                )
         apply_pairs(setlin, self._conv, *args)
 
     def set_range_values(self, *args):
@@ -1484,15 +1485,15 @@ class LinearConstraintInterface(BaseInterface):
         between lefthand side and righthand side of each linear constraint.
         If range_values[i] > 0 (zero) then the constraint i is defined as
         rhs[i] <= rhs[i] + range_values[i]. If range_values[i] < 0 (zero)
-        then constraint i is defined as 
+        then constraint i is defined as
         rhs[i] + range_value[i] <= a*x <= rhs[i].
 
-        Note that changing the range values will not change the sense of a 
-        constraint; you must call the method set_senses() of the class 
-        LinearConstraintInterface to change the sense of a ranged row if 
-        the previous range value was 0 (zero) and the constraint sense was not 
-        'R'. Similarly, changing the range coefficient from a nonzero value to 
-        0 (zero) will not change the constraint sense from 'R" to "E"; an 
+        Note that changing the range values will not change the sense of a
+        constraint; you must call the method set_senses() of the class
+        LinearConstraintInterface to change the sense of a ranged row if
+        the previous range value was 0 (zero) and the constraint sense was not
+        'R'. Similarly, changing the range coefficient from a nonzero value to
+        0 (zero) will not change the constraint sense from 'R" to "E"; an
         additional call of setsenses() is required to accomplish that.
 
         There are two forms by which linear_constraints.set_range_values may be
@@ -1669,7 +1670,7 @@ class LinearConstraintInterface(BaseInterface):
         between lefthand side and righthand side of each linear constraint.
         If range_values[i] > 0 (zero) then the constraint i is defined as
         rhs[i] <= rhs[i] + range_values[i]. If range_values[i] < 0 (zero)
-        then constraint i is defined as 
+        then constraint i is defined as
         rhs[i] + range_value[i] <= a*x <= rhs[i].
 
         Can be called by four forms.
@@ -1744,10 +1745,9 @@ class LinearConstraintInterface(BaseInterface):
         if len(args) == 2:
             return getcoef(self._conv(args[0]),
                            self._cplex.variables._conv(args[1]))
-        elif len(args) == 1:
+        if len(args) == 1:
             return [self.get_coefficients(*arg) for arg in args[0]]
-        else:
-            raise WrongNumberOfArgumentsError()
+        raise WrongNumberOfArgumentsError()
 
     def get_rows(self, *args):
         """Returns a set of rows of the linear constraint matrix.
@@ -1755,7 +1755,8 @@ class LinearConstraintInterface(BaseInterface):
         Returns a list of SparsePair instances or a single SparsePair
         instance, depending on the form by which it was called.
 
-        There are four forms by which linear_constraints.get_rows may be called.
+        There are four forms by which linear_constraints.get_rows may be
+        called.
 
         linear_constraints.get_rows()
           return the entire linear constraint matrix.
@@ -1764,7 +1765,7 @@ class LinearConstraintInterface(BaseInterface):
           i must be a row name or index.  Returns the ith row of
           the linear constraint matrix.
 
-        linear_constraints.get_rows(s) 
+        linear_constraints.get_rows(s)
           s must be a sequence of row names or indices.  Returns the
           rows of the linear constraint matrix indexed by the members
           of s.  Equivalent to
@@ -1778,21 +1779,33 @@ class LinearConstraintInterface(BaseInterface):
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = ["x1", "x2", "x3"])
-        >>> indices = c.linear_constraints.add(\
-                names = ["c0", "c1", "c2", "c3"],\
-                lin_expr = [cplex.SparsePair(ind = ["x1", "x3"], val = [1.0, -1.0]),\
-                            cplex.SparsePair(ind = ["x1", "x2"], val = [1.0, 1.0]),\
-                            cplex.SparsePair(ind = ["x1", "x2", "x3"], val = [-1.0] * 3),\
-                            cplex.SparsePair(ind = ["x2", "x3"], val = [10.0, -2.0])])
+        >>> indices = c.variables.add(names=["x1", "x2", "x3"])
+        >>> indices = c.linear_constraints.add(
+        ...     names=["c0", "c1", "c2", "c3"],
+        ...     lin_expr=[
+        ...         cplex.SparsePair(ind=["x1", "x3"], val=[1.0, -1.0]),
+        ...         cplex.SparsePair(ind=["x1", "x2"], val=[1.0, 1.0]),
+        ...         cplex.SparsePair(ind=["x1", "x2", "x3"], val=[-1.0] * 3),
+        ...         cplex.SparsePair(ind=["x2", "x3"], val=[10.0, -2.0])
+        ...     ]
+        ... )
         >>> c.linear_constraints.get_rows(0)
         SparsePair(ind = [0, 2], val = [1.0, -1.0])
-        >>> c.linear_constraints.get_rows(1,3)
-        [SparsePair(ind = [0, 1], val = [1.0, 1.0]), SparsePair(ind = [0, 1, 2], val = [-1.0, -1.0, -1.0]), SparsePair(ind = [1, 2], val = [10.0, -2.0])]
-        >>> c.linear_constraints.get_rows(["c2", 0])
-        [SparsePair(ind = [0, 1, 2], val = [-1.0, -1.0, -1.0]), SparsePair(ind = [0, 2], val = [1.0, -1.0])]
-        >>> c.linear_constraints.get_rows()
-        [SparsePair(ind = [0, 2], val = [1.0, -1.0]), SparsePair(ind = [0, 1], val = [1.0, 1.0]), SparsePair(ind = [0, 1, 2], val = [-1.0, -1.0, -1.0]), SparsePair(ind = [1, 2], val = [10.0, -2.0])]
+        >>> for row in c.linear_constraints.get_rows(1,3):
+        ...     print(row)
+        SparsePair(ind = [0, 1], val = [1.0, 1.0])
+        SparsePair(ind = [0, 1, 2], val = [-1.0, -1.0, -1.0])
+        SparsePair(ind = [1, 2], val = [10.0, -2.0])
+        >>> for row in c.linear_constraints.get_rows(["c2", 0]):
+        ...     print(row)
+        SparsePair(ind = [0, 1, 2], val = [-1.0, -1.0, -1.0])
+        SparsePair(ind = [0, 2], val = [1.0, -1.0])
+        >>> for row in c.linear_constraints.get_rows():
+        ...     print(row)
+        SparsePair(ind = [0, 2], val = [1.0, -1.0])
+        SparsePair(ind = [0, 1], val = [1.0, 1.0])
+        SparsePair(ind = [0, 1, 2], val = [-1.0, -1.0, -1.0])
+        SparsePair(ind = [1, 2], val = [10.0, -2.0])
         """
         def getrows(begin, end=self.get_num() - 1):
             mat = _HBMatrix()
@@ -1804,18 +1817,23 @@ class LinearConstraintInterface(BaseInterface):
         return apply_freeform_two_args(getrows, self._conv, args)
 
     def get_num_nonzeros(self):
-        """Returns the number of nonzeros in the linear constraint matrix.
+        """Returns the number of nonzeros in the linear constraint
+        matrix.
 
         Example usage:
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = ["x1", "x2", "x3"])
-        >>> indices = c.linear_constraints.add(names = ["c0", "c1", "c2", "c3"],\
-                                     lin_expr = [cplex.SparsePair(ind = ["x1", "x3"], val = [1.0, -1.0]),\
-                                             cplex.SparsePair(ind = ["x1", "x2"], val = [1.0, 1.0]),\
-                                             cplex.SparsePair(ind = ["x1", "x2", "x3"], val = [-1.0] * 3),\
-                                             cplex.SparsePair(ind = ["x2", "x3"], val = [10.0, -2.0])])
+        >>> indices = c.variables.add(names=["x1", "x2", "x3"])
+        >>> indices = c.linear_constraints.add(
+        ...     names=["c0", "c1", "c2", "c3"],
+        ...     lin_expr=[
+        ...         cplex.SparsePair(ind=["x1", "x3"], val=[1.0, -1.0]),
+        ...         cplex.SparsePair(ind=["x1", "x2"], val=[1.0, 1.0]),
+        ...         cplex.SparsePair(ind=["x1", "x2", "x3"], val=[-1.0] * 3),
+        ...         cplex.SparsePair(ind=["x2", "x3"], val=[10.0, -2.0])
+        ...     ]
+        ... )
         >>> c.linear_constraints.get_num_nonzeros()
         9
         """
@@ -1859,7 +1877,7 @@ class LinearConstraintInterface(BaseInterface):
         """
         def getname(a, b=self.get_num() - 1):
             return CPX_PROC.getrowname(self._env._e, self._cplex._lp,
-                                       a, b, self._env._apienc)
+                                       a, b)
         return apply_freeform_two_args(getname, self._conv, args)
 
     def get_histogram(self):
@@ -1869,7 +1887,7 @@ class LinearConstraintInterface(BaseInterface):
         slice notation.  If a negative nonzero count is queried in
         this manner an IndexError will be raised.
 
-        The __str__ method of the histogram object returns a string
+        The __str__ method of the `Histogram` object returns a string
         displaying the number of rows with given nonzeros counts in
         human readable form.
 
@@ -1895,7 +1913,7 @@ class LinearConstraintInterface(BaseInterface):
         return Histogram(self._cplex, "row")
 
 
-class IndicatorType(object):
+class IndicatorType(ConstantClass):
     """Identifiers for types of indicator constraints."""
     if_ = _constants.CPX_INDICATOR_IF
     """CPX_INDICATOR_IF ('->')."""
@@ -1903,25 +1921,6 @@ class IndicatorType(object):
     """CPX_INDICATOR_ONLYIF ('<-')"""
     iff = _constants.CPX_INDICATOR_IFANDONLYIF
     """CPX_INDICATOR_IFANDONLYIF ('<->')"""
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.indicator_constraints.type_.if_
-        1
-        >>> c.indicator_constraints.type_[1]
-        'if_'
-        """
-        if item == _constants.CPX_INDICATOR_IF:
-            return 'if_'
-        if item == _constants.CPX_INDICATOR_ONLYIF:
-            return 'onlyif'
-        if item == _constants.CPX_INDICATOR_IFANDONLYIF:
-            return 'iff'
 
 
 class IndicatorConstraintInterface(BaseInterface):
@@ -1937,8 +1936,8 @@ class IndicatorConstraintInterface(BaseInterface):
         `Cplex` class as `Cplex.indicator_constraints`.  This constructor
         is not meant to be used externally.
         """
-        super(IndicatorConstraintInterface, self).__init__(
-            cplex=cplex, getindexfunc=CPX_PROC.getindconstrindex)
+        super().__init__(cplex=cplex,
+                         getindexfunc=CPX_PROC.getindconstrindex)
 
     def get_num(self):
         """Returns the number of indicator constraints.
@@ -1956,20 +1955,19 @@ class IndicatorConstraintInterface(BaseInterface):
 
     def _add_batch(self, lin_expr, sense, rhs, indvar, complemented, name,
                    indtype):
-        if not isinstance(sense, six.string_types):
+        if not isinstance(sense, str):
             sense = "".join(sense)
         arg_list = [lin_expr, sense, rhs, indvar, complemented, name,
                     indtype]
         num_new_rows = max_arg_length(arg_list)
         validate_arg_lengths(arg_list)
-        with CPX_PROC.chbmatrix(lin_expr, self._cplex._env_lp_ptr, 0,
-                                self._env._apienc) as (linmat, nnz):
+        with CPX_PROC.chbmatrix(lin_expr, self._cplex._env_lp_ptr,
+                                0) as (linmat, nnz):
             CPX_PROC.addindconstr(self._env._e, self._cplex._lp,
                                   num_new_rows,
                                   self._cplex.variables._conv(indvar),
                                   complemented, rhs, sense,
-                                  linmat, indtype, name, nnz,
-                                  self._env._apienc)
+                                  linmat, indtype, name, nnz)
 
     def add_batch(self, lin_expr=None, sense=None, rhs=None, indvar=None,
                   complemented=None, name=None, indtype=None):
@@ -1991,9 +1989,9 @@ class IndicatorConstraintInterface(BaseInterface):
 
         sense : must be either a list of single-character strings or a
         string containing the senses of the indicator constraints.
-        Each entry must be one of 'G', 'L', 'E', indicating greater-than,
-        less-than, and equality, respectively. Left unspecified, the
-        default is 'E'.
+        Each entry must be one of 'G', 'L', 'E', indicating
+        greater-than-or-equal-to (>=), less-than-or-equal-to (<=), and
+        equality (=), respectively. Left unspecified, the default is 'E'.
 
         rhs : a list of floats, specifying the righthand side of each
         indicator constraint.
@@ -2128,8 +2126,8 @@ class IndicatorConstraintInterface(BaseInterface):
           give the best performance when deleting batches of indicator
           constraints.
 
-        See CPXdelindconstrs in the Callable Library Reference Manual for
-        more detail.
+        See :mipapi:`CPXdelindconstrs` in the Callable Library Reference
+        Manual for more detail.
 
         Example usage:
 
@@ -2157,7 +2155,7 @@ class IndicatorConstraintInterface(BaseInterface):
         delete_set_by_range(_delete, self._conv, self.get_num(), *args)
 
     def get_indicator_variables(self, *args):
-        """Returns the indicator variables of a set of indicator constraints. 
+        """Returns the indicator variables of a set of indicator constraints.
 
         May be called by four forms.
 
@@ -2450,7 +2448,8 @@ class IndicatorConstraintInterface(BaseInterface):
         return apply_freeform_two_args(gettype, self._conv, args)
 
     def get_linear_components(self, *args):
-        """Returns the linear constraint of a set of indicator constraints.
+        """Returns the linear constraint of a set of indicator
+        constraints.
 
         Returns a list of SparsePair instances or a single SparsePair
         instance, depending on the form by which it was called.
@@ -2481,23 +2480,32 @@ class IndicatorConstraintInterface(BaseInterface):
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = [str(i) for i in range(11)], types = "B" * 11)
+        >>> indices = c.variables.add(
+        ...     names=[str(i) for i in range(4)],
+        ...     types="B" * 4
+        ... )
         >>> [c.indicator_constraints.add(
-        ...      name=str(i), indvar=10,
+        ...      name=str(i), indvar=3,
         ...      lin_expr=[range(i), [1.0 * (j+1.0) for j in range(i)]])
-        ...  for i in range(10)]
-        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        ...  for i in range(3)]
+        [0, 1, 2]
         >>> c.indicator_constraints.get_num()
-        10
-        >>> c.indicator_constraints.get_linear_components(8)
-        SparsePair(ind = [0, 1, 2, 3, 4, 5, 6, 7], val = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
-        >>> c.indicator_constraints.get_linear_components("1",3)
-        [SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [0, 1], val = [1.0, 2.0]), SparsePair(ind = [0, 1, 2], val = [1.0, 2.0, 3.0])]
-        >>> c.indicator_constraints.get_linear_components([2,"0",5])
-        [SparsePair(ind = [0, 1], val = [1.0, 2.0]), SparsePair(ind = [], val = []), SparsePair(ind = [0, 1, 2, 3, 4], val = [1.0, 2.0, 3.0, 4.0, 5.0])]
-        >>> c.indicator_constraints.delete(4,9)
-        >>> c.indicator_constraints.get_linear_components()
-        [SparsePair(ind = [], val = []), SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [0, 1], val = [1.0, 2.0]), SparsePair(ind = [0, 1, 2], val = [1.0, 2.0, 3.0])]
+        3
+        >>> c.indicator_constraints.get_linear_components(2)
+        SparsePair(ind = [0, 1], val = [1.0, 2.0])
+        >>> for row in c.indicator_constraints.get_linear_components("0", 1):
+        ...     print(row)
+        SparsePair(ind = [], val = [])
+        SparsePair(ind = [0], val = [1.0])
+        >>> for row in c.indicator_constraints.get_linear_components([1, "0"]):
+        ...     print(row)
+        SparsePair(ind = [0], val = [1.0])
+        SparsePair(ind = [], val = [])
+        >>> for row in c.indicator_constraints.get_linear_components():
+        ...     print(row)
+        SparsePair(ind = [], val = [])
+        SparsePair(ind = [0], val = [1.0])
+        SparsePair(ind = [0, 1], val = [1.0, 2.0])
         """
         def getlin(begin, end=self.get_num() - 1):
             mat = _HBMatrix()
@@ -2549,8 +2557,7 @@ class IndicatorConstraintInterface(BaseInterface):
         """
         def getname(a):
             return CPX_PROC.getindconstrname(
-                self._env._e, self._cplex._lp, a,
-                self._env._apienc)
+                self._env._e, self._cplex._lp, a)
         return apply_freeform_one_arg(
             getname, self._conv, self.get_num(), args)
 
@@ -2565,8 +2572,7 @@ class QuadraticConstraintInterface(BaseInterface):
         `Cplex` class as `Cplex.quadratic_constraints`.  This constructor
         is not meant to be used externally.
         """
-        super(QuadraticConstraintInterface, self).__init__(
-            cplex=cplex, getindexfunc=CPX_PROC.getqconstrindex)
+        super().__init__(cplex=cplex, getindexfunc=CPX_PROC.getqconstrindex)
 
     def get_num(self):
         """Returns the number of quadratic constraints.
@@ -2599,8 +2605,7 @@ class QuadraticConstraintInterface(BaseInterface):
                             val,
                             self._cplex.variables._conv(ind1, varcache),
                             self._cplex.variables._conv(ind2, varcache),
-                            qval, name,
-                            self._env._apienc)
+                            qval, name)
 
     def add(self, lin_expr=None, quad_expr=None, sense="L", rhs=0.0, name=""):
         """Adds a quadratic constraint to the problem.
@@ -2680,8 +2685,8 @@ class QuadraticConstraintInterface(BaseInterface):
           give the best performance when deleting batches of quadratic
           constraints.
 
-        See CPXdelqconstrs in the Callable Library Reference Manual for
-        more detail.
+        See :socpapi:`CPXdelqconstrs` in the Callable Library Reference
+        Manual for more detail.
 
         Example usage:
 
@@ -2867,7 +2872,8 @@ class QuadraticConstraintInterface(BaseInterface):
     def get_linear_components(self, *args):
         """Returns the linear part of a set of quadratic constraints.
 
-        Returns a list of SparsePair instances or one SparsePair instance.
+        Returns a list of SparsePair instances or one SparsePair
+        instance.
 
         Can be called by four forms.
 
@@ -2895,23 +2901,32 @@ class QuadraticConstraintInterface(BaseInterface):
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = [str(i) for i in range(11)], types = "B" * 11)
+        >>> indices = c.variables.add(
+        ...     names=[str(i) for i in range(4)],
+        ...     types="B" * 4
+        ... )
         >>> [c.quadratic_constraints.add(
-        ...      name = str(i),
-        ...      lin_expr = [range(i), [1.0 * (j+1.0) for j in range(i)]])
-        ...  for i in range(10)]
-        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        ...      name=str(i),
+        ...      lin_expr=[range(i), [1.0 * (j+1.0) for j in range(i)]])
+        ...  for i in range(3)]
+        [0, 1, 2]
         >>> c.quadratic_constraints.get_num()
-        10
-        >>> c.quadratic_constraints.get_linear_components(8)
-        SparsePair(ind = [0, 1, 2, 3, 4, 5, 6, 7], val = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
-        >>> c.quadratic_constraints.get_linear_components("1",3)
-        [SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [0, 1], val = [1.0, 2.0]), SparsePair(ind = [0, 1, 2], val = [1.0, 2.0, 3.0])]
-        >>> c.quadratic_constraints.get_linear_components([2,"0",5])
-        [SparsePair(ind = [0, 1], val = [1.0, 2.0]), SparsePair(ind = [], val = []), SparsePair(ind = [0, 1, 2, 3, 4], val = [1.0, 2.0, 3.0, 4.0, 5.0])]
-        >>> c.quadratic_constraints.delete(4,9)
-        >>> c.quadratic_constraints.get_linear_components()
-        [SparsePair(ind = [], val = []), SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [0, 1], val = [1.0, 2.0]), SparsePair(ind = [0, 1, 2], val = [1.0, 2.0, 3.0])]
+        3
+        >>> c.quadratic_constraints.get_linear_components(2)
+        SparsePair(ind = [0, 1], val = [1.0, 2.0])
+        >>> for row in c.quadratic_constraints.get_linear_components("0", 1):
+        ...     print(row)
+        SparsePair(ind = [], val = [])
+        SparsePair(ind = [0], val = [1.0])
+        >>> for row in c.quadratic_constraints.get_linear_components([1, "0"]):
+        ...     print(row)
+        SparsePair(ind = [0], val = [1.0])
+        SparsePair(ind = [], val = [])
+        >>> for row in c.quadratic_constraints.get_linear_components():
+        ...     print(row)
+        SparsePair(ind = [], val = [])
+        SparsePair(ind = [0], val = [1.0])
+        SparsePair(ind = [0, 1], val = [1.0, 2.0])
         """
         def getlin(a):
             return SparsePair(*CPX_PROC.getqconstr_lin(
@@ -3000,23 +3015,31 @@ class QuadraticConstraintInterface(BaseInterface):
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = [str(i) for i in range(11)], types = "B" * 11)
+        >>> indices = c.variables.add(
+        ...     names=[str(i) for i in range(4)]
+        ... )
         >>> [c.quadratic_constraints.add(
-        ...      name = str(i),
-        ...      quad_expr = [range(i), range(i), [1.0 * (j+1.0) for j in range(i)]])
-        ...  for i in range(1, 11)]
-        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        ...      name="q{0}".format(i),
+        ...      quad_expr=[range(i), range(i),
+        ...                 [1.0 * (j+1.0) for j in range(i)]])
+        ...  for i in range(1, 3)]
+        [0, 1]
         >>> c.quadratic_constraints.get_num()
-        10
-        >>> c.quadratic_constraints.get_quadratic_components(8)
-        SparseTriple(ind1 = [0, 1, 2, 3, 4, 5, 6, 7, 8], ind2 = [0, 1, 2, 3, 4, 5, 6, 7, 8], val = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0])
-        >>> c.quadratic_constraints.get_quadratic_components("1",3)
-        [SparseTriple(ind1 = [0], ind2 = [0], val = [1.0]), SparseTriple(ind1 = [0, 1], ind2 = [0, 1], val = [1.0, 2.0]), SparseTriple(ind1 = [0, 1, 2], ind2 = [0, 1, 2], val = [1.0, 2.0, 3.0]), SparseTriple(ind1 = [0, 1, 2, 3], ind2 = [0, 1, 2, 3], val = [1.0, 2.0, 3.0, 4.0])]
-        >>> c.quadratic_constraints.get_quadratic_components([2,"1",5])
-        [SparseTriple(ind1 = [0, 1, 2], ind2 = [0, 1, 2], val = [1.0, 2.0, 3.0]), SparseTriple(ind1 = [0], ind2 = [0], val = [1.0]), SparseTriple(ind1 = [0, 1, 2, 3, 4, 5], ind2 = [0, 1, 2, 3, 4, 5], val = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0])]
-        >>> c.quadratic_constraints.delete(4,9)
-        >>> c.quadratic_constraints.get_quadratic_components()
-        [SparseTriple(ind1 = [0], ind2 = [0], val = [1.0]), SparseTriple(ind1 = [0, 1], ind2 = [0, 1], val = [1.0, 2.0]), SparseTriple(ind1 = [0, 1, 2], ind2 = [0, 1, 2], val = [1.0, 2.0, 3.0]), SparseTriple(ind1 = [0, 1, 2, 3], ind2 = [0, 1, 2, 3], val = [1.0, 2.0, 3.0, 4.0])]
+        2
+        >>> c.quadratic_constraints.get_quadratic_components(1)
+        SparseTriple(ind1 = [0, 1], ind2 = [0, 1], val = [1.0, 2.0])
+        >>> for quad in c.quadratic_constraints.get_quadratic_components("q1", 1):
+        ...     print(quad)
+        SparseTriple(ind1 = [0], ind2 = [0], val = [1.0])
+        SparseTriple(ind1 = [0, 1], ind2 = [0, 1], val = [1.0, 2.0])
+        >>> for quad in c.quadratic_constraints.get_quadratic_components(["q2", 0]):
+        ...     print(quad)
+        SparseTriple(ind1 = [0, 1], ind2 = [0, 1], val = [1.0, 2.0])
+        SparseTriple(ind1 = [0], ind2 = [0], val = [1.0])
+        >>> for quad in c.quadratic_constraints.get_quadratic_components():
+        ...     print(quad)
+        SparseTriple(ind1 = [0], ind2 = [0], val = [1.0])
+        SparseTriple(ind1 = [0, 1], ind2 = [0, 1], val = [1.0, 2.0])
         """
         def getquad(a):
             return SparseTriple(*CPX_PROC.getqconstr_quad(
@@ -3070,13 +3093,12 @@ class QuadraticConstraintInterface(BaseInterface):
         """
         def getname(a):
             return CPX_PROC.getqconstrname(
-                self._env._e, self._cplex._lp, a,
-                self._env._apienc)
+                self._env._e, self._cplex._lp, a)
         return apply_freeform_one_arg(
             getname, self._conv, self.get_num(), args)
 
 
-class SOSType(object):
+class SOSType(ConstantClass):
     """Constants defining the type of special ordered sets.
 
     For a definition of SOS type 1 and 2, see those topics in the CPLEX
@@ -3084,23 +3106,6 @@ class SOSType(object):
     """
     SOS1 = _constants.CPX_TYPE_SOS1
     SOS2 = _constants.CPX_TYPE_SOS2
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.SOS.type.SOS1
-        '1'
-        >>> c.SOS.type['1']
-        'SOS1'
-        """
-        if item == _constants.CPX_TYPE_SOS1:
-            return 'SOS1'
-        if item == _constants.CPX_TYPE_SOS2:
-            return 'SOS2'
 
 
 class SOSInterface(BaseInterface):
@@ -3116,8 +3121,7 @@ class SOSInterface(BaseInterface):
         `Cplex.SOS`.  This constructor is not meant to be used
         externally.
         """
-        super(SOSInterface, self).__init__(
-            cplex=cplex, getindexfunc=CPX_PROC.getsosindex)
+        super().__init__(cplex=cplex, getindexfunc=CPX_PROC.getsosindex)
 
     def get_num(self):
         """Returns the number of special ordered sets."""
@@ -3130,8 +3134,7 @@ class SOSInterface(BaseInterface):
         indices, weights = unpack_pair(SOS)
         CPX_PROC.addsos(self._env._e, self._cplex._lp, type, [0],
                         self._cplex.variables._conv(indices),
-                        weights, [name],
-                        self._env._apienc)
+                        weights, [name])
 
     def add(self, type="1", SOS=None, name=""):
         """Adds a special ordered set constraint to the problem.
@@ -3190,8 +3193,8 @@ class SOSInterface(BaseInterface):
           SOS.delete(range(begin, end + 1)). This will give the best
           performance when deleting batches of SOS constraints.
 
-        See CPXdelsos in the Callable Library Reference Manual for
-        more detail.
+        See :mipapi:`CPXdelsos` in the Callable Library Reference Manual
+        for more detail.
 
         Example usage:
 
@@ -3250,22 +3253,31 @@ class SOSInterface(BaseInterface):
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = [str(i) for i in range(11)], types = "B" * 11)
-        >>> [c.SOS.add(name = str(i),
-        ...            SOS = [range(i), [1.0 * (j+1.0) for j in range(i)]])
-        ...  for i in range(1,11)]
-        [0, 1, 2, 3, 4, 5, 6, 7, 8, 9]
+        >>> indices = c.variables.add(
+        ...     names=[str(i) for i in range(4)],
+        ...     types="B" * 4
+        ... )
+        >>> [c.SOS.add(
+        ...      name="s{0}".format(i),
+        ...      SOS=[range(i), [1.0 * (j+1.0) for j in range(i)]])
+        ...  for i in range(1, 3)]
+        [0, 1]
         >>> c.SOS.get_num()
-        10
-        >>> c.SOS.get_sets(7)
-        SparsePair(ind = [0, 1, 2, 3, 4, 5, 6, 7], val = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0])
-        >>> c.SOS.get_sets("1",2)
-        [SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [0, 1], val = [1.0, 2.0]), SparsePair(ind = [0, 1, 2], val = [1.0, 2.0, 3.0])]
-        >>> c.SOS.get_sets([3,"1",4])
-        [SparsePair(ind = [0, 1, 2, 3], val = [1.0, 2.0, 3.0, 4.0]), SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [0, 1, 2, 3, 4], val = [1.0, 2.0, 3.0, 4.0, 5.0])]
-        >>> c.SOS.delete(3,9)
-        >>> c.SOS.get_sets()
-        [SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [0, 1], val = [1.0, 2.0]), SparsePair(ind = [0, 1, 2], val = [1.0, 2.0, 3.0])]
+        2
+        >>> c.SOS.get_sets(1)
+        SparsePair(ind = [0, 1], val = [1.0, 2.0])
+        >>> for s in c.SOS.get_sets("s1", 1):
+        ...     print(s)
+        SparsePair(ind = [0], val = [1.0])
+        SparsePair(ind = [0, 1], val = [1.0, 2.0])
+        >>> for s in c.SOS.get_sets(["s2", 0]):
+        ...     print(s)
+        SparsePair(ind = [0, 1], val = [1.0, 2.0])
+        SparsePair(ind = [0], val = [1.0])
+        >>> for s in c.SOS.get_sets():
+        ...     print(s)
+        SparsePair(ind = [0], val = [1.0])
+        SparsePair(ind = [0, 1], val = [1.0, 2.0])
         """
         def getsos(a, b=self.get_num() - 1):
             ret = CPX_PROC.getsos(self._env._e, self._cplex._lp, a, b)
@@ -3413,12 +3425,11 @@ class SOSInterface(BaseInterface):
         ['sos1', 'sos2', 'sos3', 'sos4', 'sos5', 'sos6', 'sos7', 'sos8', 'sos9', 'sos10']
         """
         def getname(a, b=self.get_num() - 1):
-            return CPX_PROC.getsosname(self._env._e, self._cplex._lp, a, b,
-                                       self._env._apienc)
+            return CPX_PROC.getsosname(self._env._e, self._cplex._lp, a, b)
         return apply_freeform_two_args(getname, self._conv, args)
 
 
-class EffortLevel(object):
+class EffortLevel(ConstantClass):
     """Effort levels associated with a MIP start"""
     auto = _constants.CPX_MIPSTART_AUTO
     check_feasibility = _constants.CPX_MIPSTART_CHECKFEAS
@@ -3426,31 +3437,6 @@ class EffortLevel(object):
     solve_MIP = _constants.CPX_MIPSTART_SOLVEMIP
     repair = _constants.CPX_MIPSTART_REPAIR
     no_check = _constants.CPX_MIPSTART_NOCHECK
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.MIP_starts.effort_level.repair
-        4
-        >>> c.MIP_starts.effort_level[4]
-        'repair'
-        """
-        if item == _constants.CPX_MIPSTART_AUTO:
-            return 'auto'
-        if item == _constants.CPX_MIPSTART_CHECKFEAS:
-            return 'check_feasibility'
-        if item == _constants.CPX_MIPSTART_SOLVEFIXED:
-            return 'solve_fixed'
-        if item == _constants.CPX_MIPSTART_SOLVEMIP:
-            return 'solve_MIP'
-        if item == _constants.CPX_MIPSTART_REPAIR:
-            return 'repair'
-        if item == _constants.CPX_MIPSTART_NOCHECK:
-            return 'no_check'
 
 
 class MIPStartsInterface(BaseInterface):
@@ -3466,8 +3452,8 @@ class MIPStartsInterface(BaseInterface):
         class as `Cplex.MIP_starts`.  This constructor is not meant to be
         used externally.
         """
-        super(MIPStartsInterface, self).__init__(
-            cplex=cplex, getindexfunc=CPX_PROC.getmipstartindex)
+        super().__init__(cplex=cplex,
+                         getindexfunc=CPX_PROC.getmipstartindex)
 
     def get_num(self):
         """Returns the number of MIP starts currently stored.
@@ -3512,8 +3498,7 @@ class MIPStartsInterface(BaseInterface):
         >>> c.MIP_starts.write("test_all.mst")
         >>> c.MIP_starts.read("test_all.mst")
         """
-        CPX_PROC.readcopymipstarts(self._env._e, self._cplex._lp, filename,
-                                   enc=self._env._apienc)
+        CPX_PROC.readcopymipstarts(self._env._e, self._cplex._lp, filename)
 
     def write(self, filename, begin=-1, end=-1):
         """Writes a set of MIP starts to a file.
@@ -3545,7 +3530,7 @@ class MIPStartsInterface(BaseInterface):
         if end == -1:
             end = begin
         CPX_PROC.writemipstarts(self._env._e, self._cplex._lp, filename,
-                                begin, end, enc=self._env._apienc)
+                                begin, end)
 
     def _add(self, *args):
         """non-public"""
@@ -3563,8 +3548,7 @@ class MIPStartsInterface(BaseInterface):
             CPX_PROC.addmipstarts(
                 self._env._e, self._cplex._lp, [0],
                 self._cplex.variables._conv(ind),
-                val, [args[1]], [name],
-                self._env._apienc)
+                val, [args[1]], [name])
 
     def add(self, *args):
         """Adds MIP starts to the problem.
@@ -3643,13 +3627,17 @@ class MIPStartsInterface(BaseInterface):
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> indices = c.variables.add(
-        ...     names = ["x" + str(i) for i in range(11)],
-        ...     types = "I" * 11)
+        ...     names = ["x{0}".format(i) for i in range(4)],
+        ...     types = "I" * 4
+        ... )
         >>> indices = c.MIP_starts.add(
         ...     [(cplex.SparsePair(ind = [i], val = [0.0]),
         ...       c.MIP_starts.effort_level.auto) for i in range(3)])
-        >>> c.MIP_starts.get_starts()
-        [(SparsePair(ind = [0], val = [0.0]), 0), (SparsePair(ind = [1], val = [0.0]), 0), (SparsePair(ind = [2], val = [0.0]), 0)]
+        >>> for s in c.MIP_starts.get_starts():
+        ...     print(s)
+        (SparsePair(ind = [0], val = [0.0]), 0)
+        (SparsePair(ind = [1], val = [0.0]), 0)
+        (SparsePair(ind = [2], val = [0.0]), 0)
         >>> c.MIP_starts.get_names()
         ['m1', 'm2', 'm3']
         >>> check = c.MIP_starts.effort_level.check_feasibility
@@ -3660,10 +3648,12 @@ class MIPStartsInterface(BaseInterface):
         >>> c.MIP_starts.change(1, [[1, 2], [-1.0, -2.0]], repair)
         >>> c.MIP_starts.get_starts("m2")
         (SparsePair(ind = [1, 2], val = [-1.0, -2.0]), 4)
-        >>> c.MIP_starts.change([(1, [[0, 2], [-1.0, 2.0]], check),\
-                                 ("m3", [["x0", 2], [3.0, 2.0]], repair)])
-        >>> c.MIP_starts.get_starts(["m2", "m3"])
-        [(SparsePair(ind = [0, 1, 2], val = [-1.0, -1.0, 2.0]), 1), (SparsePair(ind = [0, 2], val = [3.0, 2.0]), 4)]
+        >>> c.MIP_starts.change([(1, [[0, 2], [-1.0, 2.0]], check),
+        ...                      ("m3", [["x0", 2], [3.0, 2.0]], repair)])
+        >>> for s in c.MIP_starts.get_starts(["m2", "m3"]):
+        ...     print(s)
+        (SparsePair(ind = [0, 1, 2], val = [-1.0, -1.0, 2.0]), 1)
+        (SparsePair(ind = [0, 2], val = [3.0, 2.0]), 4)
         """
         if len(args) == 3:
             ind, val = unpack_pair(args[1])
@@ -3701,8 +3691,8 @@ class MIPStartsInterface(BaseInterface):
           MIP_starts.delete(range(begin, end + 1)). This will give the
           best performance when deleting batches of MIP starts.
 
-        See CPXdelmipstarts in the Callable Library Reference Manual for
-        more detail.
+        See :mipapi:`CPXdelmipstarts` in the Callable Library Reference
+        Manual for more detail.
 
         Example usage:
 
@@ -3763,23 +3753,32 @@ class MIPStartsInterface(BaseInterface):
         >>> import cplex
         >>> c = cplex.Cplex()
         >>> indices = c.variables.add(
-        ...     names = [str(i) for i in range(11)],
-        ...     types = "B" * 11)
+        ...     names=[str(i) for i in range(11)],
+        ...     types="B" * 11)
         >>> indices =c.MIP_starts.add(
-        ...     [(cplex.SparsePair(ind = [i], val = [1.0 * i]),
+        ...     [(cplex.SparsePair(ind=[i], val=[1.0 * i]),
         ...       c.MIP_starts.effort_level.auto, str(i))
         ...      for i in range(10)])
         >>> c.MIP_starts.get_num()
         10
         >>> c.MIP_starts.get_starts(7)
         (SparsePair(ind = [7], val = [7.0]), 0)
-        >>> c.MIP_starts.get_starts("0",2)
-        [(SparsePair(ind = [0], val = [0.0]), 0), (SparsePair(ind = [1], val = [1.0]), 0), (SparsePair(ind = [2], val = [2.0]), 0)]
-        >>> c.MIP_starts.get_starts([2,"0",5])
-        [(SparsePair(ind = [2], val = [2.0]), 0), (SparsePair(ind = [0], val = [0.0]), 0), (SparsePair(ind = [5], val = [5.0]), 0)]
+        >>> for s in c.MIP_starts.get_starts("0", 2):
+        ...     print(s)
+        (SparsePair(ind = [0], val = [0.0]), 0)
+        (SparsePair(ind = [1], val = [1.0]), 0)
+        (SparsePair(ind = [2], val = [2.0]), 0)
+        >>> for s in c.MIP_starts.get_starts([2, "0", 5]):
+        ...     print(s)
+        (SparsePair(ind = [2], val = [2.0]), 0)
+        (SparsePair(ind = [0], val = [0.0]), 0)
+        (SparsePair(ind = [5], val = [5.0]), 0)
         >>> c.MIP_starts.delete(3,9)
-        >>> c.MIP_starts.get_starts()
-        [(SparsePair(ind = [0], val = [0.0]), 0), (SparsePair(ind = [1], val = [1.0]), 0), (SparsePair(ind = [2], val = [2.0]), 0)]
+        >>> for s in c.MIP_starts.get_starts():
+        ...     print(s)
+        (SparsePair(ind = [0], val = [0.0]), 0)
+        (SparsePair(ind = [1], val = [1.0]), 0)
+        (SparsePair(ind = [2], val = [2.0]), 0)
         >>> c.MIP_starts.effort_level[0]
         'auto'
         """
@@ -3941,31 +3940,21 @@ class MIPStartsInterface(BaseInterface):
         """
         def getname(a, b=self.get_num() - 1):
             return CPX_PROC.getmipstartname(self._env._e, self._cplex._lp,
-                                            a, b, self._env._apienc)
+                                            a, b)
         return apply_freeform_two_args(getname, self._conv, args)
 
 
-class ObjSense(object):
-    """Constants defining the sense of the objective function."""
+class ObjSense(ConstantClass):
+    """Constants defining the sense of the objective function.
+
+    See :cpxapi:`CPXgetobjsen` in the Callable Library Reference
+    Manual for more detail.
+    """
     maximize = _constants.CPX_MAX
+    """See CPX_MAX in the C API."""
+
     minimize = _constants.CPX_MIN
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.objective.sense.minimize
-        1
-        >>> c.objective.sense[1]
-        'minimize'
-        """
-        if item == _constants.CPX_MAX:
-            return 'maximize'
-        if item == _constants.CPX_MIN:
-            return 'minimize'
+    """See CPX_MIN in the C API."""
 
 
 class ObjectiveInterface(BaseInterface):
@@ -4016,7 +4005,7 @@ class ObjectiveInterface(BaseInterface):
         of variables in the problem.
 
         If the quadratic objective function is separable, the entries
-        of the list must all be of type float, int, or long.
+        of the list must all be of type float or int.
 
         If the quadratic objective function is not separable, the
         entries of the list must be either SparsePair instances or
@@ -4032,15 +4021,23 @@ class ObjectiveInterface(BaseInterface):
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = [str(i) for i in range(3)])
-        >>> c.objective.set_quadratic([cplex.SparsePair(ind = [0, 1, 2], val = [1.0, -2.0, 0.5]),\
-                                       cplex.SparsePair(ind = [0, 1], val = [-2.0, -1.0]),\
-                                       cplex.SparsePair(ind = [0, 2], val = [0.5, -3.0])])
-        >>> c.objective.get_quadratic()
-        [SparsePair(ind = [0, 1, 2], val = [1.0, -2.0, 0.5]), SparsePair(ind = [0, 1], val = [-2.0, -1.0]), SparsePair(ind = [0, 2], val = [0.5, -3.0])]
+        >>> indices = c.variables.add(names=[str(i) for i in range(3)])
+        >>> c.objective.set_quadratic(
+        ...     [cplex.SparsePair(ind=[0, 1, 2], val=[1.0, -2.0, 0.5]),
+        ...      cplex.SparsePair(ind=[0, 1], val=[-2.0, -1.0]),
+        ...      cplex.SparsePair(ind=[0, 2], val=[0.5, -3.0])]
+        ... )
+        >>> for q in c.objective.get_quadratic():
+        ...     print(q)
+        SparsePair(ind = [0, 1, 2], val = [1.0, -2.0, 0.5])
+        SparsePair(ind = [0, 1], val = [-2.0, -1.0])
+        SparsePair(ind = [0, 2], val = [0.5, -3.0])
         >>> c.objective.set_quadratic([1.0, 2.0, 3.0])
-        >>> c.objective.get_quadratic()
-        [SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [1], val = [2.0]), SparsePair(ind = [2], val = [3.0])]
+        >>> for q in c.objective.get_quadratic():
+        ...     print(q)
+        SparsePair(ind = [0], val = [1.0])
+        SparsePair(ind = [1], val = [2.0])
+        SparsePair(ind = [2], val = [3.0])
         """
         if len(args) != 1:
             raise WrongNumberOfArgumentsError()
@@ -4055,7 +4052,8 @@ class ObjectiveInterface(BaseInterface):
             self.set_quadratic(_HBMatrix(args[0]))
 
     def set_quadratic_coefficients(self, *args):
-        """Sets coefficients of the quadratic component of the objective function.
+        """Sets coefficients of the quadratic component of the objective
+        function.
 
         To set a single coefficient, call this method as
 
@@ -4085,21 +4083,31 @@ class ObjectiveInterface(BaseInterface):
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = [str(i) for i in range(3)])
+        >>> indices = c.variables.add(names=[str(i) for i in range(3)])
         >>> c.objective.set_quadratic_coefficients(0, 1, 1.0)
-        >>> c.objective.get_quadratic()
-        [SparsePair(ind = [1], val = [1.0]), SparsePair(ind = [0], val = [1.0]), SparsePair(ind = [], val = [])]
-        >>> c.objective.set_quadratic_coefficients([(1, 1, 2.0), (0, 2, 3.0)])
-        >>> c.objective.get_quadratic()
-        [SparsePair(ind = [1, 2], val = [1.0, 3.0]), SparsePair(ind = [0, 1], val = [1.0, 2.0]), SparsePair(ind = [0], val = [3.0])]
-        >>> c.objective.set_quadratic_coefficients([(0, 1, 4.0), (1, 0, 5.0)])
-        >>> c.objective.get_quadratic()
-        [SparsePair(ind = [1, 2], val = [5.0, 3.0]), SparsePair(ind = [0, 1], val = [5.0, 2.0]), SparsePair(ind = [0], val = [3.0])]
+        >>> for q in c.objective.get_quadratic():
+        ...     print(q)
+        SparsePair(ind = [1], val = [1.0])
+        SparsePair(ind = [0], val = [1.0])
+        SparsePair(ind = [], val = [])
+        >>> c.objective.set_quadratic_coefficients([(1, 1, 2.0),
+        ...                                         (0, 2, 3.0)])
+        >>> for q in c.objective.get_quadratic():
+        ...     print(q)
+        SparsePair(ind = [1, 2], val = [1.0, 3.0])
+        SparsePair(ind = [0, 1], val = [1.0, 2.0])
+        SparsePair(ind = [0], val = [3.0])
+        >>> c.objective.set_quadratic_coefficients([(0, 1, 4.0),
+        ...                                         (1, 0, 5.0)])
+        >>> for q in c.objective.get_quadratic():
+        ...     print(q)
+        SparsePair(ind = [1, 2], val = [5.0, 3.0])
+        SparsePair(ind = [0, 1], val = [5.0, 2.0])
+        SparsePair(ind = [0], val = [3.0])
         """
         if len(args) not in (3, 1):
             raise WrongNumberOfArgumentsError()
-        if (isinstance(args[0], six.string_types) or
-                isinstance(args[0], six.integer_types)):
+        if isinstance(args[0], (str, int)):
             arg_list = [args]
         else:
             arg_list = args[0]
@@ -4140,8 +4148,7 @@ class ObjectiveInterface(BaseInterface):
         >>> c.objective.get_name()
         'cost'
         """
-        CPX_PROC.copyobjname(self._env._e, self._cplex._lp, name,
-                             self._env._apienc)
+        CPX_PROC.copyobjname(self._env._e, self._cplex._lp, name)
 
     def get_linear(self, *args):
         """Returns the linear coefficients of a set of variables.
@@ -4190,7 +4197,8 @@ class ObjectiveInterface(BaseInterface):
             getobj, self._cplex.variables._conv, args)
 
     def get_quadratic(self, *args):
-        """Returns a set of columns of the quadratic component of the objective function.
+        """Returns a set of columns of the quadratic component of the
+        objective function.
 
         Returns a SparsePair instance or a list of SparsePair instances.
 
@@ -4219,18 +4227,34 @@ class ObjectiveInterface(BaseInterface):
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = [str(i) for i in range(10)])
+        >>> indices = c.variables.add(names=[str(i) for i in range(10)])
         >>> c.variables.get_num()
         10
         >>> c.objective.set_quadratic([1.5 * i for i in range(10)])
         >>> c.objective.get_quadratic(8)
         SparsePair(ind = [8], val = [12.0])
-        >>> c.objective.get_quadratic("1",3)
-        [SparsePair(ind = [1], val = [1.5]), SparsePair(ind = [2], val = [3.0]), SparsePair(ind = [3], val = [4.5])]
-        >>> c.objective.get_quadratic([3,"1",5])
-        [SparsePair(ind = [3], val = [4.5]), SparsePair(ind = [1], val = [1.5]), SparsePair(ind = [5], val = [7.5])]
-        >>> c.objective.get_quadratic()
-        [SparsePair(ind = [], val = []), SparsePair(ind = [1], val = [1.5]), SparsePair(ind = [2], val = [3.0]), SparsePair(ind = [3], val = [4.5]), SparsePair(ind = [4], val = [6.0]), SparsePair(ind = [5], val = [7.5]), SparsePair(ind = [6], val = [9.0]), SparsePair(ind = [7], val = [10.5]), SparsePair(ind = [8], val = [12.0]), SparsePair(ind = [9], val = [13.5])]
+        >>> for q in c.objective.get_quadratic("1", 3):
+        ...     print(q)
+        SparsePair(ind = [1], val = [1.5])
+        SparsePair(ind = [2], val = [3.0])
+        SparsePair(ind = [3], val = [4.5])
+        >>> for q in c.objective.get_quadratic([3, "1", 5]):
+        ...     print(q)
+        SparsePair(ind = [3], val = [4.5])
+        SparsePair(ind = [1], val = [1.5])
+        SparsePair(ind = [5], val = [7.5])
+        >>> for q in c.objective.get_quadratic():
+        ...     print(q)
+        SparsePair(ind = [], val = [])
+        SparsePair(ind = [1], val = [1.5])
+        SparsePair(ind = [2], val = [3.0])
+        SparsePair(ind = [3], val = [4.5])
+        SparsePair(ind = [4], val = [6.0])
+        SparsePair(ind = [5], val = [7.5])
+        SparsePair(ind = [6], val = [9.0])
+        SparsePair(ind = [7], val = [10.5])
+        SparsePair(ind = [8], val = [12.0])
+        SparsePair(ind = [9], val = [13.5])
         """
         num = self._cplex.variables.get_num()
 
@@ -4273,10 +4297,9 @@ class ObjectiveInterface(BaseInterface):
         if len(args) == 2:
             indices = self._cplex.variables._conv(args)
             return getqpcoef(indices[0], indices[1])
-        elif len(args) == 1:
+        if len(args) == 1:
             return [self.get_quadratic_coefficients(*arg) for arg in args[0]]
-        else:
-            raise WrongNumberOfArgumentsError()
+        raise WrongNumberOfArgumentsError()
 
     def get_sense(self):
         """Returns the sense of the objective function.
@@ -4307,8 +4330,7 @@ class ObjectiveInterface(BaseInterface):
         >>> c.objective.get_name()
         'cost'
         """
-        return CPX_PROC.getobjname(self._env._e, self._cplex._lp,
-                                   self._env._apienc)
+        return CPX_PROC.getobjname(self._env._e, self._cplex._lp)
 
     def get_num_quadratic_variables(self):
         """Returns the number of variables with quadratic coefficients.
@@ -4388,8 +4410,7 @@ class ProgressInterface(BaseInterface):
         class as Cplex.solution.progress.  This constructor is not
         meant to be used externally.
         """
-        super(ProgressInterface, self).__init__(cplex=parent._cplex,
-                                                advanced=True)
+        super().__init__(cplex=parent._cplex, advanced=True)
 
     def get_num_iterations(self):
         """Returns the number of iterations executed so far.
@@ -4603,8 +4624,7 @@ class InfeasibilityInterface(BaseInterface):
         class as Cplex.solution.infeasibility.  This constructor is not
         meant to be used externally.
         """
-        super(InfeasibilityInterface, self).__init__(cplex=parent._cplex,
-                                                     advanced=True)
+        super().__init__(cplex=parent._cplex, advanced=True)
 
     def bound_constraints(self, x, *args):
         """Returns the amount by which variable bounds are violated by x.
@@ -4740,7 +4760,7 @@ class InfeasibilityInterface(BaseInterface):
             getinfeas, self._cplex.SOS._conv, args)
 
 
-class CutType(object):
+class CutType(ConstantClass):
     """Identifiers for types of cuts."""
     # NB: If you edit these, look at MIPInfoCallback.cut_type too!
     cover = _constants.CPX_CUT_COVER
@@ -4767,69 +4787,6 @@ class CutType(object):
     benders = _constants.CPX_CUT_BENDERS
     __num_types = _constants.CPX_CUT_NUM_TYPES
 
-    def __iter__(self):
-        return list(range(self.__num_types)).__iter__()
-
-    def __len__(self):
-        return self.__num_types
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.solution.MIP.cut_type.MIR
-        5
-        >>> c.solution.MIP.cut_type[5]
-        'MIR'
-        """
-        if item == _constants.CPX_CUT_COVER:
-            return 'cover'
-        if item == _constants.CPX_CUT_GUBCOVER:
-            return 'GUB_cover'
-        if item == _constants.CPX_CUT_FLOWCOVER:
-            return 'flow_cover'
-        if item == _constants.CPX_CUT_CLIQUE:
-            return 'clique'
-        if item == _constants.CPX_CUT_FRAC:
-            return 'fractional'
-        if item == _constants.CPX_CUT_MIR:
-            return 'MIR'
-        if item == _constants.CPX_CUT_FLOWPATH:
-            return 'flow_path'
-        if item == _constants.CPX_CUT_DISJ:
-            return 'disjunctive'
-        if item == _constants.CPX_CUT_IMPLBD:
-            return 'implied_bound'
-        if item == _constants.CPX_CUT_ZEROHALF:
-            return 'zero_half'
-        if item == _constants.CPX_CUT_MCF:
-            return 'multi_commodity_flow'
-        if item == _constants.CPX_CUT_LANDP:
-            return 'lift_and_project'
-        if item == _constants.CPX_CUT_LOCALCOVER:
-            return '_local_cover'
-        if item == _constants.CPX_CUT_TIGHTEN:
-            return '_tighten'
-        if item == _constants.CPX_CUT_OBJDISJ:
-            return '_objective_disjunctive'
-        if item == _constants.CPX_CUT_USER:
-            return 'user'
-        if item == _constants.CPX_CUT_TABLE:
-            return 'table'
-        if item == _constants.CPX_CUT_SOLNPOOL:
-            return 'solution_pool'
-        if item == _constants.CPX_CUT_LOCALIMPLBD:
-            return 'local_implied_bound'
-        if item == _constants.CPX_CUT_BQP:
-            return 'BQP'
-        if item == _constants.CPX_CUT_RLT:
-            return 'RLT'
-        if item == _constants.CPX_CUT_BENDERS:
-            return 'benders'
-
 
 class MIPSolutionInterface(BaseInterface):
     """Methods for accessing solutions to a MIP."""
@@ -4844,21 +4801,22 @@ class MIPSolutionInterface(BaseInterface):
         class as Cplex.solution.MIP.  This constructor is not meant to
         be used externally.
         """
-        super(MIPSolutionInterface, self).__init__(cplex=parent._cplex,
-                                                   advanced=True)
+        super().__init__(cplex=parent._cplex, advanced=True)
 
     def get_best_objective(self):
-        """Returns the currently best known bound of all the remaining open nodes in a branch-and-cut tree.
+        """Returns the currently best known bound of all the remaining
+        open nodes in a branch-and-cut tree.
 
-        It is computed for a minimization problem as the minimum objective
-        function value of all remaining unexplored nodes.  Similarly, it is
-        computed for a maximization problem as the maximum objective function
-        value of all remaining unexplored nodes.
+        It is computed for a minimization problem as the minimum
+        objective function value of all remaining unexplored nodes.
+        Similarly, it is computed for a maximization problem as the
+        maximum objective function value of all remaining unexplored
+        nodes.
 
         For a regular MIP optimization, this value is also the best known
-        bound on the optimal solution value of the MIP problem.  In fact, when
-        a problem has been solved to optimality, this value matches the
-        optimal solution value.
+        bound on the optimal solution value of the MIP problem.  In fact,
+        when a problem has been solved to optimality, this value matches
+        the optimal solution value.
 
         However, for the populate method, the value can also exceed the
         optimal solution value if CPLEX has already solved the model to
@@ -4896,8 +4854,8 @@ class MIPSolutionInterface(BaseInterface):
     def get_mip_relative_gap(self):
         """Returns the MIP relative gap.
 
-        See CPXgetmiprelgap in the Callable Library Reference Manual for
-        more detail.
+        See :mipapi:`CPXgetmiprelgap` in the Callable Library Reference
+        Manual for more detail.
 
         Example usage:
 
@@ -4913,7 +4871,7 @@ class MIPSolutionInterface(BaseInterface):
         return CPX_PROC.getmiprelgap(self._env._e, self._cplex._lp)
 
     def get_incumbent_node(self):
-        """Returns the node number of the best solution found. 
+        """Returns the node number of the best solution found.
 
         Example usage:
 
@@ -4971,33 +4929,12 @@ class MIPSolutionInterface(BaseInterface):
         return CPX_PROC.getsubstat(self._env._e, self._cplex._lp)
 
 
-class BasisVarStatus(object):
+class BasisVarStatus(ConstantClass):
     """Status values returned by basis query methods."""
     at_lower_bound = _constants.CPX_AT_LOWER
     basic = _constants.CPX_BASIC
     at_upper_bound = _constants.CPX_AT_UPPER
     free_nonbasic = _constants.CPX_FREE_SUPER
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.solution.basis.status.basic
-        1
-        >>> c.solution.basis.status[1]
-        'basic'
-        """
-        if item == _constants.CPX_AT_LOWER:
-            return 'at_lower_bound'
-        if item == _constants.CPX_BASIC:
-            return 'basic'
-        if item == _constants.CPX_AT_UPPER:
-            return 'at_upper_bound'
-        if item == _constants.CPX_FREE_SUPER:
-            return 'free_nonbasic'
 
 
 class BasisInterface(BaseInterface):
@@ -5013,8 +4950,7 @@ class BasisInterface(BaseInterface):
         Cplex.solution.basis.  This constructor is not meant to be used
         externally.
         """
-        super(BasisInterface, self).__init__(cplex=parent._cplex,
-                                             advanced=True)
+        super().__init__(cplex=parent._cplex, advanced=True)
 
     def get_basis(self):
         """Returns the status of structural and slack variables.
@@ -5025,8 +4961,8 @@ class BasisInterface(BaseInterface):
         the slack variables (of length equal to the number of linear
         constraints).
 
-        See CPXgetbase in the Callable Library Reference Manual for
-        more detail.
+        See :cpxapi:`CPXgetbase` in the Callable Library Reference Manual
+        for more detail.
 
         Example usage:
 
@@ -5041,9 +4977,22 @@ class BasisInterface(BaseInterface):
         return CPX_PROC.getbase(self._env._e, self._cplex._lp)
 
     def write(self, filename):
-        """Writes the basis to a file."""
-        CPX_PROC.mbasewrite(self._env._e, self._cplex._lp, filename,
-                            enc=self._env._apienc)
+        """Writes the basis to a file.
+
+        See :cpxapi:`CPXmbasewrite` in the Callable Library Reference
+        Manual and also `InitialInterface.read_basis()`.
+
+        Example:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> out = c.set_results_stream(None)
+        >>> out = c.set_log_stream(None)
+        >>> c.read("lpex.mps")
+        >>> c.solve()
+        >>> c.solution.basis.write("lpex.bas")
+        """
+        CPX_PROC.mbasewrite(self._env._e, self._cplex._lp, filename)
 
     def get_header(self):
         """Returns the basis header.
@@ -5069,7 +5018,7 @@ class BasisInterface(BaseInterface):
         >>> c.solution.basis.get_basic_row_index(2)
         3
         """
-        return CPX_PROC.getijrow(self._env._e, self._cplex._lp, row, "R")
+        return CPX_PROC.getijrow(self._env._e, self._cplex._lp, row, True)
 
     def get_basic_col_index(self, col):
         """Returns the position of a basic structural variable in the basis header.
@@ -5085,7 +5034,7 @@ class BasisInterface(BaseInterface):
         >>> c.solution.basis.get_basic_col_index(2)
         1
         """
-        return CPX_PROC.getijrow(self._env._e, self._cplex._lp, col, "C")
+        return CPX_PROC.getijrow(self._env._e, self._cplex._lp, col, False)
 
     def get_primal_norms(self):
         """Returns norms from the primal steepest edge.
@@ -5169,8 +5118,7 @@ class SensitivityInterface(BaseInterface):
         class as Cplex.solution.sensitivity.  This constructor is not
         meant to be used externally.
         """
-        super(SensitivityInterface, self).__init__(cplex=parent._cplex,
-                                                   advanced=True)
+        super().__init__(cplex=parent._cplex, advanced=True)
 
     def lower_bounds(self, *args):
         """Returns the sensitivity of a set of lower bounds.
@@ -5319,27 +5267,10 @@ class SensitivityInterface(BaseInterface):
             sa, self._cplex.linear_constraints._conv, args)
 
 
-class FilterType(object):
+class FilterType(ConstantClass):
     """Attributes define the filter types."""
     diversity = _constants.CPX_SOLNPOOL_FILTER_DIVERSITY
     range = _constants.CPX_SOLNPOOL_FILTER_RANGE
-
-    def __getitem__(self, item):
-        """Convert a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.solution.pool.filter.type.range
-        2
-        >>> c.solution.pool.filter.type[2]
-        'range'
-        """
-        if item == _constants.CPX_SOLNPOOL_FILTER_DIVERSITY:
-            return 'diversity'
-        if item == _constants.CPX_SOLNPOOL_FILTER_RANGE:
-            return 'range'
 
 
 class SolnPoolFilterInterface(BaseInterface):
@@ -5355,9 +5286,8 @@ class SolnPoolFilterInterface(BaseInterface):
         `Cplex` class as Cplex.solution.pool.filter.  This constructor
         is not meant to be used externally.
         """
-        super(SolnPoolFilterInterface, self).__init__(
-            cplex=parent._cplex, advanced=True,
-            getindexfunc=CPX_PROC.getsolnpoolfilterindex)
+        super().__init__(cplex=parent._cplex, advanced=True,
+                         getindexfunc=CPX_PROC.getsolnpoolfilterindex)
 
     def _add_diversity_filter(self, lb, ub, expression, weights, name):
         """non-public"""
@@ -5366,8 +5296,7 @@ class SolnPoolFilterInterface(BaseInterface):
         CPX_PROC.addsolnpooldivfilter(
             self._env._e, self._cplex._lp, lb, ub,
             self._cplex.variables._conv(ind),
-            weights, val, name,
-            self._env._apienc)
+            weights, val, name)
 
     def add_diversity_filter(self, lb, ub, expression, weights=None,
                              name=''):
@@ -5410,7 +5339,7 @@ class SolnPoolFilterInterface(BaseInterface):
         CPX_PROC.addsolnpoolrngfilter(
             self._env._e, self._cplex._lp, lb, ub,
             self._cplex.variables._conv(ind),
-            val, name, self._env._apienc)
+            val, name)
 
     def add_range_filter(self, lb, ub, expression, name=''):
         """Adds a range filter to the solution pool.
@@ -5503,6 +5432,15 @@ class SolnPoolFilterInterface(BaseInterface):
         return apply_freeform_one_arg(
             getflt, self._conv, self.get_num(), args)
 
+    def _getfilter_constant(self, which):
+        filter_type = self.get_types(which)
+        if filter_type == self.type.diversity:
+            func = CPX_PROC.getsolnpooldivfilter_constant
+        else:
+            assert filter_type == self.type.range
+            func = CPX_PROC.getsolnpoolrngfilter_constant
+        return func(self._env._e, self._cplex._lp, which)
+
     def get_bounds(self, *args):
         """Returns (lb, ub) pairs for a set of filters.
 
@@ -5510,25 +5448,26 @@ class SolnPoolFilterInterface(BaseInterface):
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = ['x','y'], types = ["II"])
-        >>> f = cplex.SparsePair(ind = ['x'],val = [1.0])
-        >>> [c.solution.pool.filter.add_range_filter(
-        ...      0.0, 1.0, f, str(i)) for i in range(2)]
+        >>> indices = c.variables.add(names=['x', 'y'], types=["BB"])
+        >>> f = cplex.SparsePair(ind=['x'], val=[1.0])
+        >>> [c.solution.pool.filter.add_diversity_filter(
+        ...      0, 1, f, [1], "div{0}".format(i)) for i in range(2)]
         [0, 1]
+        >>> [c.solution.pool.filter.add_range_filter(
+        ...      0, 1, f, "rng{0}".format(i)) for i in range(2)]
+        [2, 3]
         >>> c.solution.pool.filter.get_bounds(0)
         (0.0, 1.0)
-        >>> c.solution.pool.filter.get_bounds("1")
+        >>> c.solution.pool.filter.get_bounds("rng0")
         (0.0, 1.0)
-        >>> c.solution.pool.filter.get_bounds([0, "1"])
+        >>> c.solution.pool.filter.get_bounds(["div0", 2])
         [(0.0, 1.0), (0.0, 1.0)]
         >>> c.solution.pool.filter.get_bounds()
-        [(0.0, 1.0), (0.0, 1.0)]
+        [(0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0)]
         """
-        def getbds(a):
-            if self.get_types(a) == self.type.diversity:
-                return tuple(CPX_PROC.getsolnpooldivfilter_constant(self._env._e, self._cplex._lp, a)[0:2])
-            if self.get_types(a) == self.type.range:
-                return tuple(CPX_PROC.getsolnpoolrngfilter_constant(self._env._e, self._cplex._lp, a)[0:2])
+        def getbds(which):
+            lb, ub, _ = self._getfilter_constant(which)
+            return (lb, ub)
         return apply_freeform_one_arg(
             getbds, self._conv, self.get_num(), args)
 
@@ -5539,25 +5478,26 @@ class SolnPoolFilterInterface(BaseInterface):
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = ['x','y'], types = ["BB"])
-        >>> f = cplex.SparsePair(ind = ['x'],val = [1.0])
+        >>> indices = c.variables.add(names=['x', 'y'], types=["BB"])
+        >>> f = cplex.SparsePair(ind=['x'], val=[1.0])
         >>> [c.solution.pool.filter.add_diversity_filter(
-        ...      0, 1, f, [1], str(i)) for i in range(2)]
+        ...      0, 1, f, [1], "div{0}".format(i)) for i in range(2)]
         [0, 1]
+        >>> [c.solution.pool.filter.add_range_filter(
+        ...      0, 1, f, "rng{0}".format(i)) for i in range(2)]
+        [2, 3]
         >>> c.solution.pool.filter.get_num_nonzeros(0)
         1
-        >>> c.solution.pool.filter.get_num_nonzeros("1")
+        >>> c.solution.pool.filter.get_num_nonzeros("rng0")
         1
-        >>> c.solution.pool.filter.get_num_nonzeros([0, "1"])
+        >>> c.solution.pool.filter.get_num_nonzeros(["div0", 2])
         [1, 1]
         >>> c.solution.pool.filter.get_num_nonzeros()
-        [1, 1]
+        [1, 1, 1, 1]
         """
-        def getnnz(a):
-            if self.get_types(a) == self.type.diversity:
-                return CPX_PROC.getsolnpooldivfilter_constant(self._env._e, self._cplex._lp, a)[2]
-            if self.get_types(a) == self.type.range:
-                return CPX_PROC.getsolnpoolrngfilter_constant(self._env._e, self._cplex._lp, a)[2]
+        def getnnz(which):
+            _, _, nnz = self._getfilter_constant(which)
+            return nnz
         return apply_freeform_one_arg(
             getnnz, self._conv, self.get_num(), args)
 
@@ -5585,8 +5525,8 @@ class SolnPoolFilterInterface(BaseInterface):
           will give the best performance when deleting batches of
           filters.
 
-        See CPXdelsolnpoolfilters in the Callable Library Reference
-        Manual for more detail.
+        See :mipapi:`CPXdelsolnpoolfilters` in the Callable Library
+        Reference Manual for more detail.
 
         Example usage:
 
@@ -5683,8 +5623,7 @@ class SolnPoolFilterInterface(BaseInterface):
         """
         def getname(a):
             return CPX_PROC.getsolnpoolfiltername(
-                self._env._e, self._cplex._lp, a,
-                self._env._apienc)
+                self._env._e, self._cplex._lp, a)
         return apply_freeform_one_arg(
             getname, self._conv, self.get_num(), args)
 
@@ -5704,8 +5643,7 @@ class SolnPoolFilterInterface(BaseInterface):
         0
         >>> c.solution.pool.filter.write("ind.flt")
         """
-        CPX_PROC.fltwrite(self._env._e, self._cplex._lp, filename,
-                          enc=self._env._apienc)
+        CPX_PROC.fltwrite(self._env._e, self._cplex._lp, filename)
 
     def read(self, filename):
         """Reads filters from a file.
@@ -5725,7 +5663,7 @@ class SolnPoolFilterInterface(BaseInterface):
         >>> c.solution.pool.filter.read("ind.flt")
         """
         CPX_PROC.readcopysolnpoolfilters(self._env._e, self._cplex._lp,
-                                         filename, enc=self._env._apienc)
+                                         filename)
 
     def get_num(self):
         """Returns the number of filters in the problem.
@@ -5747,7 +5685,7 @@ class SolnPoolFilterInterface(BaseInterface):
         return CPX_PROC.getsolnpoolnumfilters(self._env._e, self._cplex._lp)
 
 
-class QualityMetric(object):
+class QualityMetric(ConstantClass):
     """Measures of solution quality."""
     max_primal_infeasibility = _constants.CPX_MAX_PRIMAL_INFEAS
     max_scaled_primal_infeasibility = _constants.CPX_MAX_SCALED_PRIMAL_INFEAS
@@ -5807,154 +5745,17 @@ class QualityMetric(object):
     kappa_max = _constants.CPX_KAPPA_MAX
     kappa_attention = _constants.CPX_KAPPA_ATTENTION
 
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.solution.quality_metric.kappa
-        39
-        >>> c.solution.quality_metric[39]
-        'kappa'
-        """
-        if item == _constants.CPX_MAX_PRIMAL_INFEAS:
-            return 'max_primal_infeasibility'
-        if item == _constants.CPX_MAX_SCALED_PRIMAL_INFEAS:
-            return 'max_scaled_primal_infeasibility'
-        if item == _constants.CPX_SUM_PRIMAL_INFEAS:
-            return 'sum_primal_infeasibilities'
-        if item == _constants.CPX_SUM_SCALED_PRIMAL_INFEAS:
-            return 'sum_scaled_primal_infeasibilities'
-        if item == _constants.CPX_MAX_DUAL_INFEAS:
-            return 'max_dual_infeasibility'
-        if item == _constants.CPX_MAX_SCALED_DUAL_INFEAS:
-            return 'max_scaled_dual_infeasibility'
-        if item == _constants.CPX_SUM_DUAL_INFEAS:
-            return 'sum_dual_infeasibilities'
-        if item == _constants.CPX_SUM_SCALED_DUAL_INFEAS:
-            return 'sum_scaled_dual_infeasibilities'
-        if item == _constants.CPX_MAX_INT_INFEAS:
-            return 'max_int_infeasibility'
-        if item == _constants.CPX_SUM_INT_INFEAS:
-            return 'sum_integer_infeasibilities'
-        if item == _constants.CPX_MAX_PRIMAL_RESIDUAL:
-            return 'max_primal_residual'
-        if item == _constants.CPX_MAX_SCALED_PRIMAL_RESIDUAL:
-            return 'max_scaled_primal_residual'
-        if item == _constants.CPX_SUM_PRIMAL_RESIDUAL:
-            return 'sum_primal_residual'
-        if item == _constants.CPX_SUM_SCALED_PRIMAL_RESIDUAL:
-            return 'sum_scaled_primal_residual'
-        if item == _constants.CPX_MAX_DUAL_RESIDUAL:
-            return 'max_dual_residual'
-        if item == _constants.CPX_MAX_SCALED_DUAL_RESIDUAL:
-            return 'max_scaled_dual_residual'
-        if item == _constants.CPX_SUM_DUAL_RESIDUAL:
-            return 'sum_dual_residual'
-        if item == _constants.CPX_SUM_SCALED_DUAL_RESIDUAL:
-            return 'sum_scaled_dual_residual'
-        if item == _constants.CPX_MAX_COMP_SLACK:
-            return 'max_comp_slack'
-        if item == _constants.CPX_SUM_COMP_SLACK:
-            return 'sum_comp_slack'
-        if item == _constants.CPX_MAX_X:
-            return 'max_x'
-        if item == _constants.CPX_MAX_SCALED_X:
-            return 'max_scaled_x'
-        if item == _constants.CPX_MAX_PI:
-            return 'max_pi'
-        if item == _constants.CPX_MAX_SCALED_PI:
-            return 'max_scaled_pi'
-        if item == _constants.CPX_MAX_SLACK:
-            return 'max_slack'
-        if item == _constants.CPX_MAX_SCALED_SLACK:
-            return 'max_scaled_slack'
-        if item == _constants.CPX_MAX_RED_COST:
-            return 'max_reduced_cost'
-        if item == _constants.CPX_MAX_SCALED_RED_COST:
-            return 'max_scaled_reduced_cost'
-        if item == _constants.CPX_SUM_X:
-            return 'sum_x'
-        if item == _constants.CPX_SUM_SCALED_X:
-            return 'sum_scaled_x'
-        if item == _constants.CPX_SUM_PI:
-            return 'sum_pi'
-        if item == _constants.CPX_SUM_SCALED_PI:
-            return 'sum_scaled_pi'
-        if item == _constants.CPX_SUM_SLACK:
-            return 'sum_slack'
-        if item == _constants.CPX_SUM_SCALED_SLACK:
-            return 'sum_scaled_slack'
-        if item == _constants.CPX_SUM_RED_COST:
-            return 'sum_reduced_cost'
-        if item == _constants.CPX_SUM_SCALED_RED_COST:
-            return 'sum_scaled_reduced_cost'
-        if item == _constants.CPX_KAPPA:
-            return 'kappa'
-        if item == _constants.CPX_OBJ_GAP:
-            return 'objective_gap'
-        if item == _constants.CPX_DUAL_OBJ:
-            return 'dual_objective'
-        if item == _constants.CPX_PRIMAL_OBJ:
-            return 'primal_objective'
-        if item == _constants.CPX_MAX_QCPRIMAL_RESIDUAL:
-            return 'max_quadratic_primal_residual'
-        if item == _constants.CPX_SUM_QCPRIMAL_RESIDUAL:
-            return 'sum_quadratic_primal_residual'
-        if item == _constants.CPX_MAX_QCSLACK_INFEAS:
-            return 'max_quadratic_slack_infeasibility'
-        if item == _constants.CPX_SUM_QCSLACK_INFEAS:
-            return 'sum_quadratic_slack_infeasibility'
-        if item == _constants.CPX_MAX_QCSLACK:
-            return 'max_quadratic_slack'
-        if item == _constants.CPX_SUM_QCSLACK:
-            return 'sum_quadratic_slack'
-        if item == _constants.CPX_MAX_INDSLACK_INFEAS:
-            return 'max_indicator_slack_infeasibility'
-        if item == _constants.CPX_SUM_INDSLACK_INFEAS:
-            return 'sum_indicator_slack_infeasibility'
-        if item == _constants.CPX_MAX_PWLSLACK_INFEAS:
-            return 'max_pwl_slack_infeasibility'
-        if item == _constants.CPX_SUM_PWLSLACK_INFEAS:
-            return 'sum_pwl_slack_infeasibility'
-        if item == _constants.CPX_EXACT_KAPPA:
-            return 'exact_kappa'
-        if item == _constants.CPX_KAPPA_STABLE:
-            return 'kappa_stable'
-        if item == _constants.CPX_KAPPA_SUSPICIOUS:
-            return 'kappa_suspicious'
-        if item == _constants.CPX_KAPPA_UNSTABLE:
-            return 'kappa_unstable'
-        if item == _constants.CPX_KAPPA_ILLPOSED:
-            return 'kappa_illposed'
-        if item == _constants.CPX_KAPPA_MAX:
-            return 'kappa_max'
-        if item == _constants.CPX_KAPPA_ATTENTION:
-            return 'kappa_attention'
-
 
 @contextmanager
 def _temp_results_stream(cpx, temp_stream):
     old_results_stream = cpx._env._get_results_stream()
     try:
-        cpx._env.set_results_stream(temp_stream)
-        yield
+        yield cpx._env.set_results_stream(temp_stream)
     finally:
-        if old_results_stream._was_opened:
-            # If this was a file-like object opened within
-            # _ostream.__init__, then it was closed when we set the temp
-            # stream above. We can get the name of the file using the
-            # 'name' attribute and re-open the file when we reset the
-            # stream below.
-            tmp = old_results_stream._file.name
-        else:
-            tmp = old_results_stream._file
-        cpx._env.set_results_stream(tmp)
+        cpx._env.set_results_stream(old_results_stream._file)
 
 
-class QualityMetrics(object):
+class QualityMetrics():
     """A class containing measures of the quality of a solution.
 
     The __str__ method of this class prints all available measures of
@@ -5967,170 +5768,167 @@ class QualityMetrics(object):
     An instance of this class always has the member quality_type,
     which is one of the following strings:
 
-    "feasopt"
-    "simplex"
-    "quadratically_constrained"
-    "barrier"
-    "MIP"
-
+     * "feasopt"
+     * "simplex"
+     * "quadratically_constrained"
+     * "barrier"
+     * "MIP"
 
     If self.quality_type is "feasopt" this instance has the following
     members:
 
-    scaled
-    max_x
-    max_bound_infeas
-    max_Ax_minus_b
-    max_slack
+     * scaled
+     * max_x
+     * max_bound_infeas
+     * max_Ax_minus_b
+     * max_slack
 
     If self.scaled is 1, this instance also has the members:
 
-    max_scaled_x
-    max_scaled_bound_infeas
-    max_scaled_Ax_minus_b
-    max_scaled_slack
-
+     * max_scaled_x
+     * max_scaled_bound_infeas
+     * max_scaled_Ax_minus_b
+     * max_scaled_slack
 
     If self.quality_type is "simplex" this instance has the following
     members:
 
-    scaled
-    max_x
-    max_pi
-    max_reduced_cost
-    max_bound_infeas
-    max_reduced_cost_infeas
-    max_Ax_minus_b
-    max_c_minus_Bpi
-    max_slack
+     * scaled
+     * max_x
+     * max_pi
+     * max_reduced_cost
+     * max_bound_infeas
+     * max_reduced_cost_infeas
+     * max_Ax_minus_b
+     * max_c_minus_Bpi
+     * max_slack
 
     If self.scaled is 1, this instance also has the members:
 
-    max_scaled_x
-    max_scaled_pi
-    max_scaled_reduced_cost
-    max_scaled_bound_infeas
-    max_scaled_reduced_cost_infeas
-    max_scaled_Ax_minus_b
-    max_scaled_c_minus_Bpi
-    max_scaled_slack
+     * max_scaled_x
+     * max_scaled_pi
+     * max_scaled_reduced_cost
+     * max_scaled_bound_infeas
+     * max_scaled_reduced_cost_infeas
+     * max_scaled_Ax_minus_b
+     * max_scaled_c_minus_Bpi
+     * max_scaled_slack
 
     If the condition number of the final basis is available, this
     instance has the member:
 
-    kappa
-
-
+     * kappa
 
     If self.quality_type is "quadratically_constrained" this instance
     has the following members:
 
-    objective
-    norm_total
-    norm_max
-    error_Ax_b_total
-    error_Ax_b_max
-    error_xQx_dx_f_total
-    error_xQx_dx_f_max
-    x_bound_error_total
-    x_bound_error_max
-    slack_bound_error_total
-    slack_bound_error_max
-    quadratic_slack_bound_error_total
-    quadratic_slack_bound_error_max
-    normalized_error_max
-
+     * objective
+     * norm_total
+     * norm_max
+     * error_Ax_b_total
+     * error_Ax_b_max
+     * error_xQx_dx_f_total
+     * error_xQx_dx_f_max
+     * x_bound_error_total
+     * x_bound_error_max
+     * slack_bound_error_total
+     * slack_bound_error_max
+     * quadratic_slack_bound_error_total
+     * quadratic_slack_bound_error_max
+     * normalized_error_max
 
     If self.quality_type is "barrier" this instance has the following
     members:
 
-    primal_objective
-    dual_objective
-    duality_gap
-    complementarity_total
-    column_complementarity_total
-    column_complementarity_max
-    row_complementarity_total
-    row_complementarity_max
-    primal_norm_total
-    primal_norm_max
-    dual_norm_total
-    dual_norm_max
-    primal_error_total
-    primal_error_max
-    dual_error_total
-    dual_error_max
-    primal_x_bound_error_total
-    primal_x_bound_error_max
-    primal_slack_bound_error_total
-    primal_slack_bound_error_max
-    dual_pi_bound_error_total
-    dual_pi_bound_error_max
-    dual_reduced_cost_bound_error_total
-    dual_reduced_cost_bound_error_max
-    primal_normalized_error
-    dual_normalized_error
-
+     * primal_objective
+     * dual_objective
+     * duality_gap
+     * complementarity_total
+     * column_complementarity_total
+     * column_complementarity_max
+     * row_complementarity_total
+     * row_complementarity_max
+     * primal_norm_total
+     * primal_norm_max
+     * dual_norm_total
+     * dual_norm_max
+     * primal_error_total
+     * primal_error_max
+     * dual_error_total
+     * dual_error_max
+     * primal_x_bound_error_total
+     * primal_x_bound_error_max
+     * primal_slack_bound_error_total
+     * primal_slack_bound_error_max
+     * dual_pi_bound_error_total
+     * dual_pi_bound_error_max
+     * dual_reduced_cost_bound_error_total
+     * dual_reduced_cost_bound_error_max
+     * primal_normalized_error
+     * dual_normalized_error
 
     If self.quality_type is "MIP" and this instance was generated for
     a specific member of the solution pool, it has the members:
 
-    solution_name
-    num_solutions
+     * solution_name
+     * num_solutions
 
     If self.quality_type is "MIP", this instance was not generated for
     a specific member of the solution pool, and kappa statistics are
     available, it has the members:
 
-    max_kappa
-    pct_kappa_stable
-    pct_kappa_suspicious
-    pct_kappa_unstable
-    pct_kappa_illposed
-    kappa_attention
+     * max_kappa
+     * pct_kappa_stable
+     * pct_kappa_suspicious
+     * pct_kappa_unstable
+     * pct_kappa_illposed
+     * kappa_attention
 
     If self.quality_type is "MIP" and this instance was generated for
     the incumbent solution, it has the members:
 
-    solver
-    objective
-    x_norm_total
-    x_norm_max
-    error_Ax_b_total
-    error_Ax_b_max
-    x_bound_error_total
-    x_bound_error_max
-    integrality_error_total
-    integrality_error_max
-    slack_bound_error_total
-    slack_bound_error_max
+     * solver
+     * objective
+     * x_norm_total
+     * x_norm_max
+     * error_Ax_b_total
+     * error_Ax_b_max
+     * x_bound_error_total
+     * x_bound_error_max
+     * integrality_error_total
+     * integrality_error_max
+     * slack_bound_error_total
+     * slack_bound_error_max
 
     If in addition the problem this instance was generated for has
     indicator constraints, it has the members:
 
-    indicator_slack_bound_error_total
-    indicator_slack_bound_error_max
+     * indicator_slack_bound_error_total
+     * indicator_slack_bound_error_max
 
     if in addition the problem this instance was generated for has
     piecewise linear constraints, it has the members:
 
-    piecewise_linear_error_total
-    piecewise_linear_error_max
+     * piecewise_linear_error_total
+     * piecewise_linear_error_max
 
     If solver is "MIQCP" this instance also has the members:
 
-    error_xQx_dx_f_total
-    error_xQx_dx_f_max
-    quadratic_slack_bound_error_total
-    quadratic_slack_bound_error_max
+     * error_xQx_dx_f_total
+     * error_xQx_dx_f_max
+     * quadratic_slack_bound_error_total
+     * quadratic_slack_bound_error_max
+
+    See also `SolutionInterface.get_quality_metrics` and
+    `SolnPoolInterface.get_quality_metrics`.
     """
 
     def __init__(self, c, soln=-1):
         idata, data = CPX_PROC.getqualitymetrics(c._env._e, c._lp, soln)
         # We get the "to string" from showquality by temporarily
         # hijacking the results stream.
-        with closing(cStringIO()) as output, \
-             _temp_results_stream(c, output):
+        with closing(StringIO()) as output, \
+             _temp_results_stream(c, output):  # noqa: E127
             CPX_PROC.showquality(c._env._e, c._lp, soln)
             self._tostring = output.getvalue()
         if idata[0] == 0:
@@ -6303,6 +6101,7 @@ class QualityMetrics(object):
                 self.kappa_attention = data[23]
 
     def __str__(self):
+        """Returns a string containing quality metrics in human readable form."""
         # See __init__ (above) to see how this is constructed.
         return self._tostring
 
@@ -6323,9 +6122,8 @@ class SolnPoolInterface(BaseInterface):
         class as Cplex.solution.pool.  This constructor is not meant to
         be used externally.
         """
-        super(SolnPoolInterface, self).__init__(
-            cplex=parent._cplex, advanced=True,
-            getindexfunc=CPX_PROC.getsolnpoolsolnindex)
+        super().__init__(cplex=parent._cplex, advanced=True,
+                         getindexfunc=CPX_PROC.getsolnpoolsolnindex)
         self.filter = SolnPoolFilterInterface(self)
         """See `SolnPoolFilterInterface()` """
 
@@ -6344,7 +6142,7 @@ class SolnPoolInterface(BaseInterface):
         >>> abs(obj_val - 499.0) < 1e-6
         True
         """
-        if not isinstance(soln, six.integer_types):
+        if not isinstance(soln, int):
             soln = self.get_indices(soln)
         return CPX_PROC.getsolnpoolobjval(self._env._e, self._cplex._lp, soln)
 
@@ -6372,7 +6170,7 @@ class SolnPoolInterface(BaseInterface):
         244.0
         """
 
-        if not isinstance(soln, six.integer_types):
+        if not isinstance(soln, int):
             soln = self.get_indices(soln)
 
         def getx(a, b=self._cplex.variables.get_num() - 1):
@@ -6401,7 +6199,7 @@ class SolnPoolInterface(BaseInterface):
         >>> abs(linslack[2]) < 1e-6
         True
         """
-        if not isinstance(soln, six.integer_types):
+        if not isinstance(soln, int):
             soln = self.get_indices(soln)
 
         def getslacks(a, b=self._cplex.linear_constraints.get_num() - 1):
@@ -6426,7 +6224,7 @@ class SolnPoolInterface(BaseInterface):
         >>> vars = c.solution.pool.get_quadratic_slacks(1, ["QC3", 1])
         >>> vars = c.solution.pool.get_quadratic_slacks(1)
         """
-        if not isinstance(soln, six.integer_types):
+        if not isinstance(soln, int):
             soln = self.get_indices(soln)
 
         def getqslacks(a, b=self._cplex.quadratic_constraints.get_num() - 1):
@@ -6454,17 +6252,16 @@ class SolnPoolInterface(BaseInterface):
         >>> quality_metric = c.solution.pool.quality_metric
         >>> misi = quality_metric.max_indicator_slack_infeasibility
         >>> c.solution.pool.get_integer_quality(1, misi)
-        -1
+        0
         """
-        if not isinstance(soln, six.integer_types):
+        if not isinstance(soln, int):
             soln = self.get_indices(soln)
-        if isinstance(which, six.integer_types):
+        if isinstance(which, int):
             return CPX_PROC.getsolnpoolintquality(
                 self._env._e, self._cplex._lp, soln, which)
-        else:
-            return [CPX_PROC.getsolnpoolintquality(
-                    self._env._e, self._cplex._lp, soln, a)
-                    for a in which]
+        return [CPX_PROC.getsolnpoolintquality(self._env._e,
+                                               self._cplex._lp, soln, a)
+                for a in which]
 
     def get_float_quality(self, soln, which):
         """Returns the float quality of a given solution.
@@ -6488,15 +6285,14 @@ class SolnPoolInterface(BaseInterface):
         >>> abs(qual) < 1.e-6
         True
         """
-        if not isinstance(soln, six.integer_types):
+        if not isinstance(soln, int):
             soln = self.get_indices(soln)
-        if isinstance(which, six.integer_types):
+        if isinstance(which, int):
             return CPX_PROC.getsolnpooldblquality(
                 self._env._e, self._cplex._lp, soln, which)
-        else:
-            return [CPX_PROC.getsolnpooldblquality(
-                    self._env._e, self._cplex._lp, soln, a)
-                    for a in which]
+        return [CPX_PROC.getsolnpooldblquality(self._env._e,
+                                               self._cplex._lp, soln, a)
+                for a in which]
 
     def get_mean_objective_value(self):
         """Returns the average among the objective values in the solution pool.
@@ -6539,8 +6335,8 @@ class SolnPoolInterface(BaseInterface):
           performance when deleting batches of solutions from the
           solution pool.
 
-        See CPXdelsolnpoolsolns in the Callable Library Reference Manual
-        for more detail.
+        See :mipapi:`CPXdelsolnpoolsolns` in the Callable Library
+        Reference Manual for more detail.
 
         Example usage:
 
@@ -6619,7 +6415,7 @@ class SolnPoolInterface(BaseInterface):
         def getname(a):
             return CPX_PROC.getsolnpoolsolnname(self._env._e,
                                                 self._cplex._lp,
-                                                a, self._env._apienc)
+                                                a)
         return apply_freeform_one_arg(
             getname, self._conv, self.get_num(), args)
 
@@ -6677,17 +6473,29 @@ class SolnPoolInterface(BaseInterface):
         """
         if which is None:
             CPX_PROC.solwritesolnpoolall(self._env._e, self._cplex._lp,
-                                         filename, enc=self._env._apienc)
+                                         filename)
         else:
             CPX_PROC.solwritesolnpool(self._env._e, self._cplex._lp,
-                                      which, filename,
-                                      enc=self._env._apienc)
+                                      which, filename)
 
     def get_quality_metrics(self, soln):
-        """Returns an object containing measures of the quality of the specified solution.
+        """Returns an object containing measures of the quality of the
+        specified solution.
 
-        See `QualityMetrics` """
-        if not isinstance(soln, six.integer_types):
+        See `QualityMetrics`.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> c.parameters.randomseed.set(1)
+        >>> out = c.set_results_stream(None)
+        >>> out = c.set_log_stream(None)
+        >>> c.read("ind.lp")
+        >>> c.solve()
+        >>> qm = c.solution.pool.get_quality_metrics(0)
+        """
+        if not isinstance(soln, int):
             soln = self.get_indices(soln)
         return QualityMetrics(self._cplex, soln)
 
@@ -6730,8 +6538,7 @@ class AdvancedSolutionInterface(BaseInterface):
         `Cplex` class as Cplex.solution.advanced.  This constructor is
         not meant to be used externally.
         """
-        super(AdvancedSolutionInterface, self).__init__(
-            cplex=parent._cplex, advanced=True)
+        super().__init__(cplex=parent._cplex, advanced=True)
 
     def binvcol(self, *args):
         """Returns a set of columns of the inverted basis matrix.
@@ -6939,9 +6746,10 @@ class AdvancedSolutionInterface(BaseInterface):
         return CPX_PROC.ftran(self._env._e, self._cplex._lp, x)
 
     def get_gradients(self, *args):
-        """Returns information useful in post-solution analysis after an LP has been solved and a basis is available.
+        """Returns information useful in post-solution analysis after an
+        LP has been solved and a basis is available.
 
-        See CPXgetgrad in the Callable Library Reference Manual 
+        See :cpxapi:`CPXgetgrad` in the Callable Library Reference Manual
         for more detail.
 
         >>> import cplex
@@ -7076,8 +6884,8 @@ class AdvancedSolutionInterface(BaseInterface):
     def dual_farkas(self):
         """Returns Farkas proof of infeasibility for the active LP model after proven infeasibility.
 
-        See CPXdualfarkas in the Callable Library Reference Manual for
-        more detail.
+        See :cpxapi:`CPXdualfarkas` in the Callable Library Reference
+        Manual for more detail.
 
         >>> import cplex
         >>> c = cplex.Cplex()
@@ -7152,7 +6960,7 @@ class AdvancedSolutionInterface(BaseInterface):
         return CPX_PROC.getray(self._env._e, self._cplex._lp)
 
 
-class SolutionMethod(object):
+class SolutionMethod(ConstantClass):
     """Solution methods."""
     none = _constants.CPX_ALG_NONE
     primal = _constants.CPX_ALG_PRIMAL
@@ -7164,42 +6972,11 @@ class SolutionMethod(object):
     pivot_in = _constants.CPX_ALG_PIVOTIN
     pivot_out = _constants.CPX_ALG_PIVOTOUT
 
-    def __getitem__(self, item):
-        """Converts a constant to a string.
 
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.solution.method.feasopt
-        11
-        >>> c.solution.method[11]
-        'feasopt'
-        """
-        if item == _constants.CPX_ALG_NONE:
-            return 'none'
-        if item == _constants.CPX_ALG_PRIMAL:
-            return 'primal'
-        if item == _constants.CPX_ALG_DUAL:
-            return 'dual'
-        if item == _constants.CPX_ALG_BARRIER:
-            return 'barrier'
-        if item == _constants.CPX_ALG_FEASOPT:
-            return 'feasopt'
-        if item == _constants.CPX_ALG_MIP:
-            return 'MIP'
-        if item == _constants.CPX_ALG_PIVOT:
-            return 'pivot'
-        if item == _constants.CPX_ALG_PIVOTIN:
-            return 'pivot_in'
-        if item == _constants.CPX_ALG_PIVOTOUT:
-            return 'pivot_out'
-
-
-class SolutionStatus(object):
+class SolutionStatus(ConstantClass):
     """Solution status codes.
 
-    For documentation of each status code, see the reference manual 
+    For documentation of each status code, see the reference manual
     of the CPLEX Callable Library, especially the group
     optim.cplex.callable.solutionstatus.
     """
@@ -7251,7 +7028,6 @@ class SolutionStatus(object):
     fail_infeasible_no_tree = _constants.CPXMIP_FAIL_INFEAS_NO_TREE
     optimal_populated = _constants.CPXMIP_OPTIMAL_POPULATED
     optimal_populated_tolerance = _constants.CPXMIP_OPTIMAL_POPULATED_TOL
-    benders_master_unbounded = _constants.CPX_STAT_BENDERS_MASTER_UNBOUNDED
     benders_num_best = _constants.CPX_STAT_BENDERS_NUM_BEST
 
     MIP_optimal = _constants.CPXMIP_OPTIMAL
@@ -7272,7 +7048,6 @@ class SolutionStatus(object):
     MIP_feasible_relaxed_quad = _constants.CPXMIP_FEASIBLE_RELAXED_QUAD
     MIP_optimal_relaxed_quad = _constants.CPXMIP_OPTIMAL_RELAXED_QUAD
     MIP_feasible = _constants.CPXMIP_FEASIBLE
-    MIP_benders_master_unbounded = _constants.CPXMIP_BENDERS_MASTER_UNBOUNDED
 
     multiobj_optimal = _constants.CPX_STAT_MULTIOBJ_OPTIMAL
     multiobj_infeasible = _constants.CPX_STAT_MULTIOBJ_INFEASIBLE
@@ -7281,198 +7056,13 @@ class SolutionStatus(object):
     multiobj_stopped = _constants.CPX_STAT_MULTIOBJ_STOPPED
     multiobj_unbounded = _constants.CPX_STAT_MULTIOBJ_UNBOUNDED
 
-    def __getitem__(self, item):
-        """Converts a constant to a string.
 
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.solution.status.optimal
-        1
-        >>> c.solution.status[1]
-        'optimal'
-        """
-        if item == 0:
-            return 'unknown'
-        if item == _constants.CPX_STAT_OPTIMAL:
-            return 'optimal'
-        if item == _constants.CPX_STAT_UNBOUNDED:
-            return 'unbounded'
-        if item == _constants.CPX_STAT_INFEASIBLE:
-            return 'infeasible'
-        if item == _constants.CPX_STAT_FEASIBLE:
-            return 'feasible'
-        if item == _constants.CPX_STAT_INForUNBD:
-            return 'infeasible_or_unbounded'
-        if item == _constants.CPX_STAT_OPTIMAL_INFEAS:
-            return 'optimal_infeasible'
-        if item == _constants.CPX_STAT_NUM_BEST:
-            return 'num_best'
-        if item == _constants.CPX_STAT_FEASIBLE_RELAXED_SUM:
-            return 'feasible_relaxed_sum'
-        if item == _constants.CPX_STAT_OPTIMAL_RELAXED_SUM:
-            return 'optimal_relaxed_sum'
-        if item == _constants.CPX_STAT_FEASIBLE_RELAXED_INF:
-            return 'feasible_relaxed_inf'
-        if item == _constants.CPX_STAT_OPTIMAL_RELAXED_INF:
-            return 'optimal_relaxed_inf'
-        if item == _constants.CPX_STAT_FEASIBLE_RELAXED_QUAD:
-            return 'feasible_relaxed_quad'
-        if item == _constants.CPX_STAT_OPTIMAL_RELAXED_QUAD:
-            return 'optimal_relaxed_quad'
-        if item == _constants.CPX_STAT_ABORT_OBJ_LIM:
-            return 'abort_obj_limit'
-        if item == _constants.CPX_STAT_ABORT_PRIM_OBJ_LIM:
-            return 'abort_primal_obj_limit'
-        if item == _constants.CPX_STAT_ABORT_DUAL_OBJ_LIM:
-            return 'abort_dual_obj_limit'
-        if item == _constants.CPX_STAT_FIRSTORDER:
-            return 'first_order'
-        if item == _constants.CPX_STAT_ABORT_IT_LIM:
-            return 'abort_iteration_limit'
-        if item == _constants.CPX_STAT_ABORT_TIME_LIM:
-            return 'abort_time_limit'
-        if item == _constants.CPX_STAT_ABORT_DETTIME_LIM:
-            return 'abort_dettime_limit'
-        if item == _constants.CPX_STAT_ABORT_USER:
-            return 'abort_user'
-        if item == _constants.CPX_STAT_OPTIMAL_FACE_UNBOUNDED:
-            return 'optimal_face_unbounded'
-        if item == _constants.CPX_STAT_CONFLICT_FEASIBLE:
-            return 'conflict_feasible'
-        if item == _constants.CPX_STAT_CONFLICT_MINIMAL:
-            return 'conflict_minimal'
-        if item == _constants.CPX_STAT_CONFLICT_ABORT_CONTRADICTION:
-            return 'conflict_abort_contradiction'
-        if item == _constants.CPX_STAT_CONFLICT_ABORT_TIME_LIM:
-            return 'conflict_abort_time_limit'
-        if item == _constants.CPX_STAT_CONFLICT_ABORT_DETTIME_LIM:
-            return 'conflict_abort_dettime_limit'
-        if item == _constants.CPX_STAT_CONFLICT_ABORT_IT_LIM:
-            return 'conflict_abort_iteration_limit'
-        if item == _constants.CPX_STAT_CONFLICT_ABORT_NODE_LIM:
-            return 'conflict_abort_node_limit'
-        if item == _constants.CPX_STAT_CONFLICT_ABORT_OBJ_LIM:
-            return 'conflict_abort_obj_limit'
-        if item == _constants.CPX_STAT_CONFLICT_ABORT_MEM_LIM:
-            return 'conflict_abort_memory_limit'
-        if item == _constants.CPX_STAT_CONFLICT_ABORT_USER:
-            return 'conflict_abort_user'
-        if item == _constants.CPXMIP_ABORT_RELAXATION_UNBOUNDED:
-            return 'relaxation_unbounded'
-        if item == _constants.CPXMIP_ABORT_RELAXED:
-            return 'abort_relaxed'
-        if item == _constants.CPXMIP_OPTIMAL_TOL:
-            return 'optimal_tolerance'
-        if item == _constants.CPXMIP_SOL_LIM:
-            return 'solution_limit'
-        if item == _constants.CPXMIP_POPULATESOL_LIM:
-            return 'populate_solution_limit'
-        if item == _constants.CPXMIP_NODE_LIM_FEAS:
-            return 'node_limit_feasible'
-        if item == _constants.CPXMIP_NODE_LIM_INFEAS:
-            return 'node_limit_infeasible'
-        if item == _constants.CPXMIP_FAIL_FEAS:
-            return 'fail_feasible'
-        if item == _constants.CPXMIP_FAIL_INFEAS:
-            return 'fail_infeasible'
-        if item == _constants.CPXMIP_MEM_LIM_FEAS:
-            return 'mem_limit_feasible'
-        if item == _constants.CPXMIP_MEM_LIM_INFEAS:
-            return 'mem_limit_infeasible'
-        if item == _constants.CPXMIP_FAIL_FEAS_NO_TREE:
-            return 'fail_feasible_no_tree'
-        if item == _constants.CPXMIP_FAIL_INFEAS_NO_TREE:
-            return 'fail_infeasible_no_tree'
-        if item == _constants.CPXMIP_OPTIMAL_POPULATED:
-            return 'optimal_populated'
-        if item == _constants.CPXMIP_OPTIMAL_POPULATED_TOL:
-            return 'optimal_populated_tolerance'
-        if item == _constants.CPX_STAT_BENDERS_MASTER_UNBOUNDED:
-            return 'benders_master_unbounded'
-        if item == _constants.CPX_STAT_BENDERS_NUM_BEST:
-            return 'benders_num_best'
-        if item == _constants.CPXMIP_OPTIMAL:
-            return 'MIP_optimal'
-        if item == _constants.CPXMIP_INFEASIBLE:
-            return 'MIP_infeasible'
-        if item == _constants.CPXMIP_TIME_LIM_FEAS:
-            return 'MIP_time_limit_feasible'
-        if item == _constants.CPXMIP_TIME_LIM_INFEAS:
-            return 'MIP_time_limit_infeasible'
-        if item == _constants.CPXMIP_DETTIME_LIM_FEAS:
-            return 'MIP_dettime_limit_feasible'
-        if item == _constants.CPXMIP_DETTIME_LIM_INFEAS:
-            return 'MIP_dettime_limit_infeasible'
-        if item == _constants.CPXMIP_ABORT_FEAS:
-            return 'MIP_abort_feasible'
-        if item == _constants.CPXMIP_ABORT_INFEAS:
-            return 'MIP_abort_infeasible'
-        if item == _constants.CPXMIP_OPTIMAL_INFEAS:
-            return 'MIP_optimal_infeasible'
-        if item == _constants.CPXMIP_UNBOUNDED:
-            return 'MIP_unbounded'
-        if item == _constants.CPXMIP_INForUNBD:
-            return 'MIP_infeasible_or_unbounded'
-        if item == _constants.CPXMIP_FEASIBLE_RELAXED_SUM:
-            return 'MIP_feasible_relaxed_sum'
-        if item == _constants.CPXMIP_OPTIMAL_RELAXED_SUM:
-            return 'MIP_optimal_relaxed_sum'
-        if item == _constants.CPXMIP_FEASIBLE_RELAXED_INF:
-            return 'MIP_feasible_relaxed_inf'
-        if item == _constants.CPXMIP_OPTIMAL_RELAXED_INF:
-            return 'MIP_optimal_relaxed_inf'
-        if item == _constants.CPXMIP_FEASIBLE_RELAXED_QUAD:
-            return 'MIP_feasible_relaxed_quad'
-        if item == _constants.CPXMIP_OPTIMAL_RELAXED_QUAD:
-            return 'MIP_optimal_relaxed_sum'
-        if item == _constants.CPXMIP_FEASIBLE:
-            return 'MIP_feasible'
-        if item == _constants.CPXMIP_BENDERS_MASTER_UNBOUNDED:
-            return 'MIP_benders_master_unbounded'
-        if item == _constants.CPX_STAT_MULTIOBJ_OPTIMAL:
-            return "multiobj_optimal"
-        if item == _constants.CPX_STAT_MULTIOBJ_INFEASIBLE:
-            return "multiobj_infeasible"
-        if item == _constants.CPX_STAT_MULTIOBJ_INForUNBD:
-            return "multiobj_inforunbd"
-        if item == _constants.CPX_STAT_MULTIOBJ_NON_OPTIMAL:
-            return "multiobj_non_optimal"
-        if item == _constants.CPX_STAT_MULTIOBJ_STOPPED:
-            return "multiobj_stopped"
-        if item == _constants.CPX_STAT_MULTIOBJ_UNBOUNDED:
-            return "multiobj_unbounded"
-        raise CplexError("Unexpected solution status code!")
-
-
-class SolutionType(object):
+class SolutionType(ConstantClass):
     """Solution types"""
     none = _constants.CPX_NO_SOLN
     basic = _constants.CPX_BASIC_SOLN
     nonbasic = _constants.CPX_NONBASIC_SOLN
     primal = _constants.CPX_PRIMAL_SOLN
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.solution.type.primal
-        3
-        >>> c.solution.type[3]
-        'primal'
-        """
-        if item == _constants.CPX_NO_SOLN:
-            return 'none'
-        if item == _constants.CPX_BASIC_SOLN:
-            return 'basic'
-        if item == _constants.CPX_NONBASIC_SOLN:
-            return 'nonbasic'
-        if item == _constants.CPX_PRIMAL_SOLN:
-            return 'primal'
 
 
 class SolutionInterface(BaseInterface):
@@ -7494,7 +7084,7 @@ class SolutionInterface(BaseInterface):
         as Cplex.solution.  This constructor is not meant to be used
         externally.
         """
-        super(SolutionInterface, self).__init__(cplex)
+        super().__init__(cplex)
         self.progress = ProgressInterface(self)
         """See `ProgressInterface()` """
         self.infeasibility = InfeasibilityInterface(self)
@@ -7516,7 +7106,7 @@ class SolutionInterface(BaseInterface):
         """Returns the status of the solution.
 
         Returns an attribute of Cplex.solution.status.
-        For interpretations of the status codes, see the 
+        For interpretations of the status codes, see the
         reference manual of the CPLEX Callable Library,
         especially the group optim.cplex.callable.solutionstatus
 
@@ -7563,8 +7153,7 @@ class SolutionInterface(BaseInterface):
         """
         if status_code is None:
             status_code = self.get_status()
-        return CPX_PROC.getstatstring(self._env._e, status_code,
-                                      self._env._apienc)
+        return CPX_PROC.getstatstring(self._env._e, status_code)
 
     def get_objective_value(self):
         """Returns the value of the objective function.
@@ -7720,10 +7309,9 @@ class SolutionInterface(BaseInterface):
         """
         def getqconstrdslack(q):
             res = CPX_PROC.getqconstrdslack(self._env._e, self._cplex._lp, q)
-            if len(res) == 0:
-                return SparsePair()
-            else:
+            if res:
                 return SparsePair(res[0], res[1])
+            return SparsePair()
         return apply_freeform_one_arg(
             getqconstrdslack,
             self._cplex.quadratic_constraints._conv,
@@ -7868,12 +7456,10 @@ class SolutionInterface(BaseInterface):
         >>> c.solution.get_integer_quality([m.max_x, m.max_dual_infeasibility])
         [18, -1]
         """
-        if isinstance(which, six.integer_types):
+        if isinstance(which, int):
             return CPX_PROC.getintquality(self._env._e, self._cplex._lp, which)
-        else:
-            return [CPX_PROC.getintquality(
-                    self._env._e, self._cplex._lp, a)
-                    for a in which]
+        return [CPX_PROC.getintquality(self._env._e, self._cplex._lp, a)
+                for a in which]
 
     def get_float_quality(self, which):
         """Returns a measure of the quality of the solution.
@@ -7895,12 +7481,10 @@ class SolutionInterface(BaseInterface):
         >>> c.solution.get_float_quality([m.max_x, m.max_dual_infeasibility])
         [500.0, 0.0]
         """
-        if isinstance(which, six.integer_types):
+        if isinstance(which, int):
             return CPX_PROC.getdblquality(self._env._e, self._cplex._lp, which)
-        else:
-            return [CPX_PROC.getdblquality(
-                    self._env._e, self._cplex._lp, a)
-                    for a in which]
+        return [CPX_PROC.getdblquality(self._env._e, self._cplex._lp, a)
+                for a in which]
 
     def get_solution_type(self):
         """Returns the type of the solution.
@@ -8041,12 +7625,25 @@ class SolutionInterface(BaseInterface):
     def get_quality_metrics(self):
         """Returns an object containing measures of the solution quality.
 
-        See `QualityMetrics`
+        See `QualityMetrics`.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c = cplex.Cplex()
+        >>> out = c.set_results_stream(None)
+        >>> out = c.set_log_stream(None)
+        >>> c.read("lpex.mps")
+        >>> c.solve()
+        >>> qm = c.solution.get_quality_metrics()
         """
         return QualityMetrics(self._cplex)
 
     def write(self, filename):
         """Writes the incumbent solution to a file.
+
+        See :cpxapi:`CPXsolwrite` in the Callable Library Reference
+        Manual and also `InitialInterface.read_start()`.
 
         Example usage:
 
@@ -8058,69 +7655,25 @@ class SolutionInterface(BaseInterface):
         >>> c.solve()
         >>> c.solution.write("lpex.sol")
         """
-        CPX_PROC.solwrite(self._env._e, self._cplex._lp, filename,
-                          enc=self._env._apienc)
-
-    # FIXME: Do we really not have a way to read these solution
-    #        files back in?
+        CPX_PROC.solwrite(self._env._e, self._cplex._lp, filename)
 
 
-class PresolveStatus(object):
+class PresolveStatus(ConstantClass):
     """Presolve status codes"""
     no_reductions = 0
     has_problem = 1
     empty_problem = 2
 
-    def __getitem__(self, item):
-        """Converts a constant to a string.
 
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.presolve.status.has_problem
-        1
-        >>> c.presolve.status[1]
-        'has_problem'
-        """
-        if item == 0:
-            return 'no_reductions'
-        if item == 1:
-            return 'has_problem'
-        if item == 2:
-            return 'empty_problem'
-
-
-class PresolveMethod(object):
+class PresolveMethod(ConstantClass):
     """Presolve solution methods"""
     none = _constants.CPX_ALG_NONE
     primal = _constants.CPX_ALG_PRIMAL
     dual = _constants.CPX_ALG_DUAL
     barrier = _constants.CPX_ALG_BARRIER
 
-    def __getitem__(self, item):
-        """Converts a constant to a string.
 
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.presolve.method.dual
-        2
-        >>> c.solution.method[2]
-        'dual'
-        """
-        if item == _constants.CPX_ALG_NONE:
-            return 'none'
-        if item == _constants.CPX_ALG_PRIMAL:
-            return 'primal'
-        if item == _constants.CPX_ALG_DUAL:
-            return 'dual'
-        if item == _constants.CPX_ALG_BARRIER:
-            return 'barrier'
-
-
-class PresolveColStatus(object):
+class PresolveColStatus(ConstantClass):
     """Presolve variable status codes"""
     lower_bound = _constants.CPX_PRECOL_LOW
     upper_bound = _constants.CPX_PRECOL_UP
@@ -8128,54 +7681,12 @@ class PresolveColStatus(object):
     aggregated = _constants.CPX_PRECOL_AGG
     other = _constants.CPX_PRECOL_OTHER
 
-    def __getitem__(self, item):
-        """Converts a constant to a string.
 
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.presolve.col_status.fixed
-        -3
-        >>> c.presolve.col_status[-3]
-        'fixed'
-        """
-        if item == _constants.CPX_PRECOL_LOW:
-            return 'lower_bound'
-        if item == _constants.CPX_PRECOL_UP:
-            return 'upper_bound'
-        if item == _constants.CPX_PRECOL_FIX:
-            return 'fixed'
-        if item == _constants.CPX_PRECOL_AGG:
-            return 'aggregated'
-        if item == _constants.CPX_PRECOL_OTHER:
-            return 'other'
-
-
-class PresolveRowStatus(object):
+class PresolveRowStatus(ConstantClass):
     """Presolve linear constraint status codes"""
     reduced = _constants.CPX_PREROW_RED
     aggregated = _constants.CPX_PREROW_AGG
     other = _constants.CPX_PREROW_OTHER
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.presolve.row_status.reduced
-        -1
-        >>> c.presolve.row_status[-1]
-        'reduced'
-        """
-        if item == _constants.CPX_PREROW_RED:
-            return 'reduced'
-        if item == _constants.CPX_PREROW_AGG:
-            return 'aggregated'
-        if item == _constants.CPX_PREROW_OTHER:
-            return 'other'
 
 
 class PresolveInterface(BaseInterface):
@@ -8335,22 +7846,6 @@ class PresolveInterface(BaseInterface):
         """
         CPX_PROC.freepresolve(self._env._e, self._cplex._lp)
 
-    def get_objective_offset(self):
-        """Returns the constant offset of the objective function for a problem.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> out = c.set_results_stream(None)
-        >>> out = c.set_log_stream(None)
-        >>> c.read("example.mps")
-        >>> c.presolve.presolve(c.presolve.method.dual)
-        >>> c.presolve.get_objective_offset()
-        0.0
-        """
-        return CPX_PROC.getobjoffset(self._env._e, self._cplex._lp)
-
     def get_status(self):
         """Returns the status of presolve.
 
@@ -8464,7 +7959,7 @@ class PresolveInterface(BaseInterface):
           name, an exception will be raised.
 
         senses must be either a list of single-character strings or a
-        string containing the types of the variables.  
+        string containing the types of the variables.
 
         rhs is a list of floats, specifying the righthand side of
         each linear constraint.
@@ -8476,14 +7971,13 @@ class PresolveInterface(BaseInterface):
         """
         lin_expr, senses, rhs, names = init_list_args(
             lin_expr, senses, rhs, names)
-        if not isinstance(senses, six.string_types):
+        if not isinstance(senses, str):
             senses = "".join(senses)
         validate_arg_lengths([rhs, senses, names, lin_expr])
         if isinstance(lin_expr, list):
             rmat = _HBMatrix(lin_expr)
         CPX_PROC.preaddrows(self._env._e, self._cplex._lp, rhs, senses,
-                            rmat.matbeg, rmat.matind, rmat.matval, names,
-                            self._env._apienc)
+                            rmat.matbeg, rmat.matind, rmat.matval, names)
         # TODO: We don't return an iterator here because there's no way to
         #       get indices of presolve rows from names.
 
@@ -8518,39 +8012,16 @@ class PresolveInterface(BaseInterface):
     def write(self, filename):
         """Writes the presolved problem to a file."""
         return CPX_PROC.preslvwrite(self._env._e, self._cplex._lp,
-                                    filename, enc=self._env._apienc)
+                                    filename)
 
 
-class FeasoptConstraintType(object):
+class FeasoptConstraintType(ConstantClass):
     """Types of constraints"""
     lower_bound = _constants.CPX_CON_LOWER_BOUND
     upper_bound = _constants.CPX_CON_UPPER_BOUND
     linear = _constants.CPX_CON_LINEAR
     quadratic = _constants.CPX_CON_QUADRATIC
     indicator = _constants.CPX_CON_INDICATOR
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.feasopt.constraint_type.linear
-        3
-        >>> c.feasopt.constraint_type[3]
-        'linear'
-        """
-        if item == _constants.CPX_CON_LOWER_BOUND:
-            return 'lower_bound'
-        if item == _constants.CPX_CON_UPPER_BOUND:
-            return 'upper_bound'
-        if item == _constants.CPX_CON_LINEAR:
-            return 'linear'
-        if item == _constants.CPX_CON_QUADRATIC:
-            return 'quadratic'
-        if item == _constants.CPX_CON_INDICATOR:
-            return 'indicator'
 
 
 class FeasoptInterface(BaseInterface):
@@ -8745,7 +8216,8 @@ class FeasoptInterface(BaseInterface):
         attribute of self.constraint_type and id is either an index or a
         valid name for the type.
 
-        See CPXfeasoptext in the Callable Library Reference Manual.
+        See :cpxapi:`CPXfeasoptext` in the Callable Library Reference
+        Manual.
 
         Example usage:
 
@@ -8760,7 +8232,7 @@ class FeasoptInterface(BaseInterface):
         >>> c.solution.get_values()
         [3.0, 2.0, 3.0, 2.0]
         """
-        if len(args) == 0:
+        if not args:
             raise WrongNumberOfArgumentsError(
                 "Requires at least one argument")
         gpref, gbeg, ind, indt = [], [], [], []
@@ -8784,62 +8256,34 @@ class FeasoptInterface(BaseInterface):
         max_num = self._getnum(which)
         return make_group(conv, max_num, which, *args)
 
-    def _getnum(self, which):
+    def _getinterface(self, which):
         contype = self.constraint_type
-        if (which == contype.lower_bound or
-                which == contype.upper_bound):
-            return self._cplex.variables.get_num()
-        elif which == contype.linear:
-            return self._cplex.linear_constraints.get_num()
-        elif which == contype.quadratic:
-            return self._cplex.quadratic_constraints.get_num()
-        elif which == contype.indicator:
-            return self._cplex.indicator_constraints.get_num()
-        else:
-            raise ValueError("Unexpected constraint_type!")
+        switcher = {
+            contype.lower_bound: self._cplex.variables,
+            contype.upper_bound: self._cplex.variables,
+            contype.linear: self._cplex.linear_constraints,
+            contype.quadratic: self._cplex.quadratic_constraints,
+            contype.indicator: self._cplex.indicator_constraints
+        }
+        return switcher[which]
+
+    def _getnum(self, which):
+        interface = self._getinterface(which)
+        return interface.get_num()
 
     def _getconvfunc(self, which):
-        contype = self.constraint_type
-        if (which == contype.lower_bound or
-                which == contype.upper_bound):
-            return self._cplex.variables._conv
-        elif which == contype.linear:
-            return self._cplex.linear_constraints._conv
-        elif which == contype.quadratic:
-            return self._cplex.quadratic_constraints._conv
-        elif which == contype.indicator:
-            return self._cplex.indicator_constraints._conv
-        else:
-            raise ValueError("Unexpected constraint_type!")
+        interface = self._getinterface(which)
+        return interface._conv
 
 
-class ConflictStatus(object):
+class ConflictStatus(ConstantClass):
     """Status codes returned by conflict.get"""
     excluded = _constants.CPX_CONFLICT_EXCLUDED
     possible_member = _constants.CPX_CONFLICT_POSSIBLE_MEMBER
     member = _constants.CPX_CONFLICT_MEMBER
 
-    def __getitem__(self, item):
-        """Converts a constant to a string.
 
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.conflict.group_status.member
-        3
-        >>> c.conflict.group_status[3]
-        'member'
-        """
-        if item == _constants.CPX_CONFLICT_EXCLUDED:
-            return 'excluded'
-        if item == _constants.CPX_CONFLICT_POSSIBLE_MEMBER:
-            return 'possible_member'
-        if item == _constants.CPX_CONFLICT_MEMBER:
-            return 'member'
-
-
-class ConflictConstraintType(object):
+class ConflictConstraintType(ConstantClass):
     """Types of constraints"""
     lower_bound = _constants.CPX_CON_LOWER_BOUND
     upper_bound = _constants.CPX_CON_UPPER_BOUND
@@ -8848,33 +8292,6 @@ class ConflictConstraintType(object):
     indicator = _constants.CPX_CON_INDICATOR
     SOS = _constants.CPX_CON_SOS
     pwl = _constants.CPX_CON_PWL
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.conflict.constraint_type.linear
-        3
-        >>> c.conflict.constraint_type[3]
-        'linear'
-        """
-        if item == _constants.CPX_CON_LOWER_BOUND:
-            return 'lower_bound'
-        if item == _constants.CPX_CON_UPPER_BOUND:
-            return 'upper_bound'
-        if item == _constants.CPX_CON_LINEAR:
-            return 'linear'
-        if item == _constants.CPX_CON_QUADRATIC:
-            return 'quadratic'
-        if item == _constants.CPX_CON_INDICATOR:
-            return 'indicator'
-        if item == _constants.CPX_CON_SOS:
-            return 'SOS'
-        if item == _constants.CPX_CON_PWL:
-            return 'pwl'
 
 
 class ConflictInterface(BaseInterface):
@@ -8892,7 +8309,7 @@ class ConflictInterface(BaseInterface):
         as Cplex.conflict.  This constructor is not meant to be used
         externally.
         """
-        super(ConflictInterface, self).__init__(cplex)
+        super().__init__(cplex)
         self.__num_groups = 0
 
     def all_constraints(self):
@@ -9167,41 +8584,26 @@ class ConflictInterface(BaseInterface):
         max_num = self._getnum(which)
         return make_group(conv, max_num, which, *args)
 
-    def _getnum(self, which):
+    def _getinterface(self, which):
         contype = self.constraint_type
-        if (which == contype.lower_bound or
-                which == contype.upper_bound):
-            return self._cplex.variables.get_num()
-        elif which == contype.linear:
-            return self._cplex.linear_constraints.get_num()
-        elif which == contype.quadratic:
-            return self._cplex.quadratic_constraints.get_num()
-        elif which == contype.SOS:
-            return self._cplex.SOS.get_num()
-        elif which == contype.indicator:
-            return self._cplex.indicator_constraints.get_num()
-        elif which == contype.pwl:
-            return self._cplex.pwl_constraints.get_num()
-        else:
-            raise ValueError("Unexpected constraint_type!")
+        switcher = {
+            contype.lower_bound: self._cplex.variables,
+            contype.upper_bound: self._cplex.variables,
+            contype.linear: self._cplex.linear_constraints,
+            contype.quadratic: self._cplex.quadratic_constraints,
+            contype.SOS: self._cplex.SOS,
+            contype.indicator: self._cplex.indicator_constraints,
+            contype.pwl: self._cplex.pwl_constraints
+        }
+        return switcher[which]
+
+    def _getnum(self, which):
+        interface = self._getinterface(which)
+        return interface.get_num()
 
     def _getconvfunc(self, which):
-        contype = self.constraint_type
-        if (which == contype.lower_bound or
-                which == contype.upper_bound):
-            return self._cplex.variables._conv
-        elif which == contype.linear:
-            return self._cplex.linear_constraints._conv
-        elif which == contype.quadratic:
-            return self._cplex.quadratic_constraints._conv
-        elif which == contype.SOS:
-            return self._cplex.SOS._conv
-        elif which == contype.indicator:
-            return self._cplex.indicator_constraints._conv
-        elif which == contype.pwl:
-            return self._cplex.pwl_constraints._conv
-        else:
-            raise ValueError("Unexpected constraint_type!")
+        interface = self._getinterface(which)
+        return interface._conv
 
     def refine_MIP_start(self, MIP_start, *args):
         """Identifies a minimal conflict among a set of constraints for a
@@ -9223,8 +8625,8 @@ class ConflictInterface(BaseInterface):
         attribute of conflict.constraint_type and id is either an index
         or a valid name for the type.
 
-        See CPXrefinemipstartconflictext in the Callable Library Reference
-        Manual.
+        See :mipapi:`CPXrefinemipstartconflictext` in the Callable
+        Library Reference Manual.
 
         Example usage:
 
@@ -9244,7 +8646,7 @@ class ConflictInterface(BaseInterface):
         >>> c.conflict.get_groups(0, 3)
         [(1.0, ((2, 0),)), (1.0, ((2, 1),)), (1.0, ((1, 0),)), (1.0, ((1, 1),))]
         """
-        if len(args) == 0:
+        if not args:
             # At first glance, this message might look wrong, but it is in
             # fact, correct.  The first argument is MIP_start, and we
             # require that args is non-empty.
@@ -9275,8 +8677,8 @@ class ConflictInterface(BaseInterface):
         attribute of conflict.constraint_type and id is either an index or
         a valid name for the type.
 
-        See CPXrefineconflictext in the Callable Library Reference
-        Manual.
+        See :cpxapi:`CPXrefineconflictext` in the Callable Library
+        Reference Manual.
 
         Example usage:
 
@@ -9293,7 +8695,7 @@ class ConflictInterface(BaseInterface):
         >>> c.conflict.get_groups([0, 2])
         [(1.0, ((3, 0),)), (1.0, ((1, 0),))]
         """
-        if len(args) == 0:
+        if not args:
             raise WrongNumberOfArgumentsError(
                 "Requires at least one argument")
         gpref, gbeg, ind, indt = self._separate_groups(args)
@@ -9323,7 +8725,8 @@ class ConflictInterface(BaseInterface):
         The status codes are attributes of
         Cplex.conflict.group_status.
 
-        See CPXgetconflictext in the Callable Library Reference Manual.
+        See :cpxapi:`CPXgetconflictext` in the Callable Library Reference
+        Manual.
 
         Example usage:
 
@@ -9378,7 +8781,8 @@ class ConflictInterface(BaseInterface):
     def write(self, filename):
         """Writes the conflict to a file.
 
-        See CPXclpwrite in the Callable Library Reference Manual.
+        See :cpxapi:`CPXclpwrite` in the Callable Library Reference
+        Manual.
 
         Example usage:
 
@@ -9389,31 +8793,13 @@ class ConflictInterface(BaseInterface):
         >>> c.conflict.refine(c.conflict.all_constraints())
         >>> c.conflict.write("conflict.clp")
         """
-        CPX_PROC.clpwrite(self._env._e, self._cplex._lp, filename,
-                          enc=self._env._apienc)
+        CPX_PROC.clpwrite(self._env._e, self._cplex._lp, filename)
 
 
-class PivotVarStatus(object):
+class PivotVarStatus(ConstantClass):
     """Use as input to pivoting methods."""
     at_lower_bound = _constants.CPX_AT_LOWER
     at_upper_bound = _constants.CPX_AT_UPPER
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.advanced.variable_status.at_lower_bound
-        0
-        >>> c.advanced.variable_status[0]
-        'at_lower_bound'
-        """
-        if item == _constants.CPX_AT_LOWER:
-            return 'at_lower_bound'
-        if item == _constants.CPX_AT_UPPER:
-            return 'at_upper_bound'
 
 
 class AdvancedCplexInterface(BaseInterface):
@@ -9435,7 +8821,8 @@ class AdvancedCplexInterface(BaseInterface):
         strengthened lower bounds, a list containing the strengthened
         upper bounds, and a list containing the status of each row.
 
-        See CPXbasicpresolve in the Callable Library Reference Manual.
+        See :cpxapi:`CPXbasicpresolve` in the Callable Library Reference
+        Manual.
 
         Note
           This method does not create a presolved problem.
@@ -9481,7 +8868,8 @@ class AdvancedCplexInterface(BaseInterface):
         def conv(var):
             try:
                 return self._cplex.variables._conv(var)
-            except:  # name not found
+            except CplexSolverError:
+                # Variable name not found, try linear constraints.
                 return -self._cplex.linear_constraints._conv(var) - 1
         CPX_PROC.pivot(self._env._e, self._cplex._lp, conv(enter),
                        conv(leave), status)
@@ -9518,8 +8906,8 @@ class AdvancedCplexInterface(BaseInterface):
         same length as variables containing the penalties for
         branching down or up, respectively, on each variable.
 
-        See CPXstrongbranch in the Callable Library Reference Manual for
-        more detail.
+        See :cpxapi:`CPXstrongbranch` in the Callable Library Reference
+        Manual for more detail.
 
         Example usage:
 
@@ -9540,34 +8928,16 @@ class AdvancedCplexInterface(BaseInterface):
             conv(variables), it_limit))
 
     def complete(self):
-        """See CPXcompletelp in the Callable Library Reference Manual."""
+        """See :cpxapi:`CPXcompletelp` in the Callable Library Reference
+        Manual."""
         CPX_PROC.completelp(self._env._e, self._cplex.lp)
 
 
-class BranchDirection(object):
+class BranchDirection(ConstantClass):
     """Constants defining branch directions"""
     default = _constants.CPX_BRANCH_GLOBAL
     down = _constants.CPX_BRANCH_DOWN
     up = _constants.CPX_BRANCH_UP
-
-    def __getitem__(self, item):
-        """Converts a constant to a string.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.order.branch_direction.up
-        1
-        >>> c.order.branch_direction[1]
-        'up'
-        """
-        if item == _constants.CPX_BRANCH_GLOBAL:
-            return 'default'
-        if item == _constants.CPX_BRANCH_DOWN:
-            return 'down'
-        if item == _constants.CPX_BRANCH_UP:
-            return 'up'
 
 
 class OrderInterface(BaseInterface):
@@ -9590,7 +8960,9 @@ class OrderInterface(BaseInterface):
     """See `BranchDirection()` """
 
     def get(self):
-        """Returns a list of triples (variable, priority, direction) representing the priority order for branching."""
+        """Returns a list of triples (variable, priority, direction)
+        representing the priority order for branching.
+        """
         return unzip(CPX_PROC.getorder(self._env._e, self._cplex._lp))
 
     def get_variables(self):
@@ -9600,11 +8972,11 @@ class OrderInterface(BaseInterface):
     def set(self, order):
         """Sets the priority order for branching.
 
-        order must be a list of triples (variable, priority, direction).  
+        order must be a list of triples (variable, priority, direction).
 
         variable must be an index or name of a variable.
 
-        priority must be a nonnegative integer. 
+        priority must be a nonnegative integer.
 
         direction must be an attribute of order.branch_direction.
         """
@@ -9614,17 +8986,16 @@ class OrderInterface(BaseInterface):
 
     def read(self, filename):
         """Reads a priority order from a file."""
-        CPX_PROC.readcopyorder(self._env._e, self._cplex._lp, filename,
-                               enc=self._env._apienc)
+        CPX_PROC.readcopyorder(self._env._e, self._cplex._lp, filename)
 
     def write(self, filename):
         """Writes the priority order to a file."""
-        CPX_PROC.ordwrite(self._env._e, self._cplex._lp, filename,
-                          enc=self._env._apienc)
+        CPX_PROC.ordwrite(self._env._e, self._cplex._lp, filename)
 
 
 class InitialInterface(BaseInterface):
-    """Methods to set starting information for an optimization algorithm to solve continuous problems (LP, QP, QCP).
+    """Methods to set starting information for an optimization algorithm
+    to solve continuous problems (LP, QP, QCP).
 
     Note
       Data passed to these methods cannot be queried immediately from
@@ -9669,21 +9040,68 @@ class InitialInterface(BaseInterface):
 
         >>> import cplex
         >>> c = cplex.Cplex()
-        >>> indices = c.variables.add(names = ["v" + str(i) for i in range(5)])
-        >>> indices = c.linear_constraints.add(names = ["r" + str(i) for i in range(3)])
+        >>> indices = c.variables.add(
+        ...     names=["v{0}".format(i) for i in range(5)]
+        ... )
+        >>> indices = c.linear_constraints.add(
+        ...     names=["r{0}".format(i) for i in range(3)]
+        ... )
         >>> s = c.start.status
-        >>> c.start.set_start([s.basic] * 3 + [s.at_lower_bound] * 2, [s.basic] + [s.at_upper_bound] * 2,\
-                              [0.0] * 5, [1.0] * 3, [2.0] * 5, [3.0] * 3)
+        >>> c.start.set_start(
+        ...     [s.basic] * 3 + [s.at_lower_bound] * 2,
+        ...     [s.basic] + [s.at_upper_bound] * 2,
+        ...     [0.0] * 5,
+        ...     [1.0] * 3,
+        ...     [2.0] * 5,
+        ...     [3.0] * 3
+        ... )
         """
-        CPX_PROC.copystart(self._env._e, self._cplex._lp, col_status, row_status,
-                           col_primal, row_primal, col_dual, row_dual)
+        CPX_PROC.copystart(self._env._e, self._cplex._lp, col_status,
+                           row_status, col_primal, row_primal, col_dual,
+                           row_dual)
 
     def read_start(self, filename):
-        """Reads the starting information from a file."""
-        CPX_PROC.readcopysol(self._env._e, self._cplex._lp, filename,
-                             enc=self._env._apienc)
+        """Reads the starting information from a file.
+
+        See :cpxapi:`CPXreadcopysol` in the Callable Library Reference
+        Manual and also `SolutionInterface.write()`.
+
+        Example usage:
+
+        >>> import cplex
+        >>> c1 = cplex.Cplex()
+        >>> out = c1.set_results_stream(None)
+        >>> out = c1.set_log_stream(None)
+        >>> c1.read("lpex.mps")
+        >>> c1.solve()
+        >>> c1.solution.write("lpex.sol")
+        >>> c2 = cplex.Cplex()
+        >>> out = c2.set_results_stream(None)
+        >>> out = c2.set_log_stream(None)
+        >>> c2.read("lpex.mps")
+        >>> c2.start.read_start("lpex.sol")
+        """
+        CPX_PROC.readcopysol(self._env._e, self._cplex._lp, filename)
 
     def read_basis(self, filename):
-        """Reads the starting basis from a file."""
-        CPX_PROC.readcopybase(self._env._e, self._cplex._lp, filename,
-                              enc=self._env._apienc)
+        """Reads the starting basis from a file.
+
+        See :cpxapi:`CPXreadcopybase` in the Callable Library Reference
+        Manual and also `BasisInterface.write()`.
+
+        Example:
+
+        >>> import cplex
+        >>> c1 = cplex.Cplex()
+        >>> out = c1.set_results_stream(None)
+        >>> out = c1.set_log_stream(None)
+        >>> c1.read("lpex.mps")
+        >>> c1.solve()
+        >>> c1.solution.basis.write("lpex.bas")
+        >>> c2 = cplex.Cplex()
+        >>> out = c2.set_results_stream(None)
+        >>> out = c2.set_log_stream(None)
+        >>> c2.read("lpex.mps")
+        >>> c2.start.read_basis("lpex.bas")
+        """
+        CPX_PROC.readcopybase(self._env._e, self._cplex._lp, filename)

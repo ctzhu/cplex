@@ -12,10 +12,9 @@
 """Base-interface of the CPLEX API"""
 import weakref
 from . import _aux_functions as _aux
-from .. import six
 
 
-class BaseInterface(object):
+class BaseInterface():
     """Common methods for sub-interfaces."""
 
     def __init__(self, cplex, advanced=False, getindexfunc=None):
@@ -24,8 +23,6 @@ class BaseInterface(object):
         This class is not meant to be instantiated directly nor used
         externally.
         """
-        if type(self) == BaseInterface:
-            raise TypeError("BaseInterface must be sub-classed")
         if advanced:
             self._cplex = cplex
         else:
@@ -42,7 +39,7 @@ class BaseInterface(object):
         """non-public"""
         old = getnumfun()
         addfun(*args, **kwargs)
-        return six.moves.range(old, getnumfun())
+        return range(old, getnumfun())
 
     @staticmethod
     def _add_single(getnumfun, addfun, *args, **kwargs):
@@ -52,8 +49,7 @@ class BaseInterface(object):
 
     def _get_index(self, name):
         return self._get_index_function(
-            self._env._e, self._cplex._lp, name,
-            self._env._apienc)
+            self._env._e, self._cplex._lp, name)
 
     def get_indices(self, name):
         """Converts from names to indices.
@@ -81,7 +77,6 @@ class BaseInterface(object):
         """
         if self._get_index_function is None:
             raise NotImplementedError("This is not an indexed interface")
-        if isinstance(name, six.string_types):
+        if isinstance(name, str):
             return self._get_index(name)
-        else:
-            return [self._get_index(x) for x in name]
+        return [self._get_index(x) for x in name]
