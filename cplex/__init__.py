@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2020. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2022. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -34,7 +34,7 @@ of these classes.
 __all__ = ["Cplex", "Stats", "Aborter", "callbacks", "exceptions",
            "infinity", "ParameterSet", "SparsePair", "SparseTriple",
            "model_info"]
-__version__ = "20.1.0.0"
+__version__ = "22.1.0.0"
 
 from contextlib import closing
 from io import BytesIO
@@ -711,9 +711,7 @@ def _getcplexstudiodir():
 def _setcpxchecklicdir():
     # Only try to set CPLEX_CPXCHECKLIC_BINDIR if CPLEX_STUDIO_KEY is set
     # and CPLEX_STUDIO_DIR and CPLEX_CPXCHECKLIC_BINDIR are not set.
-    if ((not os.getenv("CPLEX_STUDIO_KEY")) or
-        os.getenv(_getcplexstudiodir()) or
-        os.getenv("CPLEX_CPXCHECKLIC_BINDIR")):
+    if ((not os.getenv("CPLEX_STUDIO_KEY")) or os.getenv(_getcplexstudiodir()) or os.getenv("CPLEX_CPXCHECKLIC_BINDIR")):
         return
     # First, try using shutil.which().
     import shutil
@@ -1245,66 +1243,6 @@ class Cplex():
         else:
             _proc.chgprobtypesolnpool(self._env._e, self._lp, type, soln)
 
-    def copy_vmconfig(self, xmlstring):
-        """Read a virtual machine configuration from a string and install
-        it in this instance.
-
-        The content of the string passed to this function must conform to
-        the VMC file specification. If the string can be successfully
-        parsed, then the virtual machine configuration specified by it is
-        installed in this instance. In case of error, a previously
-        installed virtual machine configuration is not touched.
-
-        See :distmipapi:`CPXcopyvmconfig` in the Callable Library
-        Reference Manual for more detail.
-        """
-        _proc.copyvmconfig(self._env._e, xmlstring)
-
-    def read_copy_vmconfig(self, filename):
-        """Read a virtual machine configuration from a file and install
-        it in this instance.
-
-        The filename argument to this function must specify a file that
-        conforms to the VMC file format. If the file can be successfully
-        parsed, then the virtual machine configuration specified by it is
-        installed in this instance. In case of error, a previously
-        installed virtual machine configuration is not touched.
-
-        See :distmipapi:`CPXreadcopyvmconfig` in the Callable Library
-        Reference Manual for more detail.
-        """
-        _proc.readcopyvmconfig(self._env._e, filename)
-
-    def del_vmconfig(self):
-        """Delete the virtual machine configuration in this instance (if
-        there is any).
-
-        See :distmipapi:`CPXdelvmconfig` in the Callable Library
-        Reference Manual for more detail.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.del_vmconfig()
-        """
-        _proc.delvmconfig(self._env._e)
-
-    def has_vmconfig(self):
-        """Test whether this instance has a virtual machine configuration
-        installed.
-
-        See `copy_vmconfig`, `read_copy_vmconfig`, and `del_vmconfig`.
-
-        Example usage:
-
-        >>> import cplex
-        >>> c = cplex.Cplex()
-        >>> c.has_vmconfig()
-        False
-        """
-        return _proc.hasvmconfig(self._env._e)
-
     def _is_MIP(self):
         """non-public"""
         probtype = self.get_problem_type()
@@ -1363,10 +1301,7 @@ class Cplex():
                               [None if ps is None else ps._ps
                                for ps in paramsets])
         elif self._is_MIP():
-            if _proc.hasvmconfig(self._env._e):
-                _proc.distmipopt(self._env._e, self._lp)
-            else:
-                _proc.mipopt(self._env._e, self._lp)
+            _proc.mipopt(self._env._e, self._lp)
         elif self.quadratic_constraints.get_num() > 0:
             lpmethod = self.parameters.lpmethod.get()
             if lpmethod in (_const.CPX_ALG_BARRIER, _const.CPX_ALG_AUTOMATIC):

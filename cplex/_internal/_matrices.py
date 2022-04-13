@@ -3,7 +3,7 @@
 # -----------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2020. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2022. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -14,7 +14,7 @@
 
 from ._aux_functions import init_list_args, validate_arg_lengths
 from ..exceptions import CplexError
-
+from . import _pycplex as CPX
 
 class SparsePair():
     """A class for storing sparse vector data.
@@ -120,7 +120,7 @@ class _HBMatrix():
                 end = len(self.matind)
             else:
                 end = self.matbeg[key + 1]
-            return SparsePair(self.matind[begin:end], self.matval[begin:end])
+            return SparsePair(CPX._getArrayView(self.matind, begin, end), CPX._getArrayView(self.matval, begin, end))
         elif isinstance(key, slice):
             start, stop, step = key.start, key.stop, key.step
             if start is None:

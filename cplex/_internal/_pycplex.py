@@ -91,8 +91,6 @@ class _SwigNonDynamicMeta(type):
 
 
 CPX_FEATURES_H = _pycplex_platform.CPX_FEATURES_H
-CPX_FEATURE_REMOTE_OBJECT = _pycplex_platform.CPX_FEATURE_REMOTE_OBJECT
-CPX_FEATURE_DISTRIBUTED_MIP = _pycplex_platform.CPX_FEATURE_DISTRIBUTED_MIP
 CPX_CPXAUTOINTTYPES_H_H = _pycplex_platform.CPX_CPXAUTOINTTYPES_H_H
 CPXBYTE_DEFINED = _pycplex_platform.CPXBYTE_DEFINED
 CPXINT_DEFINED = _pycplex_platform.CPXINT_DEFINED
@@ -473,10 +471,6 @@ CPX_CALLBACK_INFO_IC_COMPL = _pycplex_platform.CPX_CALLBACK_INFO_IC_COMPL
 CPX_CALLBACK_INFO_IC_RHS = _pycplex_platform.CPX_CALLBACK_INFO_IC_RHS
 CPX_CALLBACK_INFO_IC_IS_FEASIBLE = _pycplex_platform.CPX_CALLBACK_INFO_IC_IS_FEASIBLE
 CPX_INCUMBENT_ID = _pycplex_platform.CPX_INCUMBENT_ID
-CPX_RAMPUP_DISABLED = _pycplex_platform.CPX_RAMPUP_DISABLED
-CPX_RAMPUP_AUTO = _pycplex_platform.CPX_RAMPUP_AUTO
-CPX_RAMPUP_DYNAMIC = _pycplex_platform.CPX_RAMPUP_DYNAMIC
-CPX_RAMPUP_INFINITE = _pycplex_platform.CPX_RAMPUP_INFINITE
 CPX_CALLBACK_DEFAULT = _pycplex_platform.CPX_CALLBACK_DEFAULT
 CPX_CALLBACK_FAIL = _pycplex_platform.CPX_CALLBACK_FAIL
 CPX_CALLBACK_SET = _pycplex_platform.CPX_CALLBACK_SET
@@ -568,6 +562,7 @@ CPX_MULTIOBJ_BLEND = _pycplex_platform.CPX_MULTIOBJ_BLEND
 CPX_MULTIOBJ_DEGCNT = _pycplex_platform.CPX_MULTIOBJ_DEGCNT
 CPX_MULTIOBJ_DETTIME = _pycplex_platform.CPX_MULTIOBJ_DETTIME
 CPX_MULTIOBJ_DEXCH = _pycplex_platform.CPX_MULTIOBJ_DEXCH
+CPX_MULTIOBJ_DFEAS = _pycplex_platform.CPX_MULTIOBJ_DFEAS
 CPX_MULTIOBJ_DPUSH = _pycplex_platform.CPX_MULTIOBJ_DPUSH
 CPX_MULTIOBJ_ERROR = _pycplex_platform.CPX_MULTIOBJ_ERROR
 CPX_MULTIOBJ_ITCNT = _pycplex_platform.CPX_MULTIOBJ_ITCNT
@@ -576,6 +571,7 @@ CPX_MULTIOBJ_NODECNT = _pycplex_platform.CPX_MULTIOBJ_NODECNT
 CPX_MULTIOBJ_NODELEFTCNT = _pycplex_platform.CPX_MULTIOBJ_NODELEFTCNT
 CPX_MULTIOBJ_OBJVAL = _pycplex_platform.CPX_MULTIOBJ_OBJVAL
 CPX_MULTIOBJ_PEXCH = _pycplex_platform.CPX_MULTIOBJ_PEXCH
+CPX_MULTIOBJ_PFEAS = _pycplex_platform.CPX_MULTIOBJ_PFEAS
 CPX_MULTIOBJ_PHASE1CNT = _pycplex_platform.CPX_MULTIOBJ_PHASE1CNT
 CPX_MULTIOBJ_PPUSH = _pycplex_platform.CPX_MULTIOBJ_PPUSH
 CPX_MULTIOBJ_PRIORITY = _pycplex_platform.CPX_MULTIOBJ_PRIORITY
@@ -631,6 +627,7 @@ CPX_STAT_OPTIMAL_RELAXED_INF = _pycplex_platform.CPX_STAT_OPTIMAL_RELAXED_INF
 CPX_STAT_OPTIMAL_RELAXED_QUAD = _pycplex_platform.CPX_STAT_OPTIMAL_RELAXED_QUAD
 CPX_STAT_OPTIMAL_RELAXED_SUM = _pycplex_platform.CPX_STAT_OPTIMAL_RELAXED_SUM
 CPX_STAT_UNBOUNDED = _pycplex_platform.CPX_STAT_UNBOUNDED
+CPX_STAT_UNKNOWN = _pycplex_platform.CPX_STAT_UNKNOWN
 CPX_SUM_COMP_SLACK = _pycplex_platform.CPX_SUM_COMP_SLACK
 CPX_SUM_DUAL_INFEAS = _pycplex_platform.CPX_SUM_DUAL_INFEAS
 CPX_SUM_DUAL_RESIDUAL = _pycplex_platform.CPX_SUM_DUAL_RESIDUAL
@@ -754,7 +751,6 @@ CPXERR_MSG_NO_CHANNEL = _pycplex_platform.CPXERR_MSG_NO_CHANNEL
 CPXERR_MSG_NO_FILEPTR = _pycplex_platform.CPXERR_MSG_NO_FILEPTR
 CPXERR_MSG_NO_FUNCTION = _pycplex_platform.CPXERR_MSG_NO_FUNCTION
 CPXERR_MULTIOBJ_SUBPROB_SOLVE = _pycplex_platform.CPXERR_MULTIOBJ_SUBPROB_SOLVE
-CPXERR_MULTIPLE_PROBS_IN_REMOTE_ENVIRONMENT = _pycplex_platform.CPXERR_MULTIPLE_PROBS_IN_REMOTE_ENVIRONMENT
 CPXERR_NAME_CREATION = _pycplex_platform.CPXERR_NAME_CREATION
 CPXERR_NAME_NOT_FOUND = _pycplex_platform.CPXERR_NAME_NOT_FOUND
 CPXERR_NAME_TOO_LONG = _pycplex_platform.CPXERR_NAME_TOO_LONG
@@ -833,7 +829,6 @@ CPXERR_PARAM_INCOMPATIBLE = _pycplex_platform.CPXERR_PARAM_INCOMPATIBLE
 CPXERR_PARAM_TOO_BIG = _pycplex_platform.CPXERR_PARAM_TOO_BIG
 CPXERR_PARAM_TOO_SMALL = _pycplex_platform.CPXERR_PARAM_TOO_SMALL
 CPXERR_PRESLV_ABORT = _pycplex_platform.CPXERR_PRESLV_ABORT
-CPXERR_PRESLV_BAD_PARAM = _pycplex_platform.CPXERR_PRESLV_BAD_PARAM
 CPXERR_PRESLV_BASIS_MEM = _pycplex_platform.CPXERR_PRESLV_BASIS_MEM
 CPXERR_PRESLV_COPYORDER = _pycplex_platform.CPXERR_PRESLV_COPYORDER
 CPXERR_PRESLV_COPYSOS = _pycplex_platform.CPXERR_PRESLV_COPYSOS
@@ -853,7 +848,6 @@ CPXERR_PRESLV_UNBD = _pycplex_platform.CPXERR_PRESLV_UNBD
 CPXERR_PRESLV_UNCRUSHFORM = _pycplex_platform.CPXERR_PRESLV_UNCRUSHFORM
 CPXERR_PRIIND = _pycplex_platform.CPXERR_PRIIND
 CPXERR_PRM_DATA = _pycplex_platform.CPXERR_PRM_DATA
-CPXERR_PROTOCOL = _pycplex_platform.CPXERR_PROTOCOL
 CPXERR_Q_DIVISOR = _pycplex_platform.CPXERR_Q_DIVISOR
 CPXERR_Q_DUP_ENTRY = _pycplex_platform.CPXERR_Q_DUP_ENTRY
 CPXERR_Q_NOT_INDEF = _pycplex_platform.CPXERR_Q_NOT_INDEF
@@ -1019,11 +1013,6 @@ CPXCALLBACKSOLUTION_NOCHECK = _pycplex_platform.CPXCALLBACKSOLUTION_NOCHECK
 CPXCALLBACKSOLUTION_CHECKFEAS = _pycplex_platform.CPXCALLBACKSOLUTION_CHECKFEAS
 CPXCALLBACKSOLUTION_PROPAGATE = _pycplex_platform.CPXCALLBACKSOLUTION_PROPAGATE
 CPXCALLBACKSOLUTION_SOLVE = _pycplex_platform.CPXCALLBACKSOLUTION_SOLVE
-CPXINFO_BYTE = _pycplex_platform.CPXINFO_BYTE
-CPXINFO_SHORT = _pycplex_platform.CPXINFO_SHORT
-CPXINFO_INT = _pycplex_platform.CPXINFO_INT
-CPXINFO_LONG = _pycplex_platform.CPXINFO_LONG
-CPXINFO_DOUBLE = _pycplex_platform.CPXINFO_DOUBLE
 CPXPUBLICPARAMS_H = _pycplex_platform.CPXPUBLICPARAMS_H
 CPX_PARAM_ADVIND = _pycplex_platform.CPX_PARAM_ADVIND
 CPX_PARAM_AGGFILL = _pycplex_platform.CPX_PARAM_AGGFILL
@@ -1152,7 +1141,6 @@ CPX_PARAM_RINSHEUR = _pycplex_platform.CPX_PARAM_RINSHEUR
 CPX_PARAM_LBHEUR = _pycplex_platform.CPX_PARAM_LBHEUR
 CPX_PARAM_REPEATPRESOLVE = _pycplex_platform.CPX_PARAM_REPEATPRESOLVE
 CPX_PARAM_PROBETIME = _pycplex_platform.CPX_PARAM_PROBETIME
-CPX_PARAM_POLISHTIME = _pycplex_platform.CPX_PARAM_POLISHTIME
 CPX_PARAM_REPAIRTRIES = _pycplex_platform.CPX_PARAM_REPAIRTRIES
 CPX_PARAM_EPLIN = _pycplex_platform.CPX_PARAM_EPLIN
 CPX_PARAM_EPRELAX = _pycplex_platform.CPX_PARAM_EPRELAX
@@ -1181,9 +1169,6 @@ CPX_PARAM_PROBEDETTIME = _pycplex_platform.CPX_PARAM_PROBEDETTIME
 CPX_PARAM_POLISHAFTERDETTIME = _pycplex_platform.CPX_PARAM_POLISHAFTERDETTIME
 CPX_PARAM_LANDPCUTS = _pycplex_platform.CPX_PARAM_LANDPCUTS
 CPX_PARAM_NODECUTS = _pycplex_platform.CPX_PARAM_NODECUTS
-CPX_PARAM_RAMPUPDURATION = _pycplex_platform.CPX_PARAM_RAMPUPDURATION
-CPX_PARAM_RAMPUPDETTILIM = _pycplex_platform.CPX_PARAM_RAMPUPDETTILIM
-CPX_PARAM_RAMPUPTILIM = _pycplex_platform.CPX_PARAM_RAMPUPTILIM
 CPX_PARAM_LOCALIMPLBD = _pycplex_platform.CPX_PARAM_LOCALIMPLBD
 CPX_PARAM_BQPCUTS = _pycplex_platform.CPX_PARAM_BQPCUTS
 CPX_PARAM_RLTCUTS = _pycplex_platform.CPX_PARAM_RLTCUTS
@@ -1193,6 +1178,8 @@ CPX_PARAM_SUBMIPSCAIND = _pycplex_platform.CPX_PARAM_SUBMIPSCAIND
 CPX_PARAM_SUBMIPNODELIMIT = _pycplex_platform.CPX_PARAM_SUBMIPNODELIMIT
 CPX_PARAM_SOS1REFORM = _pycplex_platform.CPX_PARAM_SOS1REFORM
 CPX_PARAM_SOS2REFORM = _pycplex_platform.CPX_PARAM_SOS2REFORM
+CPX_PARAM_LOWEROBJSTOP = _pycplex_platform.CPX_PARAM_LOWEROBJSTOP
+CPX_PARAM_UPPEROBJSTOP = _pycplex_platform.CPX_PARAM_UPPEROBJSTOP
 CPX_PARAM_BAREPCOMP = _pycplex_platform.CPX_PARAM_BAREPCOMP
 CPX_PARAM_BARGROWTH = _pycplex_platform.CPX_PARAM_BARGROWTH
 CPX_PARAM_BAROBJRNG = _pycplex_platform.CPX_PARAM_BAROBJRNG
@@ -1664,6 +1651,81 @@ def free_long_C_array(Pyptr: 'PyObject *') -> "void":
 def free_double_C_array(Pyptr: 'PyObject *') -> "void":
     return _pycplex_platform.free_double_C_array(Pyptr)
 
+def allocate_int_C_array(size: 'PyObject *') -> "PyObject *":
+    return _pycplex_platform.allocate_int_C_array(size)
+
+def allocate_long_C_array(size: 'PyObject *') -> "PyObject *":
+    return _pycplex_platform.allocate_long_C_array(size)
+
+def allocate_double_C_array(size: 'PyObject *') -> "PyObject *":
+    return _pycplex_platform.allocate_double_C_array(size)
+
+def set_int_C_Array(array: 'PyObject *', index: 'PyObject *', value: 'PyObject *') -> "void":
+    return _pycplex_platform.set_int_C_Array(array, index, value)
+
+def set_long_C_Array(array: 'PyObject *', index: 'PyObject *', value: 'PyObject *') -> "void":
+    return _pycplex_platform.set_long_C_Array(array, index, value)
+
+def set_double_C_Array(array: 'PyObject *', index: 'PyObject *', value: 'PyObject *') -> "void":
+    return _pycplex_platform.set_double_C_Array(array, index, value)
+
+def CPXX_fast_newcols(env_lp_ptr: 'PyObject *', nb: 'PyObject *', lb: 'PyObject *', ub: 'PyObject *', xctype: 'PyObject *') -> "void":
+    return _pycplex_platform.CPXX_fast_newcols(env_lp_ptr, nb, lb, ub, xctype)
+
+def CPXX_has_non_default_lb(env_lp_ptr: 'PyObject *', begin: 'PyObject *', end: 'PyObject *') -> "int":
+    return _pycplex_platform.CPXX_has_non_default_lb(env_lp_ptr, begin, end)
+
+def CPXX_has_non_default_ub(env_lp_ptr: 'PyObject *', begin: 'PyObject *', end: 'PyObject *') -> "int":
+    return _pycplex_platform.CPXX_has_non_default_ub(env_lp_ptr, begin, end)
+
+def CPXX_has_name(env_lp_ptr: 'PyObject *', begin: 'PyObject *', end: 'PyObject *') -> "int":
+    return _pycplex_platform.CPXX_has_name(env_lp_ptr, begin, end)
+
+def CPXX_fast_get_rows(env_lp_ptr: 'PyObject *') -> "PyObject *":
+    return _pycplex_platform.CPXX_fast_get_rows(env_lp_ptr)
+
+def CPXX_free_rows(rows: 'PyObject *') -> "void":
+    return _pycplex_platform.CPXX_free_rows(rows)
+
+def CPXX_fast_getcolname(env_lp_ptr: 'PyObject *', begin: 'PyObject *', end: 'PyObject *') -> "PyObject *":
+    return _pycplex_platform.CPXX_fast_getcolname(env_lp_ptr, begin, end)
+
+def CPXX_fast_getrowname(env_lp_ptr: 'PyObject *', begin: 'PyObject *', end: 'PyObject *') -> "PyObject *":
+    return _pycplex_platform.CPXX_fast_getrowname(env_lp_ptr, begin, end)
+
+def CPXX_fast_getsosname(env_lp_ptr: 'PyObject *', begin: 'PyObject *', end: 'PyObject *') -> "PyObject *":
+    return _pycplex_platform.CPXX_fast_getsosname(env_lp_ptr, begin, end)
+
+def CPXX_fast_getmipstartname(env_lp_ptr: 'PyObject *', begin: 'PyObject *', end: 'PyObject *') -> "PyObject *":
+    return _pycplex_platform.CPXX_fast_getmipstartname(env_lp_ptr, begin, end)
+
+def CPXX_free_getname(names: 'PyObject *') -> "void":
+    return _pycplex_platform.CPXX_free_getname(names)
+
+def CPXX_fast_getobj(env_lp_ptr: 'PyObject *', begin: 'PyObject *', end: 'PyObject *') -> "PyObject *":
+    return _pycplex_platform.CPXX_fast_getobj(env_lp_ptr, begin, end)
+
+def CPXX_fast_multiobjgetobj(env_lp_ptr: 'PyObject *', index: 'PyObject *', begin: 'PyObject *', end: 'PyObject *') -> "PyObject *":
+    return _pycplex_platform.CPXX_fast_multiobjgetobj(env_lp_ptr, index, begin, end)
+
+def CPXX_free_getobj(coefs: 'PyObject *') -> "void":
+    return _pycplex_platform.CPXX_free_getobj(coefs)
+
+def CPXX_fast_multiobjgetoffset(env_lp_ptr: 'PyObject *', index: 'PyObject *') -> "PyObject *":
+    return _pycplex_platform.CPXX_fast_multiobjgetoffset(env_lp_ptr, index)
+
+def CPXX_fast_multiobjgetweight(env_lp_ptr: 'PyObject *', index: 'PyObject *') -> "PyObject *":
+    return _pycplex_platform.CPXX_fast_multiobjgetweight(env_lp_ptr, index)
+
+def CPXX_fast_multiobjgetpriority(env_lp_ptr: 'PyObject *', index: 'PyObject *') -> "PyObject *":
+    return _pycplex_platform.CPXX_fast_multiobjgetpriority(env_lp_ptr, index)
+
+def CPXX_fast_multiobjgetabstol(env_lp_ptr: 'PyObject *', index: 'PyObject *') -> "PyObject *":
+    return _pycplex_platform.CPXX_fast_multiobjgetabstol(env_lp_ptr, index)
+
+def CPXX_fast_multiobjgetreltol(env_lp_ptr: 'PyObject *', index: 'PyObject *') -> "PyObject *":
+    return _pycplex_platform.CPXX_fast_multiobjgetreltol(env_lp_ptr, index)
+
 def CPXXcreateprob(env: 'CPXCENVptr', status_p: 'int *', probname_str: 'char const *') -> "CPXLPptr":
     return _pycplex_platform.CPXXcreateprob(env, status_p, probname_str)
 
@@ -2122,21 +2184,6 @@ def CPXXaddmipstarts(env: 'CPXCENVptr', lp: 'CPXLPptr', mcnt: 'int', nzcnt: 'CPX
 
 def CPXXdelmipstarts(env: 'CPXCENVptr', lp: 'CPXLPptr', begin: 'int', end: 'int') -> "int":
     return _pycplex_platform.CPXXdelmipstarts(env, lp, begin, end)
-
-def CPXXdistmipopt(env: 'CPXCENVptr', lp: 'CPXLPptr') -> "int":
-    return _pycplex_platform.CPXXdistmipopt(env, lp)
-
-def CPXXcopyvmconfig(env: 'CPXENVptr', xmlstring: 'char const *') -> "int":
-    return _pycplex_platform.CPXXcopyvmconfig(env, xmlstring)
-
-def CPXXreadcopyvmconfig(env: 'CPXENVptr', file: 'char const *') -> "int":
-    return _pycplex_platform.CPXXreadcopyvmconfig(env, file)
-
-def CPXXdelvmconfig(env: 'CPXENVptr') -> "int":
-    return _pycplex_platform.CPXXdelvmconfig(env)
-
-def CPXEhasvmconfig(env: 'CPXCENVptr', hasvmconfig_p: 'int *') -> "int":
-    return _pycplex_platform.CPXEhasvmconfig(env, hasvmconfig_p)
 
 def CPXXgetmipitcnt(env: 'CPXCENVptr', lp: 'CPXCLPptr') -> "CPXLONG":
     return _pycplex_platform.CPXXgetmipitcnt(env, lp)
@@ -2985,6 +3032,191 @@ _pycplex_platform.longArray_swigregister(longArray)
 
 def longArray_frompointer(t: 'long long *') -> "longArray *":
     return _pycplex_platform.longArray_frompointer(t)
+
+class intCArray(object):
+    thisown = property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
+    __repr__ = _swig_repr
+
+    def __init__(self, nelements: 'size_t'):
+        _pycplex_platform.intCArray_swiginit(self, _pycplex_platform.new_intCArray(nelements))
+    __swig_destroy__ = _pycplex_platform.delete_intCArray
+
+    def __getitem__(self, index: 'size_t') -> "int":
+        return _pycplex_platform.intCArray___getitem__(self, index)
+
+    def __setitem__(self, index: 'size_t', value: 'int') -> "void":
+        return _pycplex_platform.intCArray___setitem__(self, index, value)
+
+    def cast(self) -> "int *":
+        return _pycplex_platform.intCArray_cast(self)
+
+    @staticmethod
+    def frompointer(t: 'int *') -> "intCArray *":
+        return _pycplex_platform.intCArray_frompointer(t)
+
+# Register intCArray in _pycplex_platform:
+_pycplex_platform.intCArray_swigregister(intCArray)
+
+def intCArray_frompointer(t: 'int *') -> "intCArray *":
+    return _pycplex_platform.intCArray_frompointer(t)
+
+class doubleCArray(object):
+    thisown = property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
+    __repr__ = _swig_repr
+
+    def __init__(self, nelements: 'size_t'):
+        _pycplex_platform.doubleCArray_swiginit(self, _pycplex_platform.new_doubleCArray(nelements))
+    __swig_destroy__ = _pycplex_platform.delete_doubleCArray
+
+    def __getitem__(self, index: 'size_t') -> "double":
+        return _pycplex_platform.doubleCArray___getitem__(self, index)
+
+    def __setitem__(self, index: 'size_t', value: 'double') -> "void":
+        return _pycplex_platform.doubleCArray___setitem__(self, index, value)
+
+    def cast(self) -> "double *":
+        return _pycplex_platform.doubleCArray_cast(self)
+
+    @staticmethod
+    def frompointer(t: 'double *') -> "doubleCArray *":
+        return _pycplex_platform.doubleCArray_frompointer(t)
+
+# Register doubleCArray in _pycplex_platform:
+_pycplex_platform.doubleCArray_swigregister(doubleCArray)
+
+def doubleCArray_frompointer(t: 'double *') -> "doubleCArray *":
+    return _pycplex_platform.doubleCArray_frompointer(t)
+
+class longCArray(object):
+    thisown = property(lambda x: x.this.own(), lambda x, v: x.this.own(v), doc='The membership flag')
+    __repr__ = _swig_repr
+
+    def __init__(self, nelements: 'size_t'):
+        _pycplex_platform.longCArray_swiginit(self, _pycplex_platform.new_longCArray(nelements))
+    __swig_destroy__ = _pycplex_platform.delete_longCArray
+
+    def __getitem__(self, index: 'size_t') -> "long long":
+        return _pycplex_platform.longCArray___getitem__(self, index)
+
+    def __setitem__(self, index: 'size_t', value: 'long long') -> "void":
+        return _pycplex_platform.longCArray___setitem__(self, index, value)
+
+    def cast(self) -> "long long *":
+        return _pycplex_platform.longCArray_cast(self)
+
+    @staticmethod
+    def frompointer(t: 'long long *') -> "longCArray *":
+        return _pycplex_platform.longCArray_frompointer(t)
+
+# Register longCArray in _pycplex_platform:
+_pycplex_platform.longCArray_swigregister(longCArray)
+
+def longCArray_frompointer(t: 'long long *') -> "longCArray *":
+    return _pycplex_platform.longCArray_frompointer(t)
+
+
+def monkeypatch(cpx_array_class):
+    cpx_array_class_dict = cpx_array_class.__dict__
+    def _generic_repr(self):
+        return _generic_str(self)
+#def _generic_bool(self):
+#    return True
+    def _generic_str(self):
+        return f"[{', '.join(str(i) for i in self)}]"
+    def _generic_eq(self, obj):
+        if len(self) != len(obj):
+            return False
+        for a,b in zip(self, obj):
+           if a != b:
+              return False
+        return True
+# now we patch
+    cpx_array_class.__eq__ = _generic_eq
+    cpx_array_class.__str__ = _generic_str
+    cpx_array_class.__repr__ = _generic_repr
+#cpx_array_class.__bool__ = _generic_bool
+
+def monkeypatch2(cpx_array_class):
+    cpx_array_class_dict = cpx_array_class.__dict__
+    def _generic_len(self):
+        return self._size
+    def _generic_iter(self):
+        for i in range(self._size):
+            yield self[i]
+# now we patch
+    cpx_array_class.__iter__ = _generic_iter
+    cpx_array_class.__len__ = _generic_len
+
+class viewArray():
+    def __init__(self, array, start, end):
+        self._array = array
+        self._start = start
+        self._end = end
+    def __setitem__(self, index, obj):
+        self._array[self._start+index] = obj
+    def __getitem__(self, index):
+        return self._array[self._start+index]
+    def __iter__(self):
+        for i in range(self._start, self._end):
+            yield self._array[i]
+    def __len__(self):
+        return self._end-self._start
+
+class intArray(intCArray):
+    def __init__(self, nbelements):
+        intCArray.__init__(self, nbelements)
+        self._size = nbelements
+#def __getitem__(self, index):
+#    return intCArray.__getitem__(self, index)
+
+class doubleArray(doubleCArray):
+    def __init__(self, nbelements):
+        doubleCArray.__init__(self, nbelements)
+        self._size = nbelements
+#def __getitem__(self, index):
+#    return doubleCArray.__getitem__(self, index)
+
+class longArray(longCArray):
+    def __init__(self, nbelements):
+        longCArray.__init__(self, nbelements)
+        self._size = nbelements
+#def __getitem__(self, index):
+#    return longCArray.__getitem__(self, index)
+
+monkeypatch(doubleArray)
+monkeypatch(longArray)
+monkeypatch(intArray)
+
+monkeypatch2(doubleArray)
+monkeypatch2(longArray)
+monkeypatch2(intArray)
+
+monkeypatch(viewArray)
+def _getArrayView(inputarray, start, end):
+    return viewArray(inputarray, start, end)
+
+class C_Array():
+   def __init__(self, size, elt):
+      self._arrayC = elt
+      self._size = size
+   def __len__(self):
+      return self._size
+class intC_array(C_Array):
+   def __init(self, size, elt):
+      C_Array.__init__(self, elt)
+   def __setitem__(self, index, value):
+      set_int_C_Array(self._arrayC, index, value)
+class longC_array(C_Array):
+   def __init(self, size, elt):
+      C_Array.__init__(self, elt)
+   def __setitem__(self, index, value):
+      set_long_C_Array(self._arrayC, index, value)
+class doubleC_array(C_Array):
+   def __init(self, size, elt):
+      C_Array.__init__(self, elt)
+   def __setitem__(self, index, value):
+      set_double_C_Array(self._arrayC, index, value)
+
 
 
 

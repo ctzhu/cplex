@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2020. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2022. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -15,7 +15,7 @@ from ._subinterfaces import ObjSense
 from . import _procedural as _proc
 from . import _aux_functions as _aux
 from . import _matrices as _mat
-
+from . import _pycplex as CPX
 
 class _Pair():
     def __init__(self):
@@ -313,7 +313,7 @@ class MultiObjInterface(BaseInterface):
         """
         (coeffs, _, _, _, _, _) = self.get_definition(objidx)
         def getcoeffs(begin, end=self._cplex.variables.get_num() - 1):
-            return coeffs[begin:end + 1]
+            return CPX._getArrayView(coeffs, begin, end + 1)
         return _aux.apply_freeform_two_args(
             getcoeffs, self._cplex.variables._conv, args)
 

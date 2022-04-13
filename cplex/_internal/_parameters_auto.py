@@ -1,9 +1,9 @@
 # --------------------------------------------------------------------------
-# Version 20.1.0
+# Version 22.1.0
 # --------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2000, 2020. All Rights Reserved.
+# Copyright IBM Corporation 2000, 2022. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -35,31 +35,28 @@ ConflictAlgorithm = [_const.CPX_PARAM_CONFLICTALG, "algorithm used to find minim
 ConflictDisplay = [_const.CPX_PARAM_CONFLICTDISPLAY, "level of the conflict display:\n  0 = no display\n  1 = summary display\n  2 = display every model being solved", _const.CPX_PARAMTYPE_INT]
 setCPUmask = [_const.CPX_PARAM_CPUMASK, "cpubinding mask (off, auto, or a hex mask)", _const.CPX_PARAMTYPE_STRING]
 setDetTimeLimit = [_const.CPX_PARAM_DETTILIM, "deterministic time limit in ticks", _const.CPX_PARAMTYPE_DOUBLE]
-DistMIPRampupDetTimeLimit = [_const.CPX_PARAM_RAMPUPDETTILIM, "deterministic time limit on rampup", _const.CPX_PARAMTYPE_DOUBLE]
-DistMIPRampupDuration = [_const.CPX_PARAM_RAMPUPDURATION, "duration of the rampup phase in distributed MIP:\n  -1 = rampup is disabled\n  0 = automatic\n  1 = rampup is followed by distributed tree search\n  2 = infinite horizon rampup", _const.CPX_PARAMTYPE_INT]
-DistMIPRampupTimeLimit = [_const.CPX_PARAM_RAMPUPTILIM, "wall-clock time limit on rampup", _const.CPX_PARAMTYPE_DOUBLE]
 EmphasisMemory = [_const.CPX_PARAM_MEMORYEMPHASIS, "reduced memory emphasis", _const.CPX_PARAMTYPE_INT]
 EmphasisMIP = [_const.CPX_PARAM_MIPEMPHASIS, "emphasis for MIP optimization:\n  0 = balance optimality and integer feasibility\n  1 = integer feasibility\n  2 = optimality\n  3 = moving best bound\n  4 = finding hidden feasible solutions\n  5 = heuristic", _const.CPX_PARAMTYPE_INT]
 EmphasisNumerical = [_const.CPX_PARAM_NUMERICALEMPHASIS, "extreme numerical caution emphasis", _const.CPX_PARAMTYPE_INT]
 FeasoptMode = [_const.CPX_PARAM_FEASOPTMODE, "relaxation measure:\n  0 = find minimum-sum relaxation\n  1 = find optimal minimum-sum relaxation\n  2 = find minimum number of relaxations\n  3 = find optimal relaxation with minimum number of relaxations\n  4 = find minimum quadratic-sum relaxation\n  5 = find optimal minimum quadratic-sum relaxation", _const.CPX_PARAMTYPE_INT]
 FeasoptTolerance = [_const.CPX_PARAM_EPRELAX, "minimum amount of accepted relaxation", _const.CPX_PARAMTYPE_DOUBLE]
 setLPMethod = [_const.CPX_PARAM_LPMETHOD, "method for linear optimization:\n  0 = automatic\n  1 = primal simplex\n  2 = dual simplex\n  3 = network simplex\n  4 = barrier\n  5 = sifting\n  6 = concurrent optimizers", _const.CPX_PARAMTYPE_INT]
-MIPCutsBQP = [_const.CPX_PARAM_BQPCUTS, "type of BQP cut generation (only applies to non-convex models solved to global optimality):\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive\n  3 = very aggressive", _const.CPX_PARAMTYPE_INT]
-MIPCutsCliques = [_const.CPX_PARAM_CLIQUES, "type of clique cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive\n  3 = very aggressive", _const.CPX_PARAMTYPE_INT]
-MIPCutsCovers = [_const.CPX_PARAM_COVERS, "type of cover cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive\n  3 = very aggressive", _const.CPX_PARAMTYPE_INT]
-MIPCutsDisjunctive = [_const.CPX_PARAM_DISJCUTS, "type of disjunctive cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive\n  3 = very aggressive", _const.CPX_PARAMTYPE_INT]
-MIPCutsFlowCovers = [_const.CPX_PARAM_FLOWCOVERS, "type of flow cover cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
-MIPCutsGomory = [_const.CPX_PARAM_FRACCUTS, "type of Gomory fractional cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
-MIPCutsGUBCovers = [_const.CPX_PARAM_GUBCOVERS, "type of GUB cover cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
-MIPCutsImplied = [_const.CPX_PARAM_IMPLBD, "type of implied bound cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
-MIPCutsLiftProj = [_const.CPX_PARAM_LANDPCUTS, "type of Lift and Project cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive\n  3 = very aggressive", _const.CPX_PARAMTYPE_INT]
-MIPCutsLocalImplied = [_const.CPX_PARAM_LOCALIMPLBD, "type of local implied bound cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive\n  3 = very aggressive", _const.CPX_PARAMTYPE_INT]
-MIPCutsMCFCut = [_const.CPX_PARAM_MCFCUTS, "type of MCF cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
-MIPCutsMIRCut = [_const.CPX_PARAM_MIRCUTS, "type of mixed integer rounding cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
+MIPCutsBQP = [_const.CPX_PARAM_BQPCUTS, "BQP cut generation (only applies to non-convex models solved to global optimality):\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive\n  3 = very aggressive", _const.CPX_PARAMTYPE_INT]
+MIPCutsCliques = [_const.CPX_PARAM_CLIQUES, "clique cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive\n  3 = very aggressive", _const.CPX_PARAMTYPE_INT]
+MIPCutsCovers = [_const.CPX_PARAM_COVERS, "cover cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive\n  3 = very aggressive", _const.CPX_PARAMTYPE_INT]
+MIPCutsDisjunctive = [_const.CPX_PARAM_DISJCUTS, "disjunctive cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive\n  3 = very aggressive", _const.CPX_PARAMTYPE_INT]
+MIPCutsFlowCovers = [_const.CPX_PARAM_FLOWCOVERS, "flow cover cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
+MIPCutsGomory = [_const.CPX_PARAM_FRACCUTS, "gomory fractional cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
+MIPCutsGUBCovers = [_const.CPX_PARAM_GUBCOVERS, "GUB cover cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
+MIPCutsImplied = [_const.CPX_PARAM_IMPLBD, "implied bound cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
+MIPCutsLiftProj = [_const.CPX_PARAM_LANDPCUTS, "lift and Project cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive\n  3 = very aggressive", _const.CPX_PARAMTYPE_INT]
+MIPCutsLocalImplied = [_const.CPX_PARAM_LOCALIMPLBD, "local implied bound cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive\n  3 = very aggressive", _const.CPX_PARAMTYPE_INT]
+MIPCutsMCFCut = [_const.CPX_PARAM_MCFCUTS, "MCF cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
+MIPCutsMIRCut = [_const.CPX_PARAM_MIRCUTS, "mixed integer rounding cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
 MIPCutsNodecuts = [_const.CPX_PARAM_NODECUTS, "level of cut separation at nodes:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive\n  3 = very aggressive", _const.CPX_PARAMTYPE_INT]
-MIPCutsPathCut = [_const.CPX_PARAM_FLOWPATHS, "type of flow path cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
-MIPCutsRLT = [_const.CPX_PARAM_RLTCUTS, "type of RLT cut generation (only applies to non-convex models solved to global optimality):\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive\n  3 = very aggressive", _const.CPX_PARAMTYPE_INT]
-MIPCutsZeroHalfCut = [_const.CPX_PARAM_ZEROHALFCUTS, "type of zero-half cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
+MIPCutsPathCut = [_const.CPX_PARAM_FLOWPATHS, "flow path cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
+MIPCutsRLT = [_const.CPX_PARAM_RLTCUTS, "RLT cut generation (only applies to non-convex models solved to global optimality):\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive\n  3 = very aggressive", _const.CPX_PARAMTYPE_INT]
+MIPCutsZeroHalfCut = [_const.CPX_PARAM_ZEROHALFCUTS, "zero-half cut generation:\n  -1 = do not generate\n  0 = automatic\n  1 = moderate\n  2 = aggressive", _const.CPX_PARAMTYPE_INT]
 MIPDisplay = [_const.CPX_PARAM_MIPDISPLAY, "level of mixed integer node display:\n  0 = no display\n  1 = display integer feasible solutions\n  2 = display nodes under 'mip interval' control\n  3 = same as 2, but add information on node cuts and solution times\n  4 = same as 3, but add LP display for root node\n  5 = same as 3, but add LP display for all nodes", _const.CPX_PARAMTYPE_INT]
 MIPInterval = [_const.CPX_PARAM_MIPINTERVAL, "interval for printing mixed integer node display:\n  0 = automatic (equivalent to -1000)\n  n>0 = display every n nodes and new incumbents\n  n<0 = progressively less log output over time (closer to 0: more frequent)", _const.CPX_PARAMTYPE_LONG]
 MIPLimitsAggForCut = [_const.CPX_PARAM_AGGCUTLIM, "constraint aggregation limit for cut generation:\n  0 = no constraint aggregation for cut generation\n  positive values at this limit", _const.CPX_PARAMTYPE_INT]
@@ -69,8 +66,8 @@ MIPLimitsCutsFactor = [_const.CPX_PARAM_CUTSFACTOR, "rows multiplier factor to l
 MIPLimitsEachCutLimit = [_const.CPX_PARAM_EACHCUTLIM, "limit on number of cuts for each type per pass", _const.CPX_PARAMTYPE_INT]
 MIPLimitsGomoryCand = [_const.CPX_PARAM_FRACCAND, "candidate limit for generating Gomory fractional cuts", _const.CPX_PARAMTYPE_INT]
 MIPLimitsGomoryPass = [_const.CPX_PARAM_FRACPASS, "pass limit for generating Gomory fractional cuts:\n  0 = automatic\n  positive values at this limit", _const.CPX_PARAMTYPE_LONG]
+MIPLimitsLowerObjStop = [_const.CPX_PARAM_LOWEROBJSTOP, "lower limit on the objective before triggering the end of a minimization MIP", _const.CPX_PARAMTYPE_DOUBLE]
 MIPLimitsNodes = [_const.CPX_PARAM_NODELIM, "branch and cut node limit", _const.CPX_PARAMTYPE_LONG]
-MIPLimitsPolishTime = [_const.CPX_PARAM_POLISHTIME, "time limit for polishing best solution", _const.CPX_PARAMTYPE_DOUBLE]
 MIPLimitsPopulate = [_const.CPX_PARAM_POPULATELIM, "solutions limit for each populate call", _const.CPX_PARAMTYPE_INT]
 MIPLimitsProbeDetTime = [_const.CPX_PARAM_PROBEDETTIME, "deterministic time limit for probing", _const.CPX_PARAMTYPE_DOUBLE]
 MIPLimitsProbeTime = [_const.CPX_PARAM_PROBETIME, "time limit for probing", _const.CPX_PARAMTYPE_DOUBLE]
@@ -79,6 +76,7 @@ MIPLimitsSolutions = [_const.CPX_PARAM_INTSOLLIM, "mixed integer solutions limit
 MIPLimitsStrongCand = [_const.CPX_PARAM_STRONGCANDLIM, "strong branching candidate limit", _const.CPX_PARAMTYPE_INT]
 MIPLimitsStrongIt = [_const.CPX_PARAM_STRONGITLIM, "strong branching iteration limit:\n  0 = automatic\n  positive values at this limit", _const.CPX_PARAMTYPE_LONG]
 MIPLimitsTreeMemory = [_const.CPX_PARAM_TRELIM, "upper limit on size of tree in megabytes", _const.CPX_PARAMTYPE_DOUBLE]
+MIPLimitsUpperObjStop = [_const.CPX_PARAM_UPPEROBJSTOP, "upper limit on the objective before triggering the end of a maximization MIP", _const.CPX_PARAMTYPE_DOUBLE]
 MIPOrderType = [_const.CPX_PARAM_MIPORDTYPE, "type of generated priority order:\n  0 = none\n  1 = decreasing cost\n  2 = increasing bound range\n  3 = increasing cost per coefficient count", _const.CPX_PARAMTYPE_INT]
 MIPPolishAfterAbsMIPGap = [_const.CPX_PARAM_POLISHAFTEREPAGAP, "absolute MIP gap after which to start solution polishing", _const.CPX_PARAMTYPE_DOUBLE]
 MIPPolishAfterDetTime = [_const.CPX_PARAM_POLISHAFTERDETTIME, "deterministic time after which to start solution polishing", _const.CPX_PARAMTYPE_DOUBLE]

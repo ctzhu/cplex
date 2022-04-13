@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2020. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2022. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -81,35 +81,85 @@ def array_to_list(inputarray, length):
     """
     return [inputarray[i] for i in range(length)]
 
+def fast_array_to_list(inputarray, length):
+    if inputarray is None:
+        return []
+    if inputarray is CPX.cvar.CPX_NULL:
+        return []
+    if length == 0:
+        return []
+    if isinstance(inputarray, CPX.intArray) or isinstance(inputarray, CPX.doubleArray) or isinstance(inputarray, CPX.longArray):
+        if inputarray._size != length:
+            return CPX._getArrayView(inputarray, 0, length)
+        return inputarray
+    return [inputarray[i] for i in range(length)]
 
 @contextmanager
 def int_c_array(seq):
     """See matrix_conversion.c:int_list_to_C_array.()"""
-    array = CPX.int_list_to_C_array(seq)
+    if isinstance(seq, CPX.intC_array):
+        yield seq._arrayC
+    else:
+        array = CPX.int_list_to_C_array(seq)
+        try:
+            yield array
+        finally:
+            CPX.free_int_C_array(array)
+
+@contextmanager
+def allocate_int_C_array(nb):
+    """See matrix_conversion.c:allocate_int_C_array.()"""
+    size = nb if nb != 0 else 1
+    array = CPX.allocate_int_C_array(size)
     try:
-        yield array
+        yield CPX.intC_array(size, array)
     finally:
         CPX.free_int_C_array(array)
 
+@contextmanager
+def allocate_long_C_array(nb):
+    """See matrix_conversion.c:allocate_int_C_array.()"""
+    size = nb if nb != 0 else 1
+    array = CPX.allocate_long_C_array(size)
+    try:
+        yield CPX.longC_array(size, array)
+    finally:
+        CPX.free_long_C_array(array)
+
+@contextmanager
+def allocate_double_C_array(nb):
+    """See matrix_conversion.c:allocate_int_C_array.()"""
+    size = nb if nb != 0 else 1
+    array = CPX.allocate_double_C_array(size)
+    try:
+        yield CPX.doubleC_array(size, array)
+    finally:
+        CPX.free_double_C_array(array)
 
 @contextmanager
 def long_c_array(seq):
     """See matrix_conversion.c:long_list_to_C_array.()"""
-    array = CPX.long_list_to_C_array(seq)
-    try:
-        yield array
-    finally:
-        CPX.free_long_C_array(array)
+    if isinstance(seq, CPX.longC_array):
+        yield seq._arrayC
+    else:
+        array = CPX.long_list_to_C_array(seq)
+        try:
+            yield array
+        finally:
+            CPX.free_long_C_array(array)
 
 
 @contextmanager
 def double_c_array(seq):
     """See matrix_conversion.c:double_list_to_C_array()."""
-    array = CPX.double_list_to_C_array(seq)
-    try:
-        yield array
-    finally:
-        CPX.free_double_C_array(array)
+    if isinstance(seq, CPX.doubleC_array):
+        yield seq._arrayC
+    else:
+        array = CPX.double_list_to_C_array(seq)
+        try:
+            yield array
+        finally:
+            CPX.free_double_C_array(array)
 
 
 @contextmanager

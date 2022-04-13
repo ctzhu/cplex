@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2020. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2022. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -538,8 +538,8 @@ class MIPInfoCallback(OptimizationCallback):
           inclusive of end.  Equivalent to
           self.get_incumbent_linear_slacks(range(begin, end + 1)).
         """
-        status = _pycplex.cb_slackfromx(
-            self._cbstruct, self._env_lp_ptr, self.get_incumbent_values())
+        values = [x for x in iter(self.get_incumbent_values())]
+        status = _pycplex.cb_slackfromx(self._cbstruct, self._env_lp_ptr, values)
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         slacks = status[1]
 
@@ -576,8 +576,8 @@ class MIPInfoCallback(OptimizationCallback):
           inclusive of end. Equivalent to
           self.get_incumbent_quadratic_slacks(range(begin, end + 1)).
         """
-        status = _pycplex.cb_qconstrslackfromx(
-            self._cbstruct, self._env_lp_ptr, self.get_incumbent_values())
+        values = [x for x in iter(self.get_incumbent_values())]
+        status = _pycplex.cb_qconstrslackfromx(self._cbstruct, self._env_lp_ptr, values)
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         slacks = status[1]
 
@@ -975,8 +975,9 @@ class ControlCallback(MIPCallback):
           inclusive of end.  Equivalent to
           self.get_linear_slacks(range(begin, end + 1)).
         """
+        values = [x for x in iter(self.get_values())]
         status = _pycplex.cb_slackfromx(
-            self._cbstruct, self._env_lp_ptr, self.get_values())
+            self._cbstruct, self._env_lp_ptr, values)
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         slacks = status[1]
 
@@ -1012,8 +1013,8 @@ class ControlCallback(MIPCallback):
           inclusive of end. Equivalent to
           self.get_quadratic_slacks(range(begin, end + 1)).
         """
-        status = _pycplex.cb_qconstrslackfromx(
-            self._cbstruct, self._env_lp_ptr, self.get_values())
+        values = [x for x in iter(self.get_values())]
+        status = _pycplex.cb_qconstrslackfromx(self._cbstruct, self._env_lp_ptr, values)
         _proc.check_status(self._cbstruct, status[0], from_cb=True)
         slacks = status[1]
 

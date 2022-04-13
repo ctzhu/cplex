@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2020. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2022. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -708,34 +708,6 @@ def mipopt(env, lp):
     check_status(env, status)
 
 
-def distmipopt(env, lp):
-    with SigIntHandler():
-        status = CR.CPXXdistmipopt(env, lp)
-    check_status(env, status)
-
-
-def copyvmconfig(env, xmlstring):
-    status = CR.CPXXcopyvmconfig(env, xmlstring)
-    check_status(env, status)
-
-
-def readcopyvmconfig(env, filename):
-    status = CR.CPXXreadcopyvmconfig(env, filename)
-    check_status(env, status)
-
-
-def delvmconfig(env):
-    status = CR.CPXXdelvmconfig(env)
-    check_status(env, status)
-
-
-def hasvmconfig(env):
-    hasvmconfig_p = CR.intPtr()
-    status = CR.CPXEhasvmconfig(env, hasvmconfig_p)
-    check_status(env, status)
-    return hasvmconfig_p.value() != 0
-
-
 def qpopt(env, lp):
     with SigIntHandler():
         status = CR.CPXXqpopt(env, lp)
@@ -971,6 +943,98 @@ def completelp(env, lp):
     check_status(env, status)
 
 # Variables
+@contextmanager
+def fast_getrows(env, lp):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    rows = CR.CPXX_fast_get_rows(env_lp_ptr)
+    try:
+        yield rows
+    finally:
+        CR.CPXX_free_rows(rows)
+
+@contextmanager
+def fast_getcolname(env, lp, begin, end):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    names = CR.CPXX_fast_getcolname(env_lp_ptr, begin, end)
+    try:
+        yield names
+    finally:
+        CR.CPXX_free_getname(names)
+
+@contextmanager
+def fast_getrowname(env, lp, begin, end):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    names = CR.CPXX_fast_getrowname(env_lp_ptr, begin, end)
+    try:
+        yield names
+    finally:
+        CR.CPXX_free_getname(names)
+
+@contextmanager
+def fast_getsosname(env, lp, begin, end):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    names = CR.CPXX_fast_getsosname(env_lp_ptr, begin, end)
+    try:
+        yield names
+    finally:
+        CR.CPXX_free_getname(names)
+
+@contextmanager
+def fast_getmipstartname(env, lp, begin, end):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    names = CR.CPXX_fast_getmipstartname(env_lp_ptr, begin, end)
+    try:
+        yield names
+    finally:
+        CR.CPXX_free_getname(names)
+
+@contextmanager
+def fast_getobj(env, lp, begin, end):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    coefs = CR.CPXX_fast_getobj(env_lp_ptr, begin, end)
+    try:
+        yield coefs
+    finally:
+        CR.CPXX_free_getobj(coefs)
+@contextmanager
+def fast_multiobjgetobj(env, lp, objidx, begin, end):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    coefs = CR.CPXX_fast_multiobjgetobj(env_lp_ptr, objidx, begin, end)
+    try:
+        yield coefs
+    finally:
+        CR.CPXX_free_getobj(coefs)
+
+def fast_multiobjgetoffset(env, lp, objidx):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    return CR.CPXX_fast_multiobjgetoffset(env_lp_ptr, objidx)
+def fast_multiobjgetweight(env, lp, objidx):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    return CR.CPXX_fast_multiobjgetweight(env_lp_ptr, objidx)
+def fast_multiobjgetpriority(env, lp, objidx):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    return CR.CPXX_fast_multiobjgetpriority(env_lp_ptr, objidx)
+def fast_multiobjgetabstol(env, lp, objidx):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    return CR.CPXX_fast_multiobjgetabstol(env_lp_ptr, objidx)
+def fast_multiobjgetreltol(env, lp, objidx):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    return CR.CPXX_fast_multiobjgetreltol(env_lp_ptr, objidx)
+
+
+def fast_newcols(env, lp, nb, lb, ub, xctype):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    CR.CPXX_fast_newcols(env_lp_ptr, nb, lb, ub, xctype)
+
+def has_name(env, lp, start, end):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    return True if CR.CPXX_has_name(env_lp_ptr, start, end) != 0 else False
+def has_non_default_lb(env, lp, start, end):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    return True if CR.CPXX_has_non_default_lb(env_lp_ptr, start, end) != 0 else False
+def has_non_default_ub(env, lp, start, end):
+    env_lp_ptr = pack_env_lp_ptr(env, lp)
+    return True if CR.CPXX_has_non_default_ub(env_lp_ptr, start, end) != 0 else False
 
 
 def newcols(env, lp, obj, lb, ub, xctype, colname):

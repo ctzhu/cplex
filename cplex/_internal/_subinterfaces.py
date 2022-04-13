@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2020. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2022. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -6556,12 +6556,13 @@ class AdvancedSolutionInterface(BaseInterface):
     (-0.215, 1.0)
     >>> binvrow[24][0], binvrow[6][1]
     (-0.215, 1.0)
-    >>> binvacol[0][0:3], binvacol[1][0:3]
+    >>> [x for i,x in enumerate(binvacol[0]) if i in range(0,3)], [x for i,x in enumerate(binvacol[1]) if i in range(0,3)]
     ([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
-    >>> binvarow[0][0:2], binvarow[1][0:2], binvarow[2][0:2]
+    >>> [x for i,x in enumerate(binvarow[0]) if i in range(0,2)], [x for i,x in enumerate(binvarow[1]) if i in range(0,2)], [x for i,x in enumerate(binvarow[2]) if i in range(0,2)]
     ([1.0, 0.0], [0.0, 1.0], [0.0, 0.0])
     >>> btran = c.solution.advanced.btran([1.0] * c.linear_constraints.get_num())
-    >>> [x if x else 0.0 for x in btran[14:17]]
+    >>> bbtran = [x if x else 0.0 for i,x in enumerate(btran) if i in range(14,17)]
+    >>> [x if x else 0.0 for x in bbtran]
     [0.0, 2.0, 1.0]
     >>> ftran = c.solution.advanced.ftran([1.0] * c.linear_constraints.get_num())
     >>> ftran[0]
@@ -6689,7 +6690,7 @@ class AdvancedSolutionInterface(BaseInterface):
         >>> c.read("lpex.mps")
         >>> c.solve()
         >>> binvacol = c.solution.advanced.binvacol()
-        >>> binvacol[0][0:3], binvacol[1][0:3]
+        >>> [x for i,x in enumerate(binvacol[0]) if i in range(0,3)], [x for i,x in enumerate(binvacol[1]) if i in range(0,3)]
         ([1.0, 0.0, 0.0], [0.0, 1.0, 0.0])
         """
         def inv(a):
@@ -6729,7 +6730,7 @@ class AdvancedSolutionInterface(BaseInterface):
         >>> c.read("lpex.mps")
         >>> c.solve()
         >>> binvarow = c.solution.advanced.binvarow()
-        >>> binvarow[0][0:2], binvarow[1][0:2], binvarow[2][0:2]
+        >>> [x for i,x in enumerate(binvarow[0]) if i in range(0,2)], [x for i,x in enumerate(binvarow[1]) if i in range(0,2)], [x for i,x in enumerate(binvarow[2]) if i in range(0,2)]
         ([1.0, 0.0], [0.0, 1.0], [0.0, 0.0])
         """
         def inv(a):
@@ -6755,7 +6756,8 @@ class AdvancedSolutionInterface(BaseInterface):
         >>> c.read("lpex.mps")
         >>> c.solve()
         >>> btran = c.solution.advanced.btran([1.0] * c.linear_constraints.get_num())
-        >>> [x if x else 0.0 for x in btran[14:17]]
+        >>> bbtran = [x if x else 0.0 for i,x in enumerate(btran) if i in range(14,17)]
+        >>> [x if x else 0.0 for x in bbtran]
         [0.0, 2.0, 1.0]
         """
         return CPX_PROC.btran(self._env._e, self._cplex._lp, y)
@@ -8713,7 +8715,6 @@ class ConflictInterface(BaseInterface):
                                            mipstartindex,
                                            grppref, grpbeg, grpind, grptype)
 
-
     def refine(self, *args):
         """Identifies a minimal conflict among a set of constraints.
 
@@ -8759,7 +8760,6 @@ class ConflictInterface(BaseInterface):
             grppref, grpbeg, grpind, grptype = None, None, None, None
         CPX_PROC.refineconflictext(self._env._e, self._cplex._lp,
                                    grppref, grpbeg, grpind, grptype)
-
 
     def get(self, *args):
         """Returns the status of a set of groups of constraints.

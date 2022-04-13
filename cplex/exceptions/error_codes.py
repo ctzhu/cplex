@@ -3,7 +3,7 @@
 # ------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2020. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2022. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -331,9 +331,6 @@ CPXERR_MSG_NO_FUNCTION = 1053
 CPXERR_MULTIOBJ_SUBPROB_SOLVE = 1300
 """See :macros:`CPXERR_MULTIOBJ_SUBPROB_SOLVE` in the C API."""
 
-CPXERR_MULTIPLE_PROBS_IN_REMOTE_ENVIRONMENT = 1816
-"""See :macros:`CPXERR_MULTIPLE_PROBS_IN_REMOTE_ENVIRONMENT` in the C API."""
-
 CPXERR_NAME_CREATION = 1209
 """See :macros:`CPXERR_NAME_CREATION` in the C API."""
 
@@ -568,9 +565,6 @@ CPXERR_PARAM_TOO_SMALL = 1014
 CPXERR_PRESLV_ABORT = 1106
 """See :macros:`CPXERR_PRESLV_ABORT` in the C API."""
 
-CPXERR_PRESLV_BAD_PARAM = 1122
-"""See :macros:`CPXERR_PRESLV_BAD_PARAM` in the C API."""
-
 CPXERR_PRESLV_BASIS_MEM = 1107
 """See :macros:`CPXERR_PRESLV_BASIS_MEM` in the C API."""
 
@@ -627,9 +621,6 @@ CPXERR_PRIIND = 1257
 
 CPXERR_PRM_DATA = 1660
 """See :macros:`CPXERR_PRM_DATA` in the C API."""
-
-CPXERR_PROTOCOL = 1812
-"""See :macros:`CPXERR_PROTOCOL` in the C API."""
 
 CPXERR_Q_DIVISOR = 1619
 """See :macros:`CPXERR_Q_DIVISOR` in the C API."""

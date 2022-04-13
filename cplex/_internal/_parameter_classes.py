@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2020. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2022. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -1042,16 +1042,6 @@ class optimalitytarget_constants(ConstantClass):
     optimal_convex = 1
     first_order = 2
     optimal_global = 3
-
-
-class rampup_duration_constants(ConstantClass):
-    # pylint: disable=invalid-name
-    # pylint: disable=missing-docstring
-    # pylint: disable=too-few-public-methods
-    disabled = _constants.CPX_RAMPUP_DISABLED
-    auto = _constants.CPX_RAMPUP_AUTO
-    dynamic = _constants.CPX_RAMPUP_DYNAMIC
-    infinite = _constants.CPX_RAMPUP_INFINITE
 
 
 class datacheck_constants(ConstantClass):

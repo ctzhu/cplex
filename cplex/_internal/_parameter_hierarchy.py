@@ -1,9 +1,9 @@
 # --------------------------------------------------------------------------
-# Version 20.1.0
+# Version 22.1.0
 # --------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2000, 2020. All Rights Reserved.
+# Copyright IBM Corporation 2000, 2022. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -72,24 +72,6 @@ def conflict_members(env, parent):
         display=_cls.NumParameter(env, _auto.ConflictDisplay, parent, 'display', _cls.display_constants),
     )
 
-def distmip_rampup_members(env, parent):
-    """Rampup related parameters in distributed MIP."""
-    return dict(
-        _name="rampup",
-        help=lambda: "Rampup related parameters in distributed MIP.",
-        dettimelimit=_cls.NumParameter(env, _auto.DistMIPRampupDetTimeLimit, parent, 'dettimelimit'),
-        duration=_cls.NumParameter(env, _auto.DistMIPRampupDuration, parent, 'duration', _cls.rampup_duration_constants),
-        timelimit=_cls.NumParameter(env, _auto.DistMIPRampupTimeLimit, parent, 'timelimit'),
-    )
-
-def distmip_members(env, parent):
-    """Distributed parallel mixed integer optimization."""
-    return dict(
-        _name="distmip",
-        help=lambda: "Distributed parallel mixed integer optimization.",
-        rampup=_cls.ParameterGroup(env, distmip_rampup_members, parent),
-    )
-
 def emphasis_members(env, parent):
     """Optimization emphasis."""
     return dict(
@@ -144,8 +126,8 @@ def mip_limits_members(env, parent):
         eachcutlimit=_cls.NumParameter(env, _auto.MIPLimitsEachCutLimit, parent, 'eachcutlimit'),
         gomorycand=_cls.NumParameter(env, _auto.MIPLimitsGomoryCand, parent, 'gomorycand'),
         gomorypass=_cls.NumParameter(env, _auto.MIPLimitsGomoryPass, parent, 'gomorypass'),
+        lowerobjstop=_cls.NumParameter(env, _auto.MIPLimitsLowerObjStop, parent, 'lowerobjstop'),
         nodes=_cls.NumParameter(env, _auto.MIPLimitsNodes, parent, 'nodes'),
-        polishtime=_cls.NumParameter(env, _auto.MIPLimitsPolishTime, parent, 'polishtime'),
         populate=_cls.NumParameter(env, _auto.MIPLimitsPopulate, parent, 'populate'),
         probedettime=_cls.NumParameter(env, _auto.MIPLimitsProbeDetTime, parent, 'probedettime'),
         probetime=_cls.NumParameter(env, _auto.MIPLimitsProbeTime, parent, 'probetime'),
@@ -154,6 +136,7 @@ def mip_limits_members(env, parent):
         strongcand=_cls.NumParameter(env, _auto.MIPLimitsStrongCand, parent, 'strongcand'),
         strongit=_cls.NumParameter(env, _auto.MIPLimitsStrongIt, parent, 'strongit'),
         treememory=_cls.NumParameter(env, _auto.MIPLimitsTreeMemory, parent, 'treememory'),
+        upperobjstop=_cls.NumParameter(env, _auto.MIPLimitsUpperObjStop, parent, 'upperobjstop'),
     )
 
 def mip_polishafter_members(env, parent):
@@ -416,7 +399,6 @@ def root_members(env, parent):
         conflict=_cls.ParameterGroup(env, conflict_members, parent),
         cpumask=_cls.StrParameter(env, _auto.setCPUmask, parent, 'cpumask'),
         dettimelimit=_cls.NumParameter(env, _auto.setDetTimeLimit, parent, 'dettimelimit'),
-        distmip=_cls.ParameterGroup(env, distmip_members, parent),
         emphasis=_cls.ParameterGroup(env, emphasis_members, parent),
         feasopt=_cls.ParameterGroup(env, feasopt_members, parent),
         lpmethod=_cls.NumParameter(env, _auto.setLPMethod, parent, 'lpmethod', _cls.alg_constants),

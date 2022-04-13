@@ -3,7 +3,7 @@
 # ---------------------------------------------------------------------------
 # Licensed Materials - Property of IBM
 # 5725-A06 5725-A29 5724-Y48 5724-Y49 5724-Y54 5724-Y55 5655-Y21
-# Copyright IBM Corporation 2008, 2020. All Rights Reserved.
+# Copyright IBM Corporation 2008, 2022. All Rights Reserved.
 #
 # US Government Users Restricted Rights - Use, duplication or
 # disclosure restricted by GSA ADP Schedule Contract with
@@ -67,6 +67,12 @@ class MultiObjIntInfo(ConstantClass):
 
     blend = _const.CPX_MULTIOBJ_BLEND
     """See :macros:`CPX_MULTIOBJ_BLEND` in the C API."""
+
+    pfeas = _const.CPX_MULTIOBJ_PFEAS
+    """See :macros:`CPX_MULTIOBJ_PFEAS` in the C API."""
+
+    dfeas = _const.CPX_MULTIOBJ_DFEAS
+    """See :macros:`CPX_MULTIOBJ_DFEAS` in the C API."""
 
 
 class MultiObjLongInfo(ConstantClass):
